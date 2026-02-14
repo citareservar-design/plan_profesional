@@ -1,0 +1,21 @@
+<div class="p-6 bg-white rounded-3xl shadow-sm">
+    <h2 class="text-xl font-bold mb-4">Base de Datos de Terceros (Clientes)</h2>
+    <table class="w-full text-left">
+        <thead>
+            <tr class="text-slate-400 text-sm uppercase">
+                <th class="py-2">Nombre</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clientes %}
+            <tr class="border-t">
+                <td class="py-3 font-bold">{{ c.cli_nombre }}</td>
+                <td>{{ c.cli_telefono }}</td>
+                <td>{{ c.cli_email }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,223 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="p-4 max-w-6xl mx-auto mb-20 space-y-12">
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-10">
+        <div>
+            <h2 class="text-5xl font-black text-white tracking-tighter uppercase">
+                Reparto de <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500">Comisiones</span>
+            </h2>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {% for item in reporte %}
+        <div x-data="{ open: false }" 
+             class="group relative bg-slate-900/40 backdrop-blur-2xl border border-white/10 rounded-[3rem] p-8 transition-all duration-500 hover:border-sky-500/40 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+            
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-sky-500/10 blur-[80px] rounded-full group-hover:bg-sky-500/20 transition-all"></div>
+
+            <div class="relative flex justify-between items-start mb-10">
+                <div class="space-y-1">
+                    <h3 class="text-white font-black text-3xl tracking-tight leading-none">{{ item.nombre }}</h3>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
+                        <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">{{ item.cargo or 'Especialista' }}</p>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end">
+                    <div class="bg-gradient-to-br from-sky-400 to-indigo-600 px-4 py-2 rounded-2xl shadow-lg shadow-sky-500/20 transform group-hover:scale-105 transition-transform">
+                        <span class="text-slate-900 text-sm font-black">{{ item.porcentaje }}% PAGO</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-8 relative">
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end px-1">
+                        <div class="flex flex-col">
+                            <span class="text-slate-500 text-[9px] font-black uppercase tracking-tighter">Local ({{ 100 - item.porcentaje }}%)</span>
+                            <span class="text-white font-bold text-sm">${{ "{:,.0f}".format(item.bruto - item.pago_empleado) }}</span>
+                        </div>
+                        <div class="flex flex-col text-right">
+                            <span class="text-sky-400 text-[9px] font-black uppercase tracking-tighter">Profesional ({{ item.porcentaje }}%)</span>
+                            <span class="text-sky-400 font-bold text-sm">${{ "{:,.0f}".format(item.pago_empleado) }}</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-800 h-4 rounded-full flex overflow-hidden p-1 border border-white/5">
+                        <div class="bg-slate-600 h-full rounded-full transition-all duration-1000" style="width: {{ 100 - item.porcentaje }}%"></div>
+                        <div class="bg-sky-500 h-full rounded-full transition-all duration-1000 ml-1 shadow-[0_0_15px_rgba(14,165,233,0.5)]" style="width: {{ item.porcentaje }}%"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="flex justify-between items-center p-6 bg-white/5 rounded-[2rem] border border-white/5 group/box hover:bg-white/10 transition-colors">
+                        <div>
+                            <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Producción Bruta</p>
+                            <p class="text-white text-3xl font-black tracking-tighter">${{ "{:,.0f}".format(item.bruto if item.bruto else 0) }}</p>
+                        </div>
+                        <div class="bg-slate-800 p-4 rounded-2xl text-slate-400 group-hover/box:text-white transition-colors">
+                            <i class="fa-solid fa-chart-line text-xl"></i>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center p-6 bg-sky-500/10 border border-sky-500/20 rounded-[2.2rem] relative overflow-hidden group/pago">
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/pago:translate-x-full transition-transform duration-1000"></div>
+                        <div class="relative z-10">
+                            <p class="text-sky-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Neto a Liquidar</p>
+                            <p class="text-white font-black text-5xl tracking-tighter drop-shadow-lg">
+                                ${{ "{:,.0f}".format(item.pago_empleado if item.pago_empleado else 0) }}
+                            </p>
+                        </div>
+                        <div class="relative z-10 bg-sky-500 p-4 rounded-2xl shadow-xl shadow-sky-500/30">
+                            <i class="fa-solid fa-wallet text-slate-900 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                    {% set mensaje_wpp = 
+                        "*REPORTE DE COMISIONES*\n" ~
+                        "*Empleado:* " ~ item.nombre ~ "\n" ~
+                        "*Servicios realizados:*\n" ~ item.servicios_wpp ~ "\n" ~
+                        "*TOTAL A PAGAR:* $" ~ "{:,.0f}".format(item.pago_empleado) 
+                    %}
+
+                    <a href="https://wa.me/{{ item.telefono }}?text={{ mensaje_wpp | urlencode }}"
+                    target="_blank"
+                    class="flex flex-col items-center justify-center py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-3xl transition-all group/wa">
+                        <i class="fa-brands fa-whatsapp text-2xl text-emerald-500 mb-1 group-hover/wa:scale-110 transition-transform"></i>
+                        <span class="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Enviar Reporte</span>
+                    </a>
+
+                    <a href="{{ url_for('admin.descargar_recibo', emp_id=item.id) }}"
+                        target="_blank"
+                       class="flex flex-col items-center justify-center py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl transition-all group/pdf">
+                        <i class="fa-solid fa-file-pdf text-2xl text-rose-500 mb-1 group-hover/pdf:scale-110 transition-transform"></i>
+                        <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest">Descargar PDF</span>
+                    </a>
+                </div>
+
+                <div class="pt-2">
+                    <button @click="open = !open" 
+                            class="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-white/5 rounded-2xl transition-all">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Desglose de servicios ({{ item.cantidad_citas }})</span>
+                        <i class="fa-solid fa-chevron-down text-slate-600 transition-transform duration-500" :class="open ? 'rotate-180 text-sky-400' : ''"></i>
+                    </button>
+
+                    <div x-show="open" x-collapse x-cloak class="mt-4 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {% for serv in item.servicios_detalle %}
+                        <div class="flex justify-between items-center p-4 bg-slate-900/80 border border-white/5 rounded-2xl hover:border-sky-500/30 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center border border-white/5">
+                                    <i class="fa-solid fa-cut text-[10px] text-slate-500"></i>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-white text-xs font-bold">{{ serv.nombre }}</span>
+                                    <span class="text-slate-500 text-[9px] font-medium">{{ serv.fecha }}</span>
+                                </div>
+                            </div>
+                            <span class="text-emerald-400 text-sm font-black">${{ "{:,.0f}".format(serv.precio) }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+
+
+
+<div class="max-w-2xl mx-auto pt-10">
+    <form action="{{ url_for('admin.cerrar_caja_comisiones') }}" method="POST" id="formCerrarCaja">
+        <button type="button" onclick="confirmarCerrarCaja()" 
+                class="group relative w-full bg-white hover:bg-sky-50 text-slate-900 font-black py-8 rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(255,255,255,0.1)] transition-all duration-500 flex items-center justify-center gap-6 overflow-hidden">
+            
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-sky-200/50 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+            
+            <div class="relative z-10 bg-slate-900 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-lock-open text-white text-xl group-hover:hidden"></i>
+                <i class="fa-solid fa-lock text-sky-400 text-xl hidden group-hover:block"></i>
+            </div>
+            <div class="relative z-10 text-left">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 font-bold mb-1">Finalizar Jornada</p>
+                <p class="text-2xl leading-none font-black uppercase">CERRAR CAJA Y LIQUIDAR</p>
+            </div>
+        </button>
+    </form>
+    <p class="text-center text-slate-600 text-[10px] mt-6 uppercase font-bold tracking-[0.2em] opacity-60">
+        <i class="fa-solid fa-shield-halved mr-2"></i> Esta operación archivará los servicios y reseteará el balance
+    </p>
+</div>
+
+<script>
+    // 1. Definición global de la función (Soluciona el "not defined")
+    window.confirmarCerrarCaja = function() {
+        const formulario = document.getElementById('formCerrarCaja');
+        
+        if (typeof Swal === 'undefined') {
+            console.warn("SweetAlert no cargado, enviando directo...");
+            formulario.submit();
+            return;
+        }
+
+        Swal.fire({
+            title: '¿CERRAR CAJA HOY?',
+            text: "Se archivarán todos los servicios y el reporte volverá a cero. ¿Deseas continuar?",
+            icon: 'warning',
+            showCancelButton: true,
+            background: '#0f172a',
+            color: '#ffffff',
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#334155',
+            confirmButtonText: 'SÍ, LIQUIDAR JORNADA',
+            cancelButtonText: 'VOLVER',
+            borderRadius: '2.5rem',
+            customClass: {
+                popup: 'rounded-[2.5rem] border border-white/10 shadow-2xl',
+                confirmButton: 'rounded-full px-8 py-4 font-black text-sm',
+                cancelButton: 'rounded-full px-8 py-4 font-black text-sm'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                formulario.submit();
+            }
+        });
+    };
+
+    // 2. Manejo de Mensajes Flash (Éxito/Error)
+    document.addEventListener('DOMContentLoaded', function() {
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    Swal.fire({
+                        icon: '{{ "success" if category == "success" else "error" if category == "danger" else "info" }}',
+                        title: '{{ "¡OPERACIÓN EXITOSA!" if category == "success" else "SISTEMA" }}',
+                        text: '{{ message }}',
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        confirmButtonColor: '#0ea5e9',
+                        borderRadius: '2rem',
+                        customClass: {
+                            popup: 'rounded-[2rem] border border-white/10 shadow-2xl'
+                        }
+                    });
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    });
+</script>
+
+<style>
+    [x-cloak] { display: none !important; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(14, 165, 233, 0.3); border-radius: 10px; }
+</style>
+
+{% endblock %}

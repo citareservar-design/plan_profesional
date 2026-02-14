@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: sans-serif;">
+    <div style="padding:20px; background:#f1f5f9;">
+        <div style="background:white; border-radius:32px; max-width:500px; margin:auto; border:1px solid #e2e8f0; overflow:hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
+            
+            <div style="background:#0ea5e9; padding:40px 25px; text-align:center; color:white;">
+                <div style="width: 60px; height: 60px; background-color: rgba(255,255,255,0.2); border-radius: 50%; display: inline-table; margin-bottom: 15px;">
+                    <div style="display: table-cell; vertical-align: middle; font-size: 30px; color: white;">✓</div>
+                </div>
+                <h2 style="margin:0; font-size:28px; font-weight: 800; letter-spacing: -0.025em;">¡Todo listo!</h2>
+                <p style="margin:5px 0 0 0; opacity:0.9; font-size: 16px;">Tu cita ha sido confirmada</p>
+            </div>
+
+            <div style="padding:30px 40px; color:#1e293b;">
+                <p style="font-size:18px; margin-bottom: 10px;">Hola <b style="color: #0f172a;">{{ nombre }}</b>,</p>
+                <p style="font-size:15px; line-height:1.6; color: #64748b;">
+                    Tu cita en <b>{{ empresa.emp_razon_social }}</b> se ha agendado correctamente.
+                </p>
+                
+                <div style="background:#f8fafc; border-radius:20px; padding:25px; margin:30px 0; border:1px solid #f1f5f9;">
+                    <p style="margin:0; font-size:13px; color:#94a3b8; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;">Detalles de la reserva:</p>
+                    <p style="margin:15px 0 8px 0; font-size:17px; color: #1e293b;">📅 <b>Día:</b> {{ fecha }}</p>
+                    <p style="margin:0 0 8px 0; font-size:17px; color: #1e293b;">⏰ <b>Hora:</b> {{ hora }}</p>
+                    <p style="margin:0; font-size:17px; color: #1e293b;">📍 <b>Lugar:</b> {{ empresa.emp_direccion or 'Nuestra Sede' }}</p>
+                </div>
+                
+                <div style="text-align:center; margin:30px 0;">
+                    <a href="{{ google_url }}" style="background:#4285F4; color:white; padding:15px 25px; text-decoration:none; border-radius:16px; font-weight:bold; display:block; margin-bottom:12px;">
+                        📅 Agregar a mi Calendario
+                    </a>
+                </div>
+
+                <div style="margin-top: 30px; background-color: #f8fafc; border-radius: 24px; border: 1px solid #e2e8f0; overflow: hidden;">
+                    <div style="padding: 12px 20px; background-color: #f1f5f9; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                        <p style="margin: 0; font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
+                            🎥 Así reagendas o cancelas
+                        </p>
+                    </div>
+
+                    <div style="padding: 20px; text-align: center;">
+                        <img src="{{ url_for('static', filename='gif/reagendar_cancelar.gif', _external=True) }}" 
+                             alt="Tutorial de uso" 
+                             style="width: 100%; max-width: 350px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 4px solid white;">
+                        
+                        <div style="margin-top: 20px;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #64748b; font-weight: 500;">
+                                ¿Quieres reagendar o cancelar ahora?
+                            </p>
+                            <a href="{{ url_for('admin.mis_citas', email=email_cliente, _external=True) }}" 
+                               style="color: #0ea5e9; font-size: 15px; font-weight: 800; text-decoration: none; border-bottom: 2px solid #0ea5e9; padding-bottom: 2px;">
+                                Gestionar mi cita aquí →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:25px; padding:20px; background-color: #fff9f0; border-left: 4px solid #f59e0b; border-radius: 16px; color: #92400e;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">⏰ Reglas de Oro</p>
+                    <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+                        Para brindarte la mejor experiencia, por favor <b>llega 15 minutos antes</b> de tu cita. Si tienes algún inconveniente, avísanos de inmediato.
+                    </p>
+                    
+                    <div style="margin-top: 15px; text-align: center;">
+                        <a href="https://wa.me/{{ whatsapp_num }}" 
+                           target="_blank"
+                           style="display: inline-block; background: #25d366; color: white; padding: 12px 25px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);">
+                            📱 Escribir por WhatsApp
+                        </a>
+                    </div>
+                </div>
+
+                <div style="margin-top: 40px; text-align: center; border-top: 2px dashed #e2e8f0; padding-top: 30px;">
+                    <p style="margin: 0; color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.1em;">¿Te gusta cómo reservaste?</p>
+                    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); padding: 30px 25px; border-radius: 24px; color: white;">
+                        <p style="margin: 0; font-weight: 900; font-size: 22px; tracking: -0.05em;">Agend<span style="color: #bae6fd;">App</span></p>
+                        <p style="margin: 5px 0 20px 0; font-size: 13px; opacity: 0.9; line-height: 1.4;">Lleva tu negocio al siguiente nivel con reservas automáticas como esta.</p>
+                        <a href="https://agendapp.co" style="background: white; color: #2563eb; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 12px; display: inline-block; text-transform: uppercase;">
+                            🚀 Crear mi sistema
+                        </a>
+                    </div>
+                    <p style="margin-top: 25px; color: #cbd5e1; font-size: 11px; font-weight: bold; letter-spacing: 0.05em;">
+                        © 2026 {{ empresa.emp_razon_social }} & AGENDAPP
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="shortcut icon" href="{{ url_for('static', filename='ico/ico.ico') }}" type="image/x-icon">
+  <title>ΛgendΛpp | Reserva Inteligente</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/form_intro.css') }}" />
+  
+  <style>
+
+/* Aseguramos que el cuerpo no tenga scrolls raros durante la carga */
+body {
+    margin: 0;
+    overflow-x: hidden;
+}
+
+/* Ajuste del contenedor principal */
+#main-content {
+    display: none;
+    opacity: 0;
+    /* Este padding debe ser igual o mayor al alto de tu cabecera */
+    padding-top: 20px; 
+    will-change: opacity, transform;
+}
+
+/* Si tu cabecera es fija (sticky/fixed), añade esto: */
+.navbar-custom { /* Usa la clase de tu header */
+    position: relative;
+    z-index: 1000;
+    background: white;
+    margin-bottom: 20px; /* Espacio para que respire el título 'Reserva tu Espacio' */
+}
+
+
+/* Estilo para que el checkbox obligatorio resalte si intentan saltárselo */
+input:invalid:not(:placeholder-shown) {
+    border-color: #f87171;
+}
+
+input[type="checkbox"]:required:invalid + span {
+    color: #64748b;
+}
+
+
+  </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen">
+  
+  <div id="intro-screen">
+    <div class="text-center mb-16 animate-logo-in">
+      <h1 class="text-7xl md:text-9xl font-black tracking-tighter text-slate-900">
+        Λgend<span class="text-sky-500">Λpp</span>
+      </h1>
+      <p class="mt-4 text-slate-500 font-semibold tracking-wide uppercase text-sm md:text-base">
+        Reserva tu espacio <span class="text-sky-500">fácil e inteligente</span>
+      </p>
+    </div>
+    <div class="w-full max-w-sm px-6">
+      <div class="h-2 bg-blue-100/50 rounded-full overflow-hidden relative">
+        <div id="progress-bar" class="h-full bg-blue-600 w-0 transition-all duration-300 ease-out rounded-full"></div>
+      </div>
+      <div class="flex justify-between mt-2 text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+        <span>Iniciando Sistema</span>
+        <span id="counter">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-content">
+    <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md border-b border-slate-200">
+      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3 active:scale-95 transition-all">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center p-1 border border-sky-100 shadow-sm">
+            <img src="{{ url_for('static', filename='img/logo_company.png') }}" alt="Logo" class="w-full h-full object-contain" />
+          </div>
+          <div class="flex flex-col leading-none">
+            <span class="text-xl font-black text-slate-900 tracking-tighter">Λgend<span class="text-sky-500">Λpp</span></span>
+            <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Reserva Online</span>
+          </div>
+        </a>
+        
+        <div class="flex items-center gap-4">
+<a href="{{ url_for('admin.mis_citas') }}"
+   class="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-sky-600 transition-colors">
+   Mis reservas
+</a>
+          <a href="{{ url_for('admin.login') }}" 
+             class="bg-[#0f172a] text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg hover:scale-105 transition-all">
+            ADMIN
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="mt-28 w-full max-w-2xl mx-auto px-4 pb-20 flex flex-col items-center">
+        <div class="text-center mb-10">
+        <span
+          class="inline-block px-3 py-1 bg-sky-100 text-sky-600 text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
+          Booking System v2.0
+        </span>
+        <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+          Reserva tu Espacio
+        </h1>
+        <p class="text-slate-500 font-medium">
+          Reserva tu espacio fácil e inteligente con
+          <span class="text-slate-900 font-bold">ΛgendΛpp</span>
+        </p>
+
+        <div class="mt-6 flex flex-col items-center justify-center gap-3 border-t border-slate-800/50 pt-6">
+          <div class="flex items-center gap-2 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
+            <i class="fa-solid fa-shop text-sky-600"></i>
+            <span>Sede:
+              <span class="text-slate-900">{{ empresa.emp_razon_social }}</span>
+            </span>
+
+          </div>
+
+          <div class="flex items-center gap-1.5 rounded-full bg-sky-500/10 px-3 py-1 border border-sky-500/20">
+            <div class="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse"></div>
+            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-[0.1em]">Plan Actual:
+              {{empresa.emp_tipo_plan}}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-panel shadow-2xl shadow-sky-900/10 rounded-[2.5rem] p-8 md:p-12 w-full border border-white">
+        <form id="form-reserva" action="{{ url_for('appointment.reservar') }}" method="POST" class="space-y-6">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Fecha de Cita</label>
+                <div class="relative">
+                  <i class="fa-regular fa-calendar absolute left-4 top-1/2 -translate-y-1/2 text-sky-500"></i>
+                  <input type="date" name="date" id="fecha_reserva" min="{{ hoy }}" required
+                    class="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 focus:border-sky-500">
+                  
+                  <div id="loading_fecha" class="hidden absolute right-4 top-1/2 -translate-y-1/2">
+                      <i class="fa-solid fa-circle-notch fa-spin text-sky-500"></i>
+                  </div>
+                </div>
+                <p id="msg_fecha" class="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tight ml-2">Selecciona un día para ver horas</p>
+              </div>
+
+            <div>
+              <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Servicio</label>
+              <div class="relative">
+                <i class="fa-solid fa-sparkles absolute left-4 top-1/2 -translate-y-1/2 text-sky-500"></i>
+                <select name="tipo_una" id="select_servicio" required
+                        class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none focus:border-sky-500">
+                  <option value="" disabled selected>Selecciona servicio</option>
+                  {% for s in servicios %}
+                    {# SOLO MOSTRAMOS SI ser_estado ES 1 (ACTIVO) #}
+                    {% if s.ser_estado == 1 %}
+                      <option value="{{ s.ser_nombre }}" data-tiempo="{{ s.ser_tiempo }}">
+                        {{ s.ser_nombre }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+              </div>
+            </div>
+          </div>
+
+<div>
+    <label class="text-slate-500 text-[11px] font-black uppercase mb-3 block tracking-widest">
+        Horas Disponibles
+    </label>
+    <div id="grid_horas" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <div class="col-span-full py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <i class="fa-regular fa-calendar-check text-slate-300 text-2xl mb-2 block"></i>
+            <p class="text-slate-400 text-xs">Selecciona fecha y servicio</p>
+        </div>
+    </div>
+    
+    <input type="hidden" name="hora" id="input_hora_seleccionada" required>
+</div>
+
+          <div class="space-y-4">
+            <input type="text" name="nombre" placeholder="Nombre completo" required
+              class="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 focus:border-sky-500" />
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="email" name="email" placeholder="Correo electrónico" required
+                class="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 focus:border-sky-500" />
+              <input type="tel" name="telefono" placeholder="WhatsApp / Teléfono" required
+                class="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 focus:border-sky-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Notas o Requerimientos</label>
+            <textarea name="notes" rows="3" placeholder="¿Alguna observación especial para tu cita?"
+              class="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 resize-none focus:border-sky-500"></textarea>
+          </div>
+
+            <div class="bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 mb-6">
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <div class="relative flex items-center">
+                    <input type="checkbox" name="acepta_datos" id="acepta_datos" required
+                        class="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-200 bg-white transition-all checked:border-sky-500 checked:bg-sky-500 focus:outline-none">
+                    <i class="fa-solid fa-check absolute text-[10px] text-white opacity-0 peer-checked:opacity-100 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </div>
+                <span class="text-[11px] text-slate-500 font-medium leading-relaxed">
+                    Autorizo el tratamiento de mis datos personales para la gestión de esta reserva, conforme a la 
+                    <a href="https://agendapp.co/privacidad" target="_blank" class="text-sky-600 font-bold hover:underline">
+                        Política de Tratamiento de Datos Personales
+                    </a> de AgendApp y la Ley 1581 de 2012.
+                </span>
+            </label>
+        </div>
+
+
+          
+
+
+          <button type="submit"
+            class="w-full bg-slate-900 hover:bg-sky-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
+            <span>Confirmar Reserva</span>
+            <i class="fa-solid fa-arrow-right-long"></i>
+          </button>
+        </form>
+      </div>
+    </main>
+  </div>
+<script src="{{ url_for('static', filename='js/form_intro.js') }}"></script>
+  <div id="loader-confirmacion" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm hidden items-center justify-center p-6">
+    <div class="w-full max-w-xs bg-white rounded-[2.5rem] p-8 text-center shadow-2xl">
+        <div class="relative w-20 h-20 mx-auto mb-6">
+            <div class="absolute inset-0 border-4 border-sky-100 rounded-full"></div>
+            <div id="progress-circle" class="absolute inset-0 border-4 border-sky-500 rounded-full border-t-transparent animate-spin"></div>
+            <i class="fa-solid fa-calendar-check text-sky-500 text-3xl absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></i>
+        </div>
+        
+        <h3 class="text-slate-900 font-black text-xl mb-2">Procesando...</h3>
+        <p id="loader-msg" class="text-slate-500 text-sm font-medium leading-relaxed">Estamos validando tu espacio</p>
+        
+        <div class="w-full bg-slate-100 h-2 rounded-full mt-6 overflow-hidden">
+            <div id="progress-bar-confirm" class="bg-sky-500 h-full w-0 transition-all duration-500 ease-out"></div>
+        </div>
+    </div>
+</div>
+<footer class="bg-white border-t border-slate-100 py-12 px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+        
+        <div class="flex flex-col items-center md:items-start gap-2">
+            <span class="font-black text-xl tracking-tighter text-slate-900 uppercase italic">
+                ΛgendΛpp
+            </span>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                © 2026 Todos los derechos reservados.
+            </p>
+        </div>
+
+        <div class="flex flex-col items-center md:items-end gap-3">
+            <div class="flex items-center gap-6">
+                <a href="https://agendapp.co" target="_blank" class="text-xs font-black uppercase tracking-widest text-slate-600 hover:text-sky-500 transition-colors duration-300 flex items-center gap-2">
+                    Página Oficial 
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
+                </a>
+            </div>
+            
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 border border-slate-200">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                </span>
+                <span class="text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                    Versión 1.0.0
+                </span>
+            </div>
+        </div>
+
+    </div>
+    
+    <div class="mt-8 max-w-7xl mx-auto h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-50"></div>
+</footer>
+</body>
+</html>

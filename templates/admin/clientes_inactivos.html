@@ -1,0 +1,68 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-4xl font-black text-white tracking-tight">Clientes <span class="text-amber-500">Inactivos</span></h1>
+            <p class="text-slate-500 text-sm mt-1">Lista de usuarios que fueron ocultados del sistema.</p>
+        </div>
+        <a href="/clientes_lista" class="text-slate-400 hover:text-white text-sm font-bold transition-all">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Volver a Activos
+        </a>
+    </div>
+
+    <div class="relative max-w-md">
+        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+        <input type="text" id="buscador" onkeyup="filtrarClientes()" placeholder="Buscar en la papelera..." 
+               class="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-3 text-white outline-none focus:ring-2 focus:ring-amber-500/50 transition-all">
+    </div>
+
+    <div class="bg-white/[0.03] backdrop-blur-md border border-white/5 rounded-[2.5rem] overflow-hidden">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
+                    <th class="px-8 py-6">Cliente</th>
+                    <th class="px-8 py-6 text-right">Acción</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-white/[0.03]">
+                {% for cliente in clientes %}
+                <tr id="cli-{{ cliente.cli_id }}" class="group hover:bg-white/[0.02]">
+                    <td class="px-8 py-6">
+                        <div class="font-bold text-white cli-nombre">{{ cliente.cli_nombre }}</div>
+                        <div class="text-slate-500 text-xs cli-email">{{ cliente.cli_email }}</div>
+                    </td>
+                    <td class="px-8 py-6 text-right">
+                        <button onclick="reactivarCliente('{{ cliente.cli_id }}')" 
+                                class="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all font-bold text-xs uppercase">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reactivar
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function filtrarClientes() {
+    const filtro = document.getElementById('buscador').value.toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(fila => {
+        const texto = fila.innerText.toLowerCase();
+        fila.style.display = texto.includes(filtro) ? '' : 'none';
+    });
+}
+
+function reactivarCliente(id) {
+    fetch(`/api/cliente/reactivar/${id}`, { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            document.getElementById(`cli-${id}`).remove();
+        }
+    });
+}
+</script>
+{% endblock %}

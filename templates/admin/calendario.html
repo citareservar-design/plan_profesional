@@ -1,0 +1,647 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+
+<style>
+    /* 1. ESTILO PREMIUM GLASSMORPHISM */
+    :root {
+        --fc-border-color: rgba(255, 255, 255, 0.08);
+        --fc-button-bg-color: rgba(255, 255, 255, 0.05);
+        --fc-button-border-color: rgba(255, 255, 255, 0.1);
+        --fc-button-hover-bg-color: rgba(14, 165, 233, 0.2);
+        --fc-button-active-bg-color: #0ea5e9;
+        --fc-today-bg-color: rgba(14, 165, 233, 0.1);
+    }
+
+    #calendar {
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(15px);
+        border-radius: 2.5rem;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    
+
+    /* CORRECCIÓN DE VISIBILIDAD DE TEXTOS */
+    .fc .fc-col-header-cell-cushion { 
+        color: #000000 !important; 
+        font-weight: 700;
+        text-transform: capitalize;
+        text-decoration: none !important;
+    }
+
+    .fc .fc-timegrid-slot-label-cushion { 
+        color: #94a3b8 !important; 
+        font-size: 11px !important; 
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+
+    /* Estilo del área de selección (Arrastre) */
+    .fc-highlight {
+        background: rgba(14, 165, 233, 0.25) !important;
+        border: 2px dashed #0ea5e9 !important;
+    }
+
+    /* Eventos Estilizados */
+    .fc-v-event {
+        background: rgba(14, 165, 233, 0.2) !important;
+        border-left: 5px solid #0ea5e9 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
+
+    .fc-event-main { padding: 8px !important; }
+    .fc-event-title { font-weight: 800 !important; font-size: 13px; color: white !important; }
+
+    /* Cursor tipo cruz */
+    .fc-timegrid-cols { cursor: crosshair; }
+
+    /* Estilo para los botones (Traducidos) */
+    .fc .fc-button {
+        text-transform: capitalize !important;
+        font-weight: 600 !important;
+    }
+
+
+/* Centrar y estilizar los nombres de los días en la vista de mes */
+.fc-dayGridMonth-view .fc-col-header-cell-cushion {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    color: #000000 !important; /* Color azul para resaltar */
+}
+
+/* Darle un poco más de espacio a los números internos del mes */
+.fc .fc-daygrid-day-top {
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 5px;
+}
+
+/* Hacer el texto del evento visible y blanco */
+.fc-event-main {
+    color: #ffffff !important;
+    font-size: 10px !important; /* Tamaño pequeño para que quepa */
+    line-height: 1.1 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: visible !important; /* Evita los puntos suspensivos */
+}
+
+/* Estilo para las "burbujas" de los eventos */
+.fc-v-event {
+    border-radius: 8px !important;
+    border: 1px solid #0ea5e9 !important;
+    background-color: rgba(14, 165, 233, 0.2) !important;
+}
+
+/* En móviles, el texto debe ser un poco más grande para leerlo bien [cite: 2025-12-18] */
+@media (max-width: 768px) {
+    .fc-event-main {
+        font-size: 9px !important;
+        font-weight: bold;
+    }
+}
+
+/* 1. Eliminar puntos suspensivos y permitir varias líneas si es necesario */
+.fc-event-title {
+    white-space: normal !important;
+    overflow: visible !important;
+    display: block !important;
+    line-height: 1.2 !important;
+    font-size: 11px !important; /* Ajuste para legibilidad */
+    color: #ffffff !important;
+    text-transform: uppercase;
+    font-weight: 800 !important;
+}
+
+/* 2. Ajustar el contenedor interno para que no tenga tanto relleno */
+.fc-event-main {
+    padding: 2px 4px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+}
+
+/* 3. Hacer que la hora se vea más pequeña para dar prioridad al servicio */
+.fc-event-time {
+    font-size: 9px !important;
+    opacity: 0.8;
+    margin-bottom: 2px;
+    font-weight: 400 !important;
+}
+
+/* 4. Estilo de la burbuja para que resalte más */
+.fc-v-event {
+    background: rgba(14, 165, 233, 0.4) !important; /* Fondo un poco más sólido */
+    border-left: 4px solid #0ea5e9 !important;
+    border-radius: 8px !important;
+}
+
+/* Estilo para el buscador de clientes */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+    }
+    
+    /* Animación de entrada del modal */
+    #modal-reserva:not(.hidden) {
+        animation: fadeIn 0.2s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Asegurar que el calendario luzca bien en el contenedor */
+    #calendar {
+        min-height: 600px;
+        color: white;
+    }
+</style>
+
+<div class="space-y-6 pb-10">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center px-6 gap-4">
+        <div>
+            <h2 class="text-3xl font-black text-white italic tracking-tighter">AGENDA <span class="text-sky-500">APP</span></h2>
+            <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Arrastra sobre las horas para agendar</p>
+        </div>
+        <button onclick="abrirNuevaReserva()" 
+                class="w-full md:w-auto bg-sky-500 hover:bg-sky-400 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-sky-500/20 active:scale-95 text-xs uppercase tracking-widest">
+            + Agendar Manual
+        </button>
+    </div>
+
+    <div class="px-4">
+        <div id='calendar' class="bg-slate-900/50 rounded-[2rem] border border-white/5 p-4 backdrop-blur-sm"></div>
+    </div>
+</div>
+
+<div id="modal-reserva" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/10 p-6 md:p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl max-h-[95vh] overflow-y-auto custom-scrollbar">
+        
+        <h3 class="text-2xl font-bold text-white mb-6 italic text-center">GESTIONAR <span class="text-sky-500">CITA</span></h3>
+        
+        <form id="form-nueva-reserva" method="POST" action="{{ url_for('admin.crear_reserva') }}" class="space-y-4">
+            <input type="hidden" name="input_inicio" id="input_inicio">
+            <input type="hidden" name="cliente_id" id="cliente_id_hidden">
+            
+            <div class="relative">
+                <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Cliente</label>
+                <input type="text" id="buscar_cliente" name="buscar_cliente" autocomplete="off" placeholder="Buscar cliente..." required
+                       class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500">
+                <div id="resultados_busqueda" class="absolute w-full bg-slate-800 border border-white/10 rounded-xl mt-1 hidden z-[110] max-h-40 overflow-y-auto shadow-2xl"></div>
+            </div>
+
+<div class="grid grid-cols-2 gap-4">
+    <div>
+        <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Fecha</label>
+        <input type="date" name="fecha_manual" id="fecha_manual" 
+               class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+    </div>
+    <div>
+        <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Hora</label>
+        <input type="time" name="hora_manual" id="hora_manual" 
+               class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+    </div>
+    <div>
+        <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Alias / Apodo</label>
+        <input type="text" name="alias" id="input_alias" 
+               class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+    </div>
+    <div>
+        <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Teléfono</label>
+        <input type="text" name="telefono" id="input_telefono" 
+               class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+    </div>
+</div>
+<div class="mt-2">
+    <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Correo Electrónico</label>
+    <input type="email" name="email" id="input_email" 
+           class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+</div>
+
+
+            <div class="pt-2">
+                <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Servicio</label>
+                <select name="servicio" id="input_servicio" class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500">
+                    {% for servicio in servicios %}
+                        <option value="{{ servicio.ser_nombre }}">{{ servicio.ser_nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="contenedor-estado" class="hidden">
+                <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Estado de la Cita</label>
+                <select name="estado" id="input_estado" 
+                        class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="confirmada">Confirmada</option>
+                    <option value="completada">Completada (Verde)</option>
+                    <option value="cancelada">Cancelada (Rojo)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Notas / Observaciones</label>
+                <textarea name="notas" id="input_notas" rows="3" 
+                          class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500" 
+                          placeholder="Preferencias del cliente..."></textarea>
+            </div>
+
+            <div class="flex flex-col gap-3 pt-4">
+                <div class="flex gap-3">
+                    <button type="button" onclick="cerrarModal()" 
+                            class="flex-1 py-4 text-slate-400 font-bold hover:bg-white/5 rounded-2xl transition-all">
+                        CANCELAR
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 bg-sky-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-sky-500/20 active:scale-95 transition-all">
+                        CONFIRMAR
+                    </button>
+                </div>
+                <button type="button" id="btn-eliminar" onclick="eliminarReserva()" 
+                        class="hidden w-full py-3 text-rose-500 font-bold border border-rose-500/10 rounded-xl hover:bg-rose-500/5 transition-all">
+                    ELIMINAR CITA
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="contenedor-estado" class="hidden">
+    <label class="text-slate-400 text-[10px] uppercase font-bold ml-1">Estado de la Cita</label>
+    <select name="estado" id="input_estado" 
+            class="w-full bg-slate-800 border-white/5 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-sky-500">
+        <option value="confirmada">Confirmada</option>
+        <option value="completada">Completada (Verde)</option>
+        <option value="cancelada">Cancelada (Rojo)</option>
+    </select>
+</div>
+
+<div class="flex flex-col gap-2 pt-4">
+    <button type="button" id="btn-eliminar" onclick="eliminarReserva()" 
+            class="hidden w-full py-3 text-rose-500 font-bold border border-rose-500/20 rounded-xl hover:bg-rose-500/10 transition-all">
+        ELIMINAR CITA
+    </button>
+</div>
+
+<script>
+
+
+function esDiaPermitido(fechaStr, config) {
+    // Usamos T00:00:00 para evitar errores de zona horaria en móviles [cite: 2025-12-18]
+    const fecha = new Date(fechaStr + 'T00:00:00');
+    const diaSemana = fecha.getDay(); 
+
+    if (config.blockedDates.includes(fechaStr)) {
+        return { permitido: false, mensaje: "Esta fecha está bloqueada por el administrador." };
+    }
+
+    const horarioDia = config.businessHours.find(h => h.daysOfWeek.includes(diaSemana));
+    if (!horarioDia) {
+        return { permitido: false, mensaje: "El negocio no abre los domingos o el día seleccionado." };
+    }
+
+    return { permitido: true };
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 0. CONSULTAR CONFIGURACIÓN DE BASE DE DATOS PRIMERO
+    let configBase = { businessHours: [], blockedDates: [] };
+
+ 
+    fetch('/admin/api/configuracion_calendario')
+        .then(res => res.json())
+        .then(config => {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                // 1. CONFIGURACIÓN DE VISTA INICIAL
+                initialView: window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek',
+                locale: 'es',
+                firstDay: 1, 
+                
+                // 2. CONFIGURACIÓN DE HORARIOS LABORALES (Img 2: CONFIG_HORARIOS)
+                // Esto sombreará automáticamente las horas donde no trabajas
+                businessHours: config.businessHours,
+
+                // 3. RESTRICCIÓN DE SELECCIÓN (Img 1 y 2)
+                selectAllow: function(selectInfo) {
+                    const fechaStr = selectInfo.startStr.split('T')[0];
+                    const diaSemana = selectInfo.start.getDay();
+                    
+                    // Bloquear si la fecha está en DIAS_BLOQUEADOS
+                    if (config.blockedDates.includes(fechaStr)) return false;
+                    
+                    // Bloquear si el día de la semana no está activo en CONFIG_HORARIOS
+                    const horarioDia = config.businessHours.find(h => h.daysOfWeek.includes(diaSemana));
+                    if (!horarioDia) return false;
+                    
+                    return true;
+                },
+
+                // 4. TRADUCCIÓN DE BOTONES
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Agenda'
+                },
+
+                // 5. CONFIGURACIÓN POR VISTAS
+                views: {
+                    dayGridMonth: { dayHeaderFormat: { weekday: 'short' } },
+                    timeGridWeek: { dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'numeric', omitCommas: true } },
+                    timeGridDay: { dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' } }
+                },
+
+                // 6. FORMATO DE 12 HORAS
+                slotLabelFormat: {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    omitZeroMinute: false,
+                    meridiem: 'short',
+                    hour12: true
+                },
+
+                // 7. PERSONALIZACIÓN DEL EVENTO
+                eventMinHeight: 50,
+                eventContent: function(arg) {
+                    let timeText = arg.timeText;
+                    let titleText = arg.event.title;
+                    let container = document.createElement('div');
+                    container.classList.add('fc-event-main-container');
+                    container.innerHTML = `
+                        <div class="fc-event-time" style="font-size: 0.7rem; opacity: 0.9;">${timeText}</div>
+                        <div class="fc-event-title" style="font-weight: 800; font-size: 0.85rem; text-transform: uppercase; white-space: normal;">
+                            ${titleText}
+                        </div>
+                    `;
+                    return { domNodes: [container] };
+                },
+
+                // 8. BARRA DE HERRAMIENTAS
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                
+                // 9. RESTRICCIONES GENERALES
+                slotMinTime: '07:00:00', 
+                slotMaxTime: '22:00:00',
+                allDaySlot: false,
+                height: 'auto',
+                nowIndicator: true,
+
+                // 10. FUNCIONALIDAD DE SELECCIÓN
+                selectable: true,
+                selectMirror: true,
+                unselectAuto: true,
+                longPressDelay: 350, 
+
+
+
+                
+            select: function(info) {
+    const fechaSeleccionada = info.startStr.split('T')[0];
+    const validacion = esDiaPermitido(fechaSeleccionada, config);
+
+    if (!validacion.permitido) {
+        alert(validacion.mensaje); // Aquí sale la alerta
+        calendar.unselect(); // Deselecciona el área en el calendario
+        return;
+    }
+
+    // Si es válido, abre el modal normalmente
+    abrirNuevaReserva();
+    const horaSeleccionada = info.startStr.split('T')[1].slice(0, 5);
+    document.getElementById('fecha_manual').addEventListener('change', function() {
+    const validacion = esDiaPermitido(this.value, config);
+    if (!validacion.permitido) {
+        alert(validacion.mensaje);
+        // Opcional: resetear a la fecha de hoy si es inválida
+        const hoy = new Date().toISOString().split('T')[0];
+        this.value = hoy;
+    }
+});
+    document.getElementById('hora_manual').value = horaSeleccionada;
+    document.getElementById('input_inicio').value = info.startStr;
+},
+
+                // 11. FUENTE DE DATOS Y CLIC
+                events: '/admin/api/reservas',
+                
+                eventClick: function(info) {
+                    abrirModal();
+                    document.querySelector('#modal-reserva h3').innerHTML = 'EDITAR <span class="text-sky-500">CITA</span>';
+                    const tituloCompleto = info.event.title;
+                    const partes = tituloCompleto.split(' - ');
+                    
+                    document.getElementById('buscar_cliente').value = partes[0] || '';
+                    document.getElementById('input_servicio').value = partes[1] || '';
+                    document.getElementById('input_notas').value = info.event.extendedProps.notas || '';
+
+                    window.reservaIdActual = info.event.id;
+                    document.getElementById('btn-eliminar').classList.remove('hidden');
+                    document.getElementById('input_inicio').value = info.event.startStr.slice(0, 16);
+                },
+
+                // 12. PINTAR DÍAS BLOQUEADOS (Visual)
+                dayCellDidMount: function(info) {
+                    const fechaStr = info.date.toISOString().split('T')[0];
+                    if (config.blockedDates.includes(fechaStr)) {
+                        info.el.style.backgroundColor = 'rgba(244, 63, 94, 0.05)'; // Rojo muy sutil
+                    }
+                }
+            });
+            
+            calendar.render();
+        })
+        .catch(err => console.error("Error cargando configuración:", err));
+});
+
+function formatDateForInput(date) {
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date - tzOffset).toISOString().slice(0, 16);
+}
+
+function abrirNuevaReserva() {
+    const ahora = new Date();
+    const fechaHoy = ahora.toISOString().split('T')[0];
+    const horaHoy = ahora.toTimeString().slice(0, 5);
+
+    // Llenamos los campos manuales
+    document.getElementById('fecha_manual').value = fechaHoy;
+    document.getElementById('hora_manual').value = horaHoy;
+    
+    // Título y reset
+    document.querySelector('#modal-reserva h3').innerHTML = 'NUEVA <span class="text-sky-500">CITA</span>';
+    window.reservaIdActual = null;
+    document.getElementById('form-nueva-reserva').reset();
+    document.getElementById('btn-eliminar').classList.add('hidden');
+    
+    abrirModal();
+}
+// 1. Función para limpiar y esconder el modal
+function cerrarModal() {
+    document.getElementById('modal-reserva').classList.add('hidden');
+    document.getElementById('form-nueva-reserva').reset(); 
+    
+    // Aseguramos que los campos extra también queden vacíos
+    document.getElementById('input_alias').value = '';
+    document.getElementById('input_telefono').value = '';
+    document.getElementById('input_email').value = '';
+    document.getElementById('cliente_id_hidden').value = '';
+}
+
+document.getElementById('form-nueva-reserva').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // 1. VALIDACIÓN FINAL DE DOMINGO/BLOQUEO (Seguridad extra antes de enviar)
+    const fechaInput = document.getElementById('fecha_manual').value;
+    // Accedemos a la configuración que cargamos al inicio
+    if (typeof configGlobal !== 'undefined') {
+        const validacion = esDiaPermitido(fechaInput, configGlobal);
+        if (!validacion.permitido) {
+            alert(validacion.mensaje);
+            return; // Detiene el envío
+        }
+    }
+
+    const formData = new FormData(this);
+    console.log("--- REVISANDO DATOS ---");
+    console.log("URL de destino:", window.reservaIdActual ? 'ACTUALIZAR' : 'CREAR');
+    console.log("Cliente:", formData.get('buscar_cliente'));
+    console.log("Servicio:", formData.get('servicio'));
+    console.log("Fecha Manual:", formData.get('fecha_manual'));
+    console.log("Hora Manual:", formData.get('hora_manual'));
+    console.log("Input Inicio:", formData.get('input_inicio'));
+    
+    
+    // 2. DETERMINAR URL
+    const url = window.reservaIdActual 
+                ? `/admin/api/reservas/actualizar/${window.reservaIdActual}` 
+                : this.action;
+
+
+                
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Error en servidor');
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success' || data.id) {
+            // USAR LA INSTANCIA GLOBAL DEL CALENDARIO
+            if (window.calendarInstance) {
+                window.calendarInstance.refetchEvents();
+            } else {
+                // Si no hay instancia, recargamos la página (más seguro en móviles) [cite: 2025-12-18]
+                location.reload();
+            }
+            cerrarModal();
+        } else {
+            alert("Error: " + (data.message || "No se pudo guardar"));
+        }
+    })
+    .catch(error => {
+        console.error('Error en la petición:', error);
+        alert("Error de conexión: Verifica que todos los campos estén llenos.");
+    });
+});
+
+const inputBuscar = document.getElementById('buscar_cliente');
+const listaResultados = document.getElementById('resultados_busqueda');
+const inputHidden = document.getElementById('cliente_id_hidden');
+
+inputBuscar.addEventListener('input', function() {
+    const texto = this.value;
+    
+    // Si el usuario borra el nombre, reseteamos el ID del cliente
+    if (texto.length === 0) {
+        document.getElementById('cliente_id_hidden').value = '';
+    }
+
+    if (texto.length < 2) {
+        listaResultados.classList.add('hidden');
+        return;
+    }
+
+    fetch(`/admin/api/buscar_clientes?q=${texto}`)
+        .then(response => response.json())
+        .then(data => {
+            listaResultados.innerHTML = '';
+            if (data.length > 0) {
+                data.forEach(cliente => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 hover:bg-sky-500 cursor-pointer text-white text-sm border-b border-white/5';
+                    div.innerHTML = `<i class="fas fa-user-check mr-2 opacity-50"></i>${cliente.nombre}`;
+                    
+                    div.onclick = () => {
+                        // 1. Llenamos todos los datos del cliente encontrado
+                        inputBuscar.value = cliente.nombre;
+                        document.getElementById('cliente_id_hidden').value = cliente.id;
+                        document.getElementById('input_alias').value = cliente.alias || '';
+                        document.getElementById('input_telefono').value = cliente.telefono || '';
+                        document.getElementById('input_email').value = cliente.email || '';
+                        
+                        listaResultados.classList.add('hidden');
+                    };
+                    listaResultados.appendChild(div);
+                });
+                listaResultados.classList.remove('hidden');
+            } else {
+                // Si no hay resultados, ocultamos la lista pero permitimos seguir escribiendo
+                listaResultados.classList.add('hidden');
+                document.getElementById('cliente_id_hidden').value = ''; // Indica que es cliente nuevo
+            }
+        });
+});
+// Cerrar la lista si el usuario hace clic fuera del buscador
+document.addEventListener('click', (e) => {
+    if (!inputBuscar.contains(e.target) && !listaResultados.contains(e.target)) {
+        listaResultados.classList.add('hidden');
+    }
+});
+
+function eliminarReserva() {
+    if (confirm('¿Estás seguro de que deseas eliminar esta cita?')) {
+        fetch(`/admin/api/reservas/eliminar/${window.reservaIdActual}`, {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                calendar.getEventById(window.reservaIdActual).remove();
+                cerrarModal();
+            }
+        });
+    }
+}
+
+
+function abrirModal() {
+    document.getElementById('modal-reserva').classList.remove('hidden');
+}
+
+
+
+
+</script>
+
+{% endblock %}

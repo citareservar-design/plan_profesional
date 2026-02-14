@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AdminPro | ΛgendΛpp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="shortcut icon" href="{{ url_for('static', filename='ico/ico.ico') }}" type="image/x-icon">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        [x-cloak] { display: none !important; }
+        @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap");
+        body { font-family: "Plus Jakarta Sans", sans-serif; background-color: #0f172a; }
+        .glass-effect { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-right: 1px solid rgba(255, 255, 255, 0.05); }
+        #sidebar { transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    </style>
+</head>
+<body class="text-slate-200 overflow-x-hidden">
+
+    <div id="sidebarOverlay" onclick="toggleMenu()" class="fixed inset-0 bg-slate-950/60 z-30 hidden backdrop-blur-sm lg:hidden"></div>
+
+    <div class="lg:hidden fixed top-6 left-6 z-40">
+        <button onclick="toggleMenu()" class="bg-slate-800/50 border border-white/10 text-sky-400 p-3 rounded-2xl shadow-2xl backdrop-blur-md active:scale-95 transition-all">
+            <i class="fa-solid fa-bars-staggered text-xl"></i>
+        </button>
+    </div>
+
+    <div class="flex min-h-screen">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 glass-effect -translate-x-full lg:translate-x-0 lg:static">
+            <div class="flex flex-col h-full p-8">
+
+
+                
+<div class="flex items-center justify-between mb-10 px-2">
+    <div class="group flex items-center gap-3 cursor-default">
+        <div class="relative">
+            <div class="absolute -inset-1 bg-gradient-to-r from-sky-500 to-indigo-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+            
+            <div class="relative w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center border border-white/10 shadow-2xl overflow-hidden">
+                <img src="{{ url_for('static', filename='ico/ico.ico') }}" 
+                     alt="Logo" 
+                     class="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform duration-500">
+            </div>
+        </div>
+        
+        <div class="flex flex-col">
+            <span class="text-xl font-black tracking-tighter text-white leading-none">
+                ΛGEND<span class="text-sky-500">ΛPP</span>
+            </span>
+            <span class="text-[8px] uppercase tracking-[0.3em] font-bold text-slate-500 leading-none mt-1">
+                Admin Panel
+            </span>
+        </div>
+    </div>
+
+    <button onclick="toggleMenu()" 
+            class="lg:hidden w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all duration-300 active:scale-95 shadow-lg shadow-rose-500/5">
+        <i class="fa-solid fa-xmark text-xl"></i>
+    </button>
+</div>
+                <nav class="space-y-1.5 flex-1 overflow-y-auto pr-2">
+                    <a href="{{ url_for('admin.publicidad') }}" 
+                       class="flex items-center gap-4 px-5 py-4 mb-6 rounded-2xl transition-all active:scale-95 shadow-xl hover:bg-white/5 hover:text-white text-slate-400">
+                        <i class="fa-solid fa-house text-lg"></i>
+                        <span class="font-black tracking-wide">Inicio ΛgendΛpp</span>
+                    </a>
+
+                    <p class="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-4 mb-4 mt-2 opacity-80">Menú Principal</p>
+
+                    {% if current_user.tiene_permiso('ver_estadisticas') %}
+                    <a href="{{ url_for('admin.dashboard') }}"
+                       class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                       {% if request.endpoint == 'admin.dashboard' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-solid fa-chart-simple text-lg {% if request.endpoint == 'admin.dashboard' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Estadísticas</span>
+                    </a>
+                    {% endif %}
+
+
+                    {% if current_user.tiene_permiso('ver_clientes') %}
+                    <a href="{{ url_for('admin.gestion_clientes') }}"
+                    class="flex items-center justify-between px-5 py-3.5 rounded-2xl transition-all group
+                    {% if 'clientes' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <div class="flex items-center gap-4">
+                            <i class="fa-solid fa-address-book text-lg {% if 'clientes' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                            
+                            <div class="relative flex items-center">
+                                <span class="font-bold tracking-wide">Clientes</span>
+                                
+                                {% if hay_cumpleanos_global %}
+                                <span class="absolute -right-3 top-0 flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1"></i>
+                    </a>
+                    {% endif %}
+
+                    {% if current_user.tiene_permiso('ver_servicios') %}
+                    <a href="{{ url_for('admin.gestion_servicios') }}"
+                      class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                      {% if request.endpoint == 'admin.gestion_servicios' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-solid fa-tags text-lg {% if request.endpoint == 'admin.gestion_servicios' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Servicios</span>
+                    </a>
+                    {% endif %}
+
+                    
+                    {% if current_user.tiene_permiso('ver_empleados') %}
+                    <a href="{{ url_for('admin.gestion_empleados') }}"
+                    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                    {% if 'gestion_empleados' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-solid fa-id-card-clip text-lg {% if 'gestion_empleados' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Empleados</span>
+                    </a>
+                    {% endif %}
+
+
+                    {% if current_user.tiene_permiso('ver_reservas') %}
+                    <a href="{{ url_for('admin.reservas') }}"
+                        class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                        {% if 'reservas' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-solid fa-calendar-check text-lg {% if 'reservas' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Reservas</span>
+                    </a>
+                    {% endif %}
+
+
+                    {% if current_user.tiene_permiso('ver_comisiones') %}
+                    <a href="{{ url_for('admin.reporte_comisiones') }}" 
+                        class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                        {% if 'reporte_comisiones' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-solid fa-money-bill-trend-up text-lg {% if 'reporte_comisiones' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Comisiones</span>
+                    </a>
+                    {% endif %}
+
+
+                    {% if current_user.tiene_permiso('ver_horarios') %}
+                    <a href="{{ url_for('admin.configurar_horarios') }}"
+                        class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                        {% if request.endpoint == 'admin.configurar_horarios' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                        <i class="fa-regular fa-clock text-lg {% if request.endpoint == 'admin.configurar_horarios' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                        <span class="font-bold tracking-wide">Horarios</span>
+                    </a>
+                    {% endif %}
+
+                {% if current_user.tiene_permiso('ver_usuarios') %}
+                <a href="{{ url_for('admin.gestion_usuarios') }}" 
+                    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                    {% if request.endpoint == 'admin.gestion_usuarios' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                    <i class="fa-solid fa-users-gear text-lg {% if request.endpoint == 'admin.gestion_usuarios' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                    <span class="font-bold tracking-wide">Usuarios</span>
+                </a>
+                {% endif %}
+
+
+{% if current_user.tiene_permiso('ver_historial') %}
+<div x-data="{ open: {{ 'true' if request.endpoint == 'admin.gestion_historial' else 'false' }} }" class="w-full">
+    
+    <button @click="open = !open" 
+        type="button"
+        class="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl transition-all group 
+        {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+        
+        <div class="flex items-center gap-4">
+            <i class="fa-solid fa-clock-rotate-left text-lg {% if request.endpoint == 'admin.gestion_historial' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+            <span class="font-bold tracking-wide">Historial</span>
+        </div>
+
+        <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300" 
+           :class="open ? 'rotate-180' : ''"></i>
+    </button>
+
+    <div x-show="open" 
+         x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="mt-1 ml-4 border-l-2 border-white/10 pl-4 flex flex-col gap-1">
+        
+        <a href="{{ url_for('admin.gestion_historial') }}" 
+           class="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm
+           {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500/10 text-sky-400 font-bold {% else %} text-slate-400 hover:text-white hover:bg-white/5 {% endif %}">
+            
+            <div class="w-1.5 h-1.5 rounded-full {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500 {% else %} bg-slate-600 {% endif %}"></div>
+            Historial de Reservas
+        </a>
+    </div>
+</div>
+{% endif %}
+
+                        {% if current_user.tiene_permiso('ver_empresa') %}
+                        <a href="{{ url_for('admin.configurar_empresa') }}" 
+                            class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                            {% if request.endpoint == 'admin.configurar_empresa' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                            
+                            <i class="fa-solid fa-building text-lg 
+                                {% if request.endpoint == 'admin.configurar_empresa' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} 
+                                transition-colors"></i>
+                            
+                            <span class="font-bold tracking-wide">Empresa</span>
+                        </a>
+{% endif %}
+
+
+                        {% if current_user.tiene_permiso('ver_QR') %}
+                        <a href="{{ url_for('admin.mi_qr') }}"
+                        class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+                        {% if request.endpoint == 'admin.mi_qr' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+                            
+                            <div class="relative">
+                                <i class="fa-solid fa-qrcode text-lg {% if request.endpoint == 'admin.mi_qr' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+                                <span class="absolute -top-1 -right-1 w-2 h-2 bg-sky-500 rounded-full animate-pulse {% if request.endpoint == 'admin.mi_qr' %} hidden {% endif %}"></span>
+                            </div>
+                            
+                            <span class="font-bold tracking-wide">Mi QR</span>
+                        </a>
+                        {% endif %}
+
+                    <p class="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-4 mt-10 mb-4 opacity-80">Sesión</p>
+
+                    <a href="{{ url_for('admin.logout') }}" class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group text-rose-400/70 hover:bg-rose-500/10 border border-transparent">
+                        <div class="w-10 h-10 rounded-xl bg-rose-500/5 flex items-center justify-center">
+                            <i class="fa-solid fa-right-from-bracket text-lg"></i>
+                        </div>
+                        <span class="font-bold tracking-wide">Cerrar Sesión</span>
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-x-hidden flex flex-col">
+            <header class="h-24 flex items-center justify-between px-8 bg-[#0f172a]/80 backdrop-blur-xl sticky top-0 z-20 border-b border-white/5">
+                <div class="w-12 lg:hidden"></div>
+                
+                <div class="relative w-96 hidden md:block">
+                    <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                    <input type="text" placeholder="Buscar reservas o clientes..." class="w-full bg-slate-800/40 border border-white/5 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:ring-2 focus:ring-sky-500/20 outline-none transition-all" />
+                </div>
+
+                <div class="flex items-center gap-5">
+                    <div class="hidden sm:block text-right">
+                        <p class="text-xs font-black text-white leading-none">{{ current_user.usu_nombre if current_user.is_authenticated else "Admin" }}</p>
+                        <p class="text-[9px] text-emerald-400 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center justify-end gap-1.5">
+                            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Sincronizado
+                        </p>
+                    </div>
+                    <div class="relative group cursor-pointer">
+                        <div class="p-0.5 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-500 group-hover:rotate-6 transition-transform">
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.usu_nombre if current_user.is_authenticated else 'A' }}&background=1e293b&color=0ea5e9" class="w-12 h-12 rounded-[14px] border-2 border-[#0f172a]" />
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-6 md:p-12">
+                <div id="flash-container">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="flash-message mb-6 p-4 rounded-xl border flex items-center gap-3
+                                    {% if category == 'success' %} bg-emerald-500/10 border-emerald-500/20 text-emerald-400 {% else %} bg-red-500/10 border-red-500/20 text-red-400 {% endif %} transition-all duration-500">
+                                    <i class="fa-solid {% if category == 'success' %}fa-circle-check{% else %}fa-circle-exclamation{% endif %}"></i>
+                                    <span class="font-bold text-sm">{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            const sidebar = document.getElementById("sidebar");
+            const overlay = document.getElementById("sidebarOverlay");
+            sidebar.classList.toggle("-translate-x-full");
+            
+            if (sidebar.classList.contains("-translate-x-full")) {
+                overlay.classList.add("hidden");
+                document.body.classList.remove("overflow-hidden");
+            } else {
+                overlay.classList.remove("hidden");
+                document.body.classList.add("overflow-hidden");
+            }
+        }
+
+        // Auto-cierre de mensajes flash
+        document.addEventListener('DOMContentLoaded', function() {
+            const messages = document.querySelectorAll('.flash-message');
+            messages.forEach(msg => {
+                setTimeout(() => {
+                    msg.style.opacity = '0';
+                    msg.style.transform = 'translateY(-10px)';
+                    setTimeout(() => msg.remove(), 500);
+                }, 4000);
+            });
+        });
+    </script>
+</body>
+</html>

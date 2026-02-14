@@ -1,0 +1,517 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div style="display: none;">
+    <span id="ultimo-id-reserva">{{ ultimo_id }}</span>
+    <span id="ultimo-cliente-reserva">{{ ultimo_cliente }}</span>
+    <span id="ultimo-servicio-reserva">{{ ultimo_servicio }}</span>
+</div>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="space-y-6 mb-8">
+    
+<div class="bg-slate-900/40 border border-white/10 rounded-[2.5rem] p-1.5 overflow-hidden shadow-2xl group">
+    <div class="bg-slate-900 rounded-[2rem] p-8 relative overflow-hidden min-h-[220px] flex items-center">
+        
+        <div class="absolute inset-0 opacity-40">
+            <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600 blur-[120px] rounded-full animate-pulse"></div>
+            <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-rose-600 blur-[120px] rounded-full opacity-50"></div>
+        </div>
+
+        <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity duration-700 group-hover:rotate-12 transform">
+            <i class="fa-solid fa-gem text-[10rem]"></i>
+        </div>
+
+        <div class="relative z-10 w-full flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            
+            <div class="space-y-2">
+                <div class="flex items-center gap-2">
+                    <span class="h-px w-8 bg-indigo-500"></span>
+                    <p class="text-indigo-300 text-xs font-black uppercase tracking-[0.3em]">Balance Total Acumulado</p>
+                </div>
+                
+                <div class="flex items-baseline gap-3">
+                    <span class="text-2xl font-light text-indigo-300/60">$</span>
+                    <h2 class="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
+                        {{ "{:,.0f}".format(total_ingresos) }}
+                    </h2>
+                </div>
+
+                <div class="flex items-center gap-3 pt-4">
+                    <div class="flex -space-x-2">
+                        <div class="w-8 h-8 rounded-full border-2 border-slate-900 bg-emerald-500 flex items-center justify-center shadow-lg">
+                            <i class="fa-solid fa-arrow-trend-up text-white text-[10px]"></i>
+                        </div>
+                    </div>
+                    <p class="text-slate-400 text-xs font-medium">
+                        <span class="text-emerald-400 font-bold">Crecimiento Orgánico</span> basado en servicios finalizados
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="group/card bg-white/5 backdrop-blur-xl p-5 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-all duration-300 min-w-[140px] shadow-xl">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>
+                        <p class="text-[10px] text-indigo-200 uppercase font-black tracking-widest">Hoy</p>
+                    </div>
+                    <p class="text-2xl font-black text-white">$ {{ "{:,.0f}".format(ingresos_hoy) }}</p>
+                    <p class="text-indigo-300/40 text-[9px] mt-1 font-bold">Ingresos del día</p>
+                </div>
+
+                <div class="group/card bg-indigo-600 p-5 rounded-[2rem] shadow-[0_20px_40px_rgba(79,70,229,0.3)] min-w-[140px] relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-16 h-16 bg-white/20 blur-2xl rounded-full -mr-8 -mt-8"></div>
+                    
+                    <div class="relative z-10">
+                        <p class="text-[10px] text-indigo-100 uppercase font-black tracking-widest mb-1">Citas</p>
+                        <div class="flex items-end gap-1">
+                            <h3 id="total-citas-count" class="text-4xl font-black text-white leading-none">{{ citas_hoy }}</h3>
+                            <span class="text-indigo-200 text-xs font-bold mb-1">Hoy</span>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-white/10">
+                            <p class="text-indigo-100 text-[9px] font-bold uppercase tracking-tighter opacity-80 italic">
+                                {{ hoy.strftime('%d %B, %Y') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="bg-slate-900/40 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden h-full group">
+    <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-600/10 blur-[80px] rounded-full"></div>
+
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h3 class="text-white font-black text-xl tracking-tight">Próximas Citas</h3>
+            <p class="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-bold">Agenda reciente</p>
+        </div>
+        <div class="flex items-center gap-2 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20">
+            <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            </span>
+            <span class="text-indigo-400 text-[10px] font-black uppercase tracking-widest">En Vivo</span>
+        </div>
+    </div>
+
+    <div class="space-y-2 relative">
+        <div class="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-indigo-500 via-slate-700 to-transparent opacity-30"></div>
+
+        {% for cita in citas_proximas %}
+        <div class="relative pl-10 pb-6 last:pb-2 group/item">
+            <div class="absolute left-0 top-1.5 w-8 h-8 flex items-center justify-center z-10">
+                <div class="w-2.5 h-2.5 rounded-full bg-slate-900 border-2 border-indigo-500 group-hover/item:scale-150 group-hover/item:bg-indigo-500 transition-all duration-300"></div>
+            </div>
+            
+            <div class="bg-slate-800/40 border border-white/5 p-4 rounded-[1.5rem] hover:bg-slate-800/60 hover:border-indigo-500/30 transition-all duration-500 group-hover/item:-translate-y-1 shadow-lg backdrop-blur-sm">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-sm font-black text-white shadow-lg transform -rotate-3 group-hover/item:rotate-0 transition-transform duration-300">
+                                {% if cita.empl and cita.empl.empl_nombre %}
+                                    {{ cita.empl.empl_nombre[0] | upper }}
+                                {% else %}
+                                    <i class="fa-solid fa-user-tie text-xs"></i>
+                                {% endif %}
+                            </div>
+                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-800 rounded-full shadow-sm"></div>
+                        </div>
+                        
+                        <div>
+                            <p class="text-white font-bold text-sm group-hover/item:text-indigo-300 transition-colors">{{ cita.cliente.cli_nombre if cita.cliente else 'Cliente' }}</p>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="text-[10px] text-slate-400 font-medium">Con {{ cita.empl.empl_nombre.split(' ')[0] if cita.empl else 'Especialista' }}</span>
+                                <span class="w-1 h-1 rounded-full bg-slate-600"></span>
+                                <span class="text-[10px] text-indigo-400/80 font-bold uppercase tracking-tighter">{{ cita.res_tipo_servicio }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right">
+                        <div class="bg-slate-900/50 px-3 py-1.5 rounded-xl border border-white/5">
+                            <p class="text-white font-black text-xs">{{ cita.res_hora.strftime('%I:%M %p') }}</p>
+                            <p class="text-indigo-400/60 text-[8px] font-black uppercase tracking-widest text-center mt-0.5">
+                                {{ cita.res_fecha.day }} {{ meses_es[cita.res_fecha.month] }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not citas_proximas %}
+            <div class="flex flex-col items-center justify-center py-12 opacity-30">
+                <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-calendar-day text-2xl text-slate-500"></i>
+                </div>
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Agenda despejada</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+
+
+
+
+
+
+
+<div id="data-eficiencia" 
+     data-pendiente="{{ c_pendiente|default(0) }}" 
+     data-confirmada="{{ c_confirmada|default(0) }}" 
+     data-realizada="{{ c_realizada|default(0) }}" 
+     data-completada="{{ c_completadas|default(0) }}" 
+     data-canceladas="{{ c_canceladas|default(0) }}" 
+     style="display: none;">
+</div>
+
+<div class="bg-slate-900/40 backdrop-blur-md border border-white/10 p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+    <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 blur-[80px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700"></div>
+
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h3 class="text-white font-black text-xl tracking-tight">Estado de Agenda</h3>
+            <p class="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-bold">Rendimiento en tiempo real</p>
+        </div>
+        <div class="bg-indigo-500/20 p-3 rounded-2xl border border-indigo-500/30">
+            <i class="fa-solid fa-chart-pie text-indigo-400 text-lg"></i>
+        </div>
+    </div>
+    
+    <div class="relative mb-8" style="height: 220px; width: 100%;">
+        <canvas id="canvasEficiencia"></canvas>
+        
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            {% set total_dona = (c_pendiente|default(0)) + (c_confirmada|default(0)) + (c_realizada|default(0)) + (c_completadas|default(0)) + (c_canceladas|default(0)) %}
+            {% set total_logradas = (c_realizada|default(0)) + (c_completadas|default(0)) %}
+            
+            <div class="bg-slate-900/60 p-6 rounded-full border border-white/5 backdrop-blur-md shadow-inner flex flex-col items-center justify-center w-32 h-32">
+                <span class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-indigo-200 to-indigo-400 leading-none">
+                    {{ ((total_logradas / total_dona * 100) | int) if total_dona > 0 else 0 }}%
+                </span>
+                <span class="text-[9px] text-indigo-400/70 uppercase font-black tracking-widest mt-1">Efectividad</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div class="relative overflow-hidden bg-slate-800/40 p-4 rounded-3xl border border-white/5 hover:border-amber-500/30 transition-all duration-300 group/card">
+            <div class="flex justify-between items-start mb-1">
+                <p class="text-amber-400 font-black text-2xl tracking-tight">{{ c_pendiente | default(0) }}</p>
+                <div class="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse"></div>
+            </div>
+            <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Pendientes</p>
+        </div>
+
+        <div class="relative overflow-hidden bg-slate-800/40 p-4 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all duration-300 group/card">
+            <div class="flex justify-between items-start mb-1">
+                <p class="text-blue-400 font-black text-2xl tracking-tight">{{ c_confirmada | default(0) }}</p>
+                <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
+            </div>
+            <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Confirmadas</p>
+        </div>
+
+        <div class="relative overflow-hidden bg-slate-800/40 p-4 rounded-3xl border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/card">
+            <div class="flex justify-between items-start mb-1">
+                <p class="text-emerald-400 font-black text-2xl tracking-tight">{{ total_logradas }}</p>
+                <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+            </div>
+            <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Logradas</p>
+        </div>
+
+        <div class="relative overflow-hidden bg-slate-800/40 p-4 rounded-3xl border border-white/5 hover:border-rose-500/30 transition-all duration-300 group/card">
+            <div class="flex justify-between items-start mb-1">
+                <p class="text-rose-400 font-black text-2xl tracking-tight">{{ c_canceladas | default(0) }}</p>
+                <div class="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></div>
+            </div>
+            <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Canceladas</p>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+<div class="bg-slate-800/50 border border-white/10 p-6 rounded-3xl h-full backdrop-blur-sm shadow-2xl">
+    <div class="flex items-center justify-between mb-2">
+        <h3 class="text-white font-bold text-lg tracking-tight">Servicios Populares</h3>
+        <div class="bg-orange-500/20 p-2 rounded-xl">
+            <i class="fa-solid fa-fire-flame-curved text-orange-500 animate-pulse"></i>
+        </div>
+    </div>
+    
+    <p class="text-slate-500 text-xs mb-6 flex items-center gap-1 italic">
+        <i class="fa-solid fa-circle-info text-[10px]"></i>
+        Basado en reservas confirmadas, completadas y pendientes
+    </p>
+    
+    <div class="space-y-6">
+        {% for servicio in top_servicios %}
+        <div class="group">
+            <div class="flex justify-between items-end mb-2">
+                <div class="flex flex-col">
+                    <span class="text-xs text-slate-500 font-bold uppercase tracking-wider">Top {{ loop.index }}</span>
+                    <span class="text-slate-200 font-semibold group-hover:text-orange-400 transition-colors">
+                        {{ servicio.res_tipo_servicio }}
+                    </span>
+                </div>
+                <div class="text-right">
+                    <span class="text-white font-black text-lg">{{ servicio.total }}</span>
+                    <span class="text-slate-500 text-[10px] uppercase font-bold">Citas</span>
+                </div>
+            </div>
+
+            <div class="relative w-full bg-slate-700/50 h-3 rounded-full p-[2px] border border-white/5">
+                {% set porcentaje = (servicio.total / top_servicios[0].total * 100) if top_servicios[0].total > 0 else 0 %}
+                
+                <div class="h-full rounded-full transition-all duration-1000 ease-out 
+                            {% if loop.first %}
+                                bg-gradient-to-r from-orange-500 via-rose-500 to-orange-500 bg-[length:200%_100%] animate-[gradient_3s_linear_infinite]
+                            {% else %}
+                                bg-gradient-to-r from-indigo-500 to-purple-500
+                            {% endif %}" 
+                     style="width: {{ porcentaje }}%">
+                    
+                    <div class="absolute right-0 top-0 h-full w-4 bg-white/20 blur-sm rounded-full"></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not top_servicios %}
+            <div class="flex flex-col items-center justify-center py-10 opacity-40">
+                <i class="fa-solid fa-chart-simple text-4xl mb-3"></i>
+                <p class="text-slate-400 text-sm">Sin datos para mostrar</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+
+
+
+
+
+
+<div class="relative group bg-slate-900/40 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] mt-8 overflow-hidden shadow-2xl transition-all duration-500 hover:border-indigo-500/20">
+    
+    <div class="absolute -top-24 -left-24 w-64 h-64 bg-indigo-600/5 blur-[100px] rounded-full"></div>
+    <div class="absolute -bottom-24 -right-24 w-64 h-64 bg-purple-600/5 blur-[100px] rounded-full"></div>
+
+    <div class="relative flex items-center justify-between mb-8">
+        <div class="space-y-1">
+            <div class="flex items-center gap-2">
+                <h3 class="text-white font-black text-xl tracking-tight">Tendencia de Horarios</h3>
+                <span class="bg-indigo-500/10 text-indigo-400 text-[9px] font-black px-2 py-0.5 rounded-md border border-indigo-500/20 uppercase tracking-widest">Live Heatmap</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse"></div>
+                <p class="text-slate-400 text-xs font-bold" id="peak-hour-text">Calculando hora pico...</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="text-right hidden sm:block">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-tighter">Filtro Activo</p>
+                <p class="text-white text-xs font-bold">Hoy (24h)</p>
+            </div>
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 p-3 rounded-2xl border border-white/5 shadow-xl group-hover:scale-110 transition-transform duration-500">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-400 text-lg"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="relative h-64 overflow-x-auto custom-scrollbar group/scroll">
+        <div class="min-w-[800px] h-full pr-4">
+            <canvas id="calorChart"></canvas>
+        </div>
+        
+        <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-900/40 to-transparent pointer-events-none opacity-0 group-hover/scroll:opacity-100 transition-opacity"></div>
+    </div>
+
+    <div class="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full bg-slate-700"></div>
+                <span class="text-slate-500 text-[9px] font-black uppercase">Sin Citas</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full bg-indigo-500/40"></div>
+                <span class="text-slate-500 text-[9px] font-black uppercase">Flujo Normal</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+                <span class="text-slate-500 text-[9px] font-black uppercase">Hora Crítica</span>
+            </div>
+        </div>
+        <p class="text-slate-600 text-[9px] font-medium italic">Sincronizado con zona horaria local</p>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+<div class="relative group bg-slate-900/40 backdrop-blur-2xl border border-white/10 p-6 rounded-[2.5rem] hover:border-orange-500/30 transition-all duration-500 overflow-hidden shadow-2xl">
+    
+    <div class="absolute -top-12 -right-12 w-32 h-32 bg-orange-500/10 blur-[60px] rounded-full group-hover:bg-orange-500/20 transition-all duration-700"></div>
+
+    <div class="relative flex justify-between items-start mb-8">
+        <div>
+            <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Rendimiento Semanal</p>
+            <h3 class="text-white font-black text-xl mt-1 tracking-tight">
+                Día Pico: <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">{{ dia_pico }}</span>
+            </h3>
+        </div>
+        <div class="bg-gradient-to-br from-orange-500 to-amber-600 p-3 rounded-2xl shadow-[0_10px_20px_rgba(245,158,11,0.3)] transform group-hover:rotate-12 transition-transform duration-500">
+            <i class="fa-solid fa-chart-simple text-white text-lg"></i>
+        </div>
+    </div>
+
+    <div class="flex items-end justify-between gap-3 h-40 mb-6 px-1">
+        
+        {% for total in conteo_semanal %}
+        <div class="flex flex-col items-center flex-1 h-full justify-end group/bar">
+            
+            <div class="opacity-0 group-hover/bar:opacity-100 transition-all duration-300 -translate-y-2 group-hover/bar:-translate-y-1 mb-2">
+                <span class="bg-orange-500 text-white text-[9px] font-black px-2 py-1 rounded-md shadow-lg">
+                    {{ total }}
+                </span>
+            </div>
+            
+            {% set porcentaje = ((total | float / max_citas | float) * 100) | int if max_citas > 0 else 0 %}
+            <div class="w-full bg-slate-800/80 rounded-2xl relative overflow-hidden border border-white/5 transition-all duration-500 group-hover/bar:border-orange-500/50 shadow-inner" 
+                 style="height: {{ porcentaje }}%; min-height: 8px;">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-orange-600 via-orange-400 to-amber-300 h-full">
+                    <div class="absolute top-0 left-0 w-full h-1/2 bg-white/20 blur-[1px]"></div>
+                </div>
+
+                <div class="absolute inset-0 w-full h-full bg-gradient-to-t from-transparent via-white/10 to-transparent -translate-y-full group-hover/bar:animate-[shimmer_1.5s_infinite]"></div>
+            </div>
+
+            <span class="text-[10px] text-slate-500 mt-4 font-black uppercase tracking-widest group-hover/bar:text-orange-400 transition-colors">
+                {{ ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][loop.index0] }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="pt-4 border-t border-white/5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+            <p class="text-slate-500 text-[10px] font-bold uppercase tracking-tighter">Tendencia de agenda</p>
+        </div>
+        <span class="bg-slate-800 text-orange-400 text-[9px] font-black px-2 py-1 rounded-lg border border-orange-500/20 uppercase">
+            Sincronizado
+        </span>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+<div class="relative group bg-slate-900/40 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] hover:border-indigo-500/30 transition-all duration-500 overflow-hidden shadow-2xl">
+    
+    <div class="absolute -top-20 -right-20 w-40 h-40 bg-indigo-600/10 blur-[100px] rounded-full group-hover:bg-indigo-600/20 transition-all duration-700"></div>
+    <div class="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-600/5 blur-[100px] rounded-full"></div>
+
+    <div class="relative flex justify-between items-start">
+        <div class="space-y-1">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                    <p class="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em]">Audiencia Total</p>
+                </div>
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+            </div>
+            
+            <div class="flex items-baseline gap-1">
+                <h3 id="total-clientes-count" class="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
+                    {{ total_clientes }}
+                </h3>
+                <span class="text-3xl font-light text-indigo-500/50">+</span>
+            </div>
+            <p class="text-slate-500 text-xs font-medium">Clientes registrados en la plataforma</p>
+        </div>
+        
+        <div class="relative">
+            <div class="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+            <div class="relative bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-[1.5rem] shadow-xl transform group-hover:-translate-y-2 group-hover:rotate-6 transition-all duration-500 border border-white/20">
+                <i class="fa-solid fa-users text-white text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 space-y-3">
+        <div class="flex justify-between items-end">
+            <div class="flex flex-col">
+                <span class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Crecimiento Mensual</span>
+                <span class="text-emerald-400 text-sm font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-trend-up text-xs"></i> +12.5%
+                </span>
+            </div>
+            <span class="text-slate-400 text-[10px] font-bold">Meta: 100%</span>
+        </div>
+        
+        <div class="relative w-full bg-slate-800/80 rounded-full h-3 p-[2px] border border-white/5 overflow-hidden shadow-inner">
+            <div class="bg-gradient-to-r from-indigo-600 via-purple-500 to-indigo-400 h-full rounded-full relative group-hover:animate-pulse" 
+                 style="width: 70%">
+                <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] animate-[shimmer_2s_infinite]"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-slate-500">
+            <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+            <span class="text-[9px] font-black uppercase tracking-tighter">Base de datos optimizada</span>
+        </div>
+        <i class="fa-solid fa-shield-check text-indigo-500/50 text-xs"></i>
+    </div>
+</div>
+
+
+
+
+
+</div>
+
+
+<script>
+    const dataFlujoReal = {{ valores_flujo | tojson }};
+    const labelsFlujoReal = {{ labels_flujo | tojson }};
+</script>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,478 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+
+<meta charset="UTF-8">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reserva.css') }}" />
+
+<div x-data="{
+    seleccionadas: [],
+    modoSeleccion: false,
+    filtroNombre: '',
+    filtroEstado: 'todos',
+    filtroEmpleado: 'todos',
+    
+    // Centralizamos los estados que bloquean la selección
+    estadosBloqueados: ['realizada', 'completada', 'cancelada'],
+
+    debeMostrar(nombre, estado, servicio, emplId) {
+        const busqueda = this.filtroNombre.toLowerCase().trim();
+        const n = (nombre || '').toLowerCase();
+        const e = (estado || '').toLowerCase();
+        const idEmp = String(emplId || '0');
+
+        return n.includes(busqueda) && 
+               (this.filtroEstado === 'todos' || e === this.filtroEstado.toLowerCase()) &&
+               (this.filtroEmpleado === 'todos' || idEmp === String(this.filtroEmpleado));
+    },
+
+    toggleSeleccion(id, estadoActual) {
+        // 1. Validación inmediata usando el estado pasado por parámetro (más rápido que buscar en el DOM)
+        const estado = (estadoActual || '').toLowerCase();
+        if (this.estadosBloqueados.includes(estado)) return;
+
+        // 2. Lógica de selección limpia
+        const idStr = String(id);
+        if (this.seleccionadas.includes(idStr)) {
+            this.seleccionadas = this.seleccionadas.filter(i => i !== idStr);
+        } else {
+            this.seleccionadas.push(idStr);
+        }
+
+        // 3. Actualizar modoSeleccion basado en el conteo
+        this.modoSeleccion = this.seleccionadas.length > 0;
+    }
+}" class="pb-32 min-h-screen">
+
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<div class="mb-8 space-y-4 bg-slate-900/60 p-5 rounded-[2.5rem] border border-white/10 shadow-2xl backdrop-blur-md">
+    
+    <div class="relative group">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 group-focus-within:text-sky-400 transition-colors">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+        </span>
+        <input type="text" x-model="filtroNombre" placeholder="Buscar por nombre de cliente..." 
+               class="w-full bg-slate-800/50 border border-white/5 text-white text-sm rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 transition-all placeholder:text-slate-600">
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3">
+        
+        <div class="flex-1 relative">
+            <select x-model="filtroEstado" 
+                    class="w-full bg-slate-800/50 text-white text-[11px] font-bold uppercase tracking-wider rounded-2xl px-4 py-3 border border-white/5 outline-none appearance-none focus:border-sky-500/50 transition-all cursor-pointer">
+                <option value="todos">📊 Todos los Estados</option>
+                <option value="Pendiente">🕒 Pendientes</option>
+                <option value="confirmada">🤝 Confirmadas</option>
+                <option value="Realizada">✨ Realizadas</option> 
+                <option value="Completada">✅ Pagadas</option>
+                <option value="Cancelada">❌ Canceladas</option>
+            </select>
+            <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+        </div>
+
+        <div class="flex-1 relative">
+            <select x-model="filtroEmpleado" 
+                    class="w-full bg-slate-800/50 text-white text-[11px] font-bold uppercase tracking-wider rounded-2xl px-4 py-3 border border-white/5 outline-none appearance-none focus:border-sky-500/50 transition-all cursor-pointer">
+                <option value="todos">👤 Todos los Profesionales</option>
+                {% for emp in lista_empleados %}
+                    {# Gracias al filtro en Python, aquí solo llegarán los activos #}
+                    <option value="{{ emp.empl_id }}">🔹 {{ emp.empl_nombre }}</option>
+                {% endfor %}
+            </select>
+            <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+        </div>
+
+    </div>
+</div>
+
+    <h2 class="text-3xl font-extrabold text-white tracking-tight px-4 mb-6">Agenda de Reservas</h2>
+
+{% set categorias_lista = [
+    {'id': 'ayer', 'titulo': 'Ayer', 'color': 'text-rose-400'},
+    {'id': 'hoy', 'titulo': 'Hoy', 'color': 'text-emerald-400'},
+    {'id': 'manana', 'titulo': 'Mañana', 'color': 'text-sky-400'},
+    {'id': 'futuro', 'titulo': 'Próximas Reservas', 'color': 'text-slate-400'}
+] %}
+
+{% for cat in categorias_lista %}
+    <div class="mb-14 px-2">
+        
+        {% if not loop.first %}
+        <div class="border-t border-white/5 mb-10 mx-6"></div>
+        {% endif %}
+
+        <div class="flex items-center justify-between px-4 mb-6">
+            <h3 class="text-xs font-black uppercase tracking-[0.2em] {{ cat.color }}">
+                {{ cat.titulo }}
+            </h3>
+            
+        <span class="text-[10px] font-mono text-slate-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            {% if cat.id == 'ayer' %}
+                {{ ayer.strftime('%d/%m/%Y') }}
+            {% elif cat.id == 'hoy' %}
+                {{ hoy.strftime('%d/%m/%Y') }}
+            {% elif cat.id == 'manana' %}
+                {{ manana.strftime('%d/%m/%Y') }}
+            {% else %}
+                Vista Futura
+            {% endif %}
+        </span>
+        </div>
+        
+<div class="columna-sortable grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[150px] w-full" 
+    x-init="typeof initSortableCol === 'function' ? initSortableCol($el) : setTimeout(() => initSortableCol($el), 500)"
+    data-cat-id="{{ cat.id }}"
+    data-fecha="{% if cat.id == 'ayer' %}{{ ayer.strftime('%Y-%m-%d') }}{% elif cat.id == 'hoy' %}{{ hoy.strftime('%Y-%m-%d') }}{% elif cat.id == 'manana' %}{{ manana.strftime('%Y-%m-%d') }}{% else %}futuro{% endif %}"
+    data-empl-id="{{ current_user.emp_id }}">
+
+    {% set ns = namespace(encontrado=false) %}
+    {% for r, c, aptos in reservas_data %}
+        
+    {% set es_de_esta_cat = false %}
+
+    {% if cat.id == 'ayer' and r.res_fecha == ayer %} 
+        {# Cambiamos < hoy por == ayer para que SOLO muestre las de ayer #}
+        {% set es_de_esta_cat = true %}
+    {% elif cat.id == 'hoy' and r.res_fecha == hoy %} 
+        {% set es_de_esta_cat = true %}
+    {% elif cat.id == 'manana' and r.res_fecha == manana %} 
+        {% set es_de_esta_cat = true %}
+    {% elif cat.id == 'futuro' and r.res_fecha > manana %} 
+        {% set es_de_esta_cat = true %}
+    {% endif %}
+
+        {% if es_de_esta_cat %}
+            {% set ns.encontrado = true %}
+            
+<div x-show="debeMostrar('{{ c.cli_nombre|e }}', '{{ r.res_estado }}', '{{ r.res_tipo_servicio }}', '{{ r.empl_id|default('0') }}')"
+    {# 1. AGREGAMOS CLASE DINÁMICA 'no-drag' SI ESTÁ COMPLETADA #}
+    class="tarjeta-reserva relative backdrop-blur-md border rounded-[2.5rem] p-6 transition-all duration-300 cursor-pointer select-none w-full {% if r.res_estado == 'Completada' %}no-drag opacity-75 grayscale-[0.5]{% endif %}"
+    data-id="{{ r.res_id }}"
+    data-empl-id="{{ r.empl_id or '0' }}"
+    data-tel="{{ c.cli_telefono }}"
+    data-nombre="{{ c.cli_nombre }}"
+    {# 2. ASEGURAMOS QUE LA HORA ESTÉ LIMPIA #}
+    data-hora="{{ r.res_hora.strftime('%H:%M') if r.res_hora else '00:00' }}"
+    data-servicio="{{ r.res_tipo_servicio }}"
+    data-fecha="{{ r.res_fecha }}"
+    data-estado="{{ r.res_estado }}"
+    data-empresa="{{ empresa.emp_razon_social }}" 
+    data-direccion="{{ empresa.emp_direccion }}"
+    @click="toggleSeleccion('{{ r.res_id }}')"
+    :class="{
+        'border-sky-500 ring-4 ring-sky-500/20 bg-sky-500/10 scale-[1.02]': seleccionadas.includes('{{ r.res_id }}'),
+        'border-white/5 bg-slate-800/40': !seleccionadas.includes('{{ r.res_id }}'),
+        'opacity-40 cursor-not-allowed grayscale-[0.8]': '{{ r.res_estado|lower }}' === 'completada' || '{{ r.res_estado|lower }}' === 'realizada'
+    }">
+
+    {# 3. INDICADOR VISUAL DE COMPLETADA #}
+    <div x-show="seleccionadas.includes('{{ r.res_id }}')" 
+        class="absolute -top-2 -right-2 bg-sky-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg z-50">
+        <i class="fa-solid fa-check"></i>
+    </div>
+
+    <div :class="modoSeleccion && !seleccionadas.includes('{{ r.res_id }}') ? 'opacity-40 scale-95' : ''" class="transition-all duration-300">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h4 class="text-white font-bold text-xl leading-tight">{{ c.cli_nombre }}</h4>
+
+{# Notas Personales del Cliente con Edición Rápida #}
+<div class="mt-2" x-data="{ editando: false, nota: '{{ c.cli_notas_personales or '' }}' }">
+    <div class="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 transition-all"
+         :class="editando ? 'bg-slate-900 border-sky-500' : ''">
+        
+        <div class="mt-0.5">
+            <i class="fa-solid fa-star text-amber-400 text-[10px]"></i>
+        </div>
+
+        <div class="flex-1">
+            {# Vista de Lectura #}
+            <template x-if="!editando">
+                <div class="flex justify-between items-start gap-2">
+                    <p class="text-[10px] text-amber-200/90 font-medium leading-tight italic">
+                        {{ c.cli_notas_personales or 'Sin notas sobre preferencias...' }}
+                    </p>
+                    <button @click.stop="editando = true" class="text-amber-500/50 hover:text-amber-400 p-1">
+                        <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                    </button>
+                </div>
+            </template>
+
+            {# Vista de Edición #}
+{# Vista de Edición #}
+<template x-if="editando">
+    <div class="space-y-2">
+        <textarea x-model="nota" 
+                  {# ESTO CORRIGE EL PROBLEMA DE LOS ESPACIOS #}
+                  @click.stop 
+                  @keydown.space.stop
+                  @keydown.enter.stop
+                  class="w-full bg-slate-800 border border-white/10 rounded-lg text-[10px] text-white p-2 focus:ring-1 focus:ring-sky-500 outline-none"
+                  rows="2"
+                  placeholder="Escribe algo sobre el cliente..."></textarea>
+        
+        <div class="flex justify-end gap-2">
+            <button @click.stop="editando = false" 
+                    class="text-[9px] text-slate-400 font-black uppercase tracking-widest px-2 py-1">
+                Cancelar
+            </button>
+            <button @click.stop="
+                    fetch('/admin/cliente/update-nota/{{ c.cli_id }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nota: nota })
+                    }).then(() => { editando = false; window.location.reload(); })
+                    " 
+                    class="bg-sky-500/20 text-sky-400 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-md border border-sky-500/30">
+                Guardar
+            </button>
+        </div>
+    </div>
+</template>
+        </div>
+    </div>
+</div>
+    
+    <div class="flex flex-col gap-0.5 mt-1">
+        <p class="text-sky-400 font-mono text-sm font-bold">
+            {{ r.res_hora.strftime('%I:%M %p') }}
+        </p>
+        <p class="text-slate-500 font-black text-[10px] uppercase tracking-widest">
+            {{ r.res_fecha | fecha_es }}
+        </p>
+    </div>
+
+<div class="mt-3 p-3 bg-white/5 rounded-2xl border border-white/10" 
+     @click.stop 
+     x-data="{ 
+        abierto: false, 
+        horas: [], 
+        cargando: false,
+        {# Inicializa con la fecha de la reserva, pero si ya pasó, usa hoy #}
+        nuevaFecha: '{{ r.res_fecha if r.res_fecha >= hoy else hoy }}',
+        
+        async cargarHoras() {
+            const hoyStr = '{{ hoy.strftime('%Y-%m-%d') }}';
+            
+            {# Validación de seguridad: si es fecha pasada, no carga nada #}
+            if (this.nuevaFecha < hoyStr) {
+                this.horas = [];
+                return;
+            }
+
+            this.cargando = true;
+            this.abierto = true;
+            try {
+                {# Enviamos la nuevaFecha seleccionada y el tipo de servicio #}
+                const resp = await fetch(`/api/horas-disponibles?fecha=${this.nuevaFecha}&servicio_id={{ r.res_tipo_servicio }}`);
+                const data = await resp.json();
+                this.horas = data.horas;
+            } catch (e) { 
+                console.error('Error al cargar horas:', e); 
+            }
+            this.cargando = false;
+        }
+     }">
+    
+<div class="flex items-center justify-between 
+    {% if r.res_estado|lower == 'completada' %} 
+        opacity-30 pointer-events-none grayscale 
+    {% endif %}">
+    
+    <span class="text-[9px] font-bold uppercase tracking-tighter 
+        {% if r.res_estado|lower == 'completada' %} text-slate-500 {% else %} text-slate-400 {% endif %}">
+        {% if r.res_estado|lower == 'completada' %}
+            <i class="fa-solid fa-lock text-[8px] mr-1"></i> Cita Finalizada
+        {% else %}
+            Reagendar Cita
+        {% endif %}
+    </span>
+
+    <button @click.stop="cargarHoras()" class="text-sky-400 hover:text-sky-300 transition-colors p-1">
+        <i class="fa-solid fa-calendar-day text-sm"></i>
+    </button>
+</div>
+
+    <div x-show="abierto" x-cloak class="mt-2 space-y-3 no-drag" @click.outside="abierto = false">
+        <div>
+            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Seleccionar Día</label>
+            <input type="date" 
+                   x-model="nuevaFecha" 
+                   @change="cargarHoras()"
+                   {# Atributo MIN: Bloquea fechas anteriores a hoy en el navegador #}
+                   min="{{ hoy.strftime('%Y-%m-%d') }}"
+                   class="w-full bg-slate-900 border border-white/10 rounded-lg text-[10px] text-white p-2 focus:ring-1 focus:ring-sky-500 outline-none color-scheme-dark">
+        </div>
+
+        <div class="space-y-2">
+            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Horas Disponibles</label>
+            
+            <template x-if="cargando">
+                <div class="flex justify-center py-2">
+                    <div class="animate-spin h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full"></div>
+                </div>
+            </template>
+            
+            <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                <template x-for="h in horas" :key="h.valor">
+                    <button type="button"
+                            x-on:click.stop.prevent="window.reagendarHora('{{ r.res_id }}', h.valor, nuevaFecha)" 
+                            class="text-[10px] bg-slate-900 border border-white/10 text-slate-300 py-1.5 rounded-lg hover:bg-sky-500 hover:text-white transition-all font-mono"
+                            x-text="h.formato">
+                    </button>
+                </template>
+            </div>
+            
+            <template x-if="horas.length === 0 && !cargando">
+                <div class="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
+                    <p class="text-[9px] text-rose-400 text-center font-medium">No hay turnos disponibles para esta fecha</p>
+                </div>
+            </template>
+        </div>
+
+        <button @click.stop="abierto = false" class="w-full text-[9px] text-slate-500 hover:text-white uppercase font-black pt-2 border-t border-white/5 transition-colors">
+            Cerrar
+        </button>
+    </div>
+</div>
+</div>
+                        
+
+                    <span class="text-[10px] font-black uppercase px-2 py-1 rounded-lg border 
+                        {% if r.res_estado|lower == 'confirmada' %} bg-amber-500/20 text-amber-400 border-amber-500/30
+                        {% elif r.res_estado|lower == 'realizada' %} bg-emerald-500/20 text-emerald-400 border-emerald-500/30
+                        {% elif r.res_estado|lower == 'pendiente' %} bg-sky-500 text-white border-white animate-pulse
+                        {% else %} bg-white/5 text-slate-500 border-white/10 {% endif %}">
+                        {{ r.res_estado }}
+                    </span>
+                    </div>
+
+                    <div class="space-y-1 mb-4">
+                        <p class="text-slate-300 text-sm font-semibold">{{ r.res_tipo_servicio }}</p>
+                        <p class="text-slate-500 text-[11px] italic line-clamp-2">"{{ r.res_notas or 'Sin notas' }}"</p>
+                    </div>
+
+
+<div class="mb-3" @click.stop>
+    <form action="{{ url_for('admin.asignar_empleado', id=r.res_id) }}" method="POST">
+        <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1 mb-1 block">
+            Profesional Calificado
+        </label>
+        <select name="empleado_id" onchange="this.form.submit()" 
+                {% if r.res_estado|lower == 'completada' %} disabled {% endif %}
+                class="w-full bg-slate-900 border border-white/10 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none appearance-none transition-all
+                {% if r.res_estado|lower == 'completada' %} opacity-50 cursor-not-allowed border-transparent bg-slate-950 {% endif %}">
+            <option value="">Sin asignar</option>
+            {% for emp in aptos %}
+                <option value="{{ emp.empl_id }}" {% if r.empl_id == emp.empl_id %}selected{% endif %}>
+                    {{ emp.empl_nombre }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if r.res_estado|lower == 'completada' %}
+            <input type="hidden" name="empleado_id" value="{{ r.empl_id }}">
+        {% endif %}
+    </form>
+</div>
+
+<div @click.stop>
+    <form action="{{ url_for('admin.reserva_estado', id=r.res_id) }}" method="POST">
+        <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1 mb-1 block">
+            Estado de la Cita
+        </label>
+        <select name="estado" onchange="this.form.submit()" 
+                {% if r.res_estado|lower == 'completada' %} disabled {% endif %}
+                class="w-full border outline-none font-bold text-xs rounded-xl px-3 py-2 appearance-none transition-all
+                {% if r.res_estado|lower == 'pendiente' %} bg-sky-500 text-white
+                {% elif r.res_estado|lower == 'confirmada' %} bg-amber-500 text-white
+                {% elif r.res_estado|lower == 'realizada' %} bg-emerald-500 text-white
+                {% elif r.res_estado|lower == 'completada' %} bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed
+                {% else %} bg-slate-900 text-white {% endif %}">
+            
+            <option value="Pendiente" {% if r.res_estado|lower == 'pendiente' %}selected{% endif %}>🔔 Pendiente</option>
+            <option value="Confirmada" {% if r.res_estado|lower == 'confirmada' %}selected{% endif %}>🤝 Confirmada</option>
+            <option value="Realizada" {% if r.res_estado|lower == 'realizada' %}selected{% endif %}>✨ Realizada</option>
+            <option value="Cancelada" {% if r.res_estado|lower == 'cancelada' %}selected{% endif %}>❌ Cancelada</option>
+            
+            {% if r.res_estado|lower == 'completada' %}
+                <option value="Completada" selected>✅ Pagada</option>
+            {% endif %}
+        </select>
+    </form>
+</div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    {% if not ns.encontrado %}
+        <div class="col-span-full py-12 text-center border-2 border-dashed border-white/5 rounded-[2.5rem] bg-white/[0.02]">
+            <p class="text-slate-600 text-xs italic tracking-wide">No hay citas para esta categoría.</p>
+        </div>
+    {% endif %}
+</div>
+    </div>
+    {% endfor %}
+
+<div x-show="seleccionadas.length > 0" 
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0 translate-y-10"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100 translate-y-0"
+     x-transition:leave-end="opacity-0 translate-y-10"
+     class="fixed bottom-6 left-4 right-4 z-[150] bg-slate-900/95 backdrop-blur-xl border border-white/20 p-3 rounded-[2.5rem] shadow-2xl flex items-center justify-between">
+    
+    <div class="flex items-center gap-2 ml-3">
+        <div class="bg-sky-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shadow-[0_0_15px_rgba(14,165,233,0.5)]" 
+             x-text="seleccionadas.length"></div>
+        <div class="flex flex-col">
+            <span class="text-white text-[10px] font-black uppercase tracking-tighter">Seleccionadas</span>
+            <span class="text-sky-400 text-[8px] font-bold uppercase">Acción Masiva</span>
+        </div>
+    </div>
+
+    <div class="flex gap-2 mr-1">
+        
+        <button @click="enviarMensajeConfirmacion(seleccionadas)" 
+                title="Enviar recordatorios de WhatsApp"
+                class="bg-emerald-600 text-white w-11 h-11 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+            <i class="fa-brands fa-whatsapp text-lg"></i>
+        </button>
+
+        <div class="w-[1px] h-6 bg-white/10 mx-1 self-center"></div>
+
+        
+        <button @click="confirmarAccionMasiva('confirmada', seleccionadas)" 
+                title="Marcar como Confirmada"
+                class="bg-amber-500 text-slate-900 w-11 h-11 rounded-full flex items-center justify-center shadow-lg">
+            <i class="fa-solid fa-calendar-check text-sm"></i>
+        </button>
+        
+        <button @click="confirmarAccionMasiva('realizada', seleccionadas)" 
+                title="Marcar como realizada"
+                class="bg-emerald-500 text-slate-900 w-11 h-11 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+            <i class="fa-solid fa-check-double text-sm"></i>
+        </button>
+
+
+        <button @click="confirmarAccionMasiva('cancelada', seleccionadas)" 
+                title="Anular Reservas"
+                class="bg-rose-500 text-white w-11 h-11 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+            <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+    </div>
+</div>
+
+</div> 
+<div id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center">
+    <div class="flex flex-col items-center">
+        <div class="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-white text-xs font-bold mt-4 uppercase tracking-widest">Guardando cambios...</p>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/reservas.js') }}"></script>
+{% endblock %}
