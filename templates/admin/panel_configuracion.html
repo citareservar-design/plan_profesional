@@ -1,0 +1,74 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="p-6">
+    <h1 class="text-2xl font-bold text-white mb-8">Panel de Configuración</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        {% if current_user.tiene_permiso('ver_servicios') %}
+        <a href="{{ url_for('admin.gestion_servicios') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+            <div class="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-tags text-2xl text-indigo-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Servicios</h3>
+            <p class="text-slate-400 text-sm mt-2">Gestiona los tratamientos, precios y duraciones.</p>
+        </a>
+        {% endif %}
+        
+{% if current_user.tiene_permiso('ver_empleados') %}
+<a href="{{ url_for('admin.gestion_empleados') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+    <div class="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+        <i class="fa-solid fa-user-tie text-2xl text-purple-500"></i>
+    </div>
+    <h3 class="text-lg font-bold text-white uppercase tracking-wider">Empleados</h3>
+    <p class="text-slate-400 text-sm mt-2">Gestiona el equipo de trabajo y sus perfiles.</p>
+</a>
+{% endif %}
+
+        
+
+        
+        {% if current_user.tiene_permiso('ver_horarios') %}
+        <a href="{{ url_for('admin.configurar_horarios') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+            <div class="w-12 h-12 bg-sky-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-regular fa-clock text-2xl text-sky-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Horarios</h3>
+            <p class="text-slate-400 text-sm mt-2">Define tus días y horas de atención al público.</p>
+        </a>
+        {% endif %}
+
+        {% if current_user.tiene_permiso('ver_usuarios') %}
+        <a href="{{ url_for('admin.gestion_usuarios') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+            <div class="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-users-gear text-2xl text-purple-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Usuarios</h3>
+            <p class="text-slate-400 text-sm mt-2">Gestiona el personal y sus permisos de acceso.</p>
+        </a>
+        {% endif %}
+
+        {% if current_user.tiene_permiso('ver_empresa') %}
+        <a href="{{ url_for('admin.configurar_empresa') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+            <div class="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-building text-2xl text-amber-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Empresa</h3>
+            <p class="text-slate-400 text-sm mt-2">Actualiza logo, nombre y datos de contacto.</p>
+        </a>
+        {% endif %}
+
+        {% if current_user.tiene_permiso('ver_QR') %}
+        <a href="{{ url_for('admin.mi_qr') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
+            <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-qrcode text-2xl text-emerald-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Mi QR</h3>
+            <p class="text-slate-400 text-sm mt-2">Visualiza y descarga el código para tus clientes.</p>
+        </a>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

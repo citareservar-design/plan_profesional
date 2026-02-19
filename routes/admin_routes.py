@@ -32,6 +32,7 @@ admin_bp = Blueprint('admin', __name__)
 # ----10. GESTION DE COMISIONES 
 # ---11. HISTORIAL DE RESERVAS Y REPORTES
 #---12. CÓDIGOS QR
+# ---13  configuracion panel de control
 #
 
 
@@ -2097,3 +2098,14 @@ def mi_qr():
 
     # 3. CORRECCIÓN: Aquí decía 'empres', debe ser 'empresa'
     return render_template('admin/miqr.html', empresa=empresa)
+
+
+# ---13  configuracion panel de control
+
+@admin_bp.route('/configuracion')
+@login_required
+def panel_configuracion():
+    # Solo permitimos entrar si tiene permiso de ver configuración
+    if not current_user.tiene_permiso('ver_configuracion'):
+        abort(403)
+    return render_template('admin/panel_configuracion.html')
