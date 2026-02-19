@@ -148,6 +148,8 @@ class Servicio(db.Model):
     ser_estado = db.Column(db.Integer, default=1)
     emp_id = db.Column(db.String(2))
     ser_tiempo = db.Column(db.Integer, default=60)
+    mostrar_precio = db.Column(db.Boolean, default=True)
+    mostrar_tiempo = db.Column(db.Boolean, default=True)
 
     
     

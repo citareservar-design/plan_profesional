@@ -1175,6 +1175,29 @@ def reactivar_servicio(servicio_id):
         return jsonify({"status": "error", "message": str(e)}), 500
     
     
+    
+@admin_bp.route('/actualizar-servicios-masivo', methods=['POST'])
+@login_required
+def actualizar_servicios_masivo():
+    # Detectamos si los switches están en el request
+    nuevo_estado_precio = 1 if 'switch_precio' in request.form else 0
+    nuevo_estado_tiempo = 1 if 'switch_tiempo' in request.form else 0
+
+    try:
+        # CORRECCIÓN: Usamos 'Servicio' que es como lo tienes importado
+        db.session.query(Servicio).update({
+            Servicio.mostrar_precio: nuevo_estado_precio,
+            Servicio.mostrar_tiempo: nuevo_estado_tiempo
+        })
+        db.session.commit()
+        # Opcional: print("¡Actualización masiva exitosa!") 
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error en update masivo: {e}")
+
+    return redirect(url_for('admin.gestion_servicios'))
+    
+    
 
 # --- 6. GESTIÓN DE RESERVAS 
 
