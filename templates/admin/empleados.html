@@ -80,6 +80,35 @@
     </button>
 </form>
 
+
+
+<div class="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10">
+    <div class="flex flex-col">
+        <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest">¿Mostrar en Agenda?</span>
+        <span id="estado_visibilidad" class="text-[10px] font-bold {% if empleados[0].empl_mostrar_en_reserva %} text-sky-500 {% else %} text-rose-500 {% endif %} uppercase">
+            {% if empleados[0].empl_mostrar_en_reserva %} Activado {% else %} Desactivado {% endif %}
+        </span>
+    </div>
+    
+    <label class="relative inline-flex items-center cursor-pointer ml-2">
+        <input type="checkbox" 
+               id="toggle_mostrar_empleados" 
+               class="sr-only peer" 
+               {% if empleados[0].empl_mostrar_en_reserva %} checked {% endif %}
+               onchange="actualizarVisibilidadGlobal(this.checked)">
+        
+        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer 
+                    peer-checked:after:translate-x-full peer-checked:after:border-white 
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                    after:bg-white after:border-slate-300 after:border after:rounded-full 
+                    after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 shadow-inner">
+        </div>
+    </label>
+</div>
+
+
+
+
     </div>
 
 </div>

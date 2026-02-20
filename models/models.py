@@ -45,6 +45,7 @@ class Empleado(db.Model):
     empl_cargo = db.Column(db.String(50))
     empl_porcentaje = db.Column(db.Numeric(5, 2), default=40.00)
     empl_activo = db.Column(db.Boolean, default=True, nullable=False)
+    empl_mostrar_en_reserva = db.Column(db.Boolean, default=True)
     
     # Relación con Empresa
     emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)

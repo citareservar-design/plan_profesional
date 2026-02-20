@@ -16,6 +16,7 @@ import json
 
 
 # Definición del Blueprint para Administración
+print("✅ El archivo admin_routes.py se ha cargado correctamente")
 admin_bp = Blueprint('admin', __name__)
 
 # Configuración
@@ -719,6 +720,41 @@ def importar_empleados():
         flash(f'Error al procesar el archivo Excel.', 'error')
 
     return redirect(url_for('admin.gestion_empleados'))
+
+
+
+
+@admin_bp.route('/api/configuracion/visibilidad-empleados', methods=['POST'])
+def cambiar_visibilidad_staff():
+    try:
+        data = request.get_json()
+        nuevo_estado = data.get('mostrar_empleados')
+        
+        # Obtenemos el ID de la empresa/negocio de la sesión
+        emp_id_actual = session.get('emp_id') 
+
+        if not emp_id_actual:
+            return jsonify({'status': 'error', 'message': 'Sesión expirada'}), 401
+
+        # Filtramos por empresa y actualizamos
+        empleados = Empleado.query.filter_by(emp_id=emp_id_actual).all()
+        
+        if not empleados:
+             return jsonify({'status': 'success', 'message': 'No hay empleados para actualizar'})
+
+        for emp in empleados:
+            emp.empl_mostrar_en_reserva = nuevo_estado
+        
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Visibilidad actualizada'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error en DB: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Error interno del servidor'}), 500
+
+
+
     
 # --- 4. GESTIÓN DE CLIENTES ---
 

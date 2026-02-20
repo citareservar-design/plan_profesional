@@ -590,3 +590,81 @@ function toggleTodosServicios() {
     if(btn) btn.innerText = todosMarcados ? "Seleccionar Todos" : "Desmarcar Todos";
 }
 
+// --- LÓGICA DE VISIBILIDAD DE EMPLEADOS EN RESERVAS ---
+
+/**
+ * Actualiza la preferencia del propietario sobre si mostrar o no
+ * la selección de empleados a los clientes.
+ */
+function actualizarVisibilidadGlobal(mostrar) {
+    const textoEstado = document.getElementById('estado_visibilidad');
+    const inputSwitch = document.getElementById('toggle_mostrar_empleados');
+    
+    // 1. Guardar estado anterior por si hay que revertir
+    const estadoAnterior = !mostrar;
+
+    // 2. Feedback visual inmediato
+    if (textoEstado) {
+        textoEstado.innerText = mostrar ? "Activado" : "Desactivado";
+        if (mostrar) {
+            textoEstado.classList.replace('text-rose-500', 'text-sky-500');
+        } else {
+            textoEstado.classList.replace('text-sky-500', 'text-rose-500');
+        }
+    }
+
+    // 3. Enviar al servidor
+// Cambia la línea del fetch por esta:
+fetch('/admin/api/configuracion/visibilidad-empleados', { 
+    method: 'POST',
+    headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    },
+    body: JSON.stringify({ mostrar_empleados: mostrar })
+})
+    .then(response => {
+        // Si el servidor responde 404, 500, etc., lanzamos error
+        if (!response.ok) throw new Error('Error en la respuesta del servidor');
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+                background: '#0f172a',
+                color: '#fff'
+            });
+            
+            Toast.fire({
+                icon: 'success',
+                title: mostrar ? 'Los clientes elegirán personal' : 'Asignación automática desactivada'
+            });
+        } else {
+            throw new Error(data.message || 'Error desconocido');
+        }
+    })
+    .catch(err => {
+        console.error("Error al guardar configuración:", err);
+        
+        // 4. REVERSIÓN: Si falló, regresamos el switch y el texto a como estaban
+        if (inputSwitch) inputSwitch.checked = estadoAnterior;
+        if (textoEstado) {
+            textoEstado.innerText = estadoAnterior ? "Activado" : "Desactivado";
+            textoEstado.classList.toggle('text-sky-500', estadoAnterior);
+            textoEstado.classList.toggle('text-rose-500', !estadoAnterior);
+        }
+
+        Swal.fire({
+            title: 'No se pudo guardar',
+            text: 'Hubo un problema de conexión o el servidor falló.',
+            icon: 'error',
+            background: '#0f172a',
+            color: '#fff'
+        });
+    });
+}
