@@ -149,25 +149,43 @@ input[type="checkbox"]:required:invalid + span {
                 <p id="msg_fecha" class="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tight ml-2">Selecciona un día para ver horas</p>
               </div>
 
-            <div>
-              <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Servicio</label>
-              <div class="relative">
-                <i class="fa-solid fa-sparkles absolute left-4 top-1/2 -translate-y-1/2 text-sky-500"></i>
-                <select name="tipo_una" id="select_servicio" required
-                        class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none focus:border-sky-500">
-                  <option value="" disabled selected>Selecciona servicio</option>
-                  {% for s in servicios %}
-                    {# SOLO MOSTRAMOS SI ser_estado ES 1 (ACTIVO) #}
-                    {% if s.ser_estado == 1 %}
-                      <option value="{{ s.ser_nombre }}" data-tiempo="{{ s.ser_tiempo }}">
+
+
+              
+
+<div>
+    <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Servicio</label>
+    <div class="relative">
+        <i class="fa-solid fa-sparkles absolute left-4 top-1/2 -translate-y-1/2 text-sky-500"></i>
+        <select name="tipo_una" id="select_servicio" required
+                class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none focus:border-sky-500">
+            <option value="" disabled selected>Selecciona servicio</option>
+            {% for s in servicios %}
+                {% if s.ser_estado == 1 %}
+                    <option value="{{ s.ser_nombre }}" 
+                            data-tiempo="{{ s.ser_tiempo }}" 
+                            data-precio="{{ s.ser_precio }}"
+                            data-show-precio="{{ s.mostrar_precio }}"
+                            data-show-tiempo="{{ s.mostrar_tiempo }}">
                         {{ s.ser_nombre }}
-                      </option>
-                    {% endif %}
-                  {% endfor %}
-                </select>
-                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-              </div>
-            </div>
+                    </option>
+                {% endif %}
+            {% endfor %}
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+    </div>
+
+    <div id="detalles_servicio" class="mt-4 space-y-2 hidden">
+        </div>
+</div>
+
+
+
+
+
+
+
+
           </div>
 
 <div>
@@ -274,7 +292,7 @@ input[type="checkbox"]:required:invalid + span {
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
                 </span>
                 <span class="text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-                    Versión 1.0.0
+                    Versión 1.0.1
                 </span>
             </div>
         </div>
