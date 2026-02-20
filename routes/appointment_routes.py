@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from datetime import datetime, timedelta, time
-from models.models import  Empresa,  Servicio, DiasBloqueados,ConfigHorario, Reserva
+from models.models import  Empresa,  Servicio, DiasBloqueados,ConfigHorario, Reserva, Empleado,db
 from services.appointment_service import  obtener_horas_disponibles, enviar_correo_confirmacion
 import pytz
 
@@ -11,25 +11,47 @@ appointment_bp = Blueprint('appointment', __name__)
 @appointment_bp.route('/')
 def index(): 
     """ Formulario público que ve el cliente al entrar a la IP """
+    from sqlalchemy import text # Asegúrate de tener esta importación
     ahora = datetime.now()
     hoy_str = ahora.strftime("%Y-%m-%d")
     fecha_solicitada = request.args.get('date', hoy_str)
     
-    # Evitar que seleccionen fechas pasadas
+    emp_id = '01' 
+    
+    # --- 1. CARGAR DATOS DE LA DB ---
+    empresa_data = Empresa.query.filter_by(emp_id=emp_id).first()
+    lista_servicios = Servicio.query.all() 
+    lista_empleados = Empleado.query.filter_by(emp_id=emp_id, empl_activo=True).all()
+    
+    # --- 2. MAPA DE HABILIDADES (CONSULTA ROBUSTA) ---
+    mapa_habilidades = {}
+    for servicio in lista_servicios:
+        # Consultamos directamente la tabla intermedia para evitar fallos de relación
+        sql = text("SELECT empl_id FROM EMPLEADO_SERVICIOS WHERE ser_id = :sid")
+        resultado = db.session.execute(sql, {'sid': servicio.ser_id}).fetchall()
+        
+        # Guardamos los IDs de los empleados que pueden hacer este servicio
+        ids_autorizados = [fila[0] for fila in resultado]
+        mapa_habilidades[servicio.ser_nombre] = ids_autorizados
+
+    import json
+    # ESTE PRINT ES CLAVE: Debe mostrar IDs dentro de los corchetes
+    print(f"--- DEBUG SISTEMA INTELIGENTE ---")
+    print(f"Mapa generado: {mapa_habilidades}")
+    
+    # --- 3. CONFIGURACIÓN DE VISIBILIDAD ---
+    empleado_referencia = Empleado.query.filter_by(emp_id=emp_id).first()
+    mostrar_staff = empleado_referencia.empl_mostrar_en_reserva if empleado_referencia else False
+    
+    # Evitar fechas pasadas
     if fecha_solicitada < hoy_str:
         return redirect(url_for('appointment.index', date=hoy_str))
 
     hora_actual_str = ahora.strftime("%H:%M")
-    empresa_data = Empresa.query.filter_by(emp_id='01').first()
-    
-    # --- CORRECCIÓN AQUÍ: Cargar los servicios de la DB ---
-    # Esto permite que el {% for s in servicios %} del HTML funcione
-    lista_servicios = Servicio.query.all()
 
-    # Obtener disponibilidad de horas
+    # Obtener disponibilidad de horas (usa el nombre del servicio enviado por URL si existe)
     todas_las_horas_libres = obtener_horas_disponibles(fecha_solicitada)
 
-    # Filtrar horas si es el día de hoy para no mostrar horas que ya pasaron
     if fecha_solicitada == hoy_str:
         horas_filtradas = [h for h in todas_las_horas_libres if h['valor'] > hora_actual_str]
     else:
@@ -46,9 +68,12 @@ def index():
         hoy=hoy_str,
         horas_libres=horas_filtradas,
         fecha_seleccionada=fecha_solicitada,
+        mostrar_staff=mostrar_staff,
+        empleados=lista_empleados,
         form_data=form_data,
         empresa=empresa_data,
-        servicios=lista_servicios  # <-- PASAMOS LOS SERVICIOS AL HTML
+        mapa_habilidades=json.dumps(mapa_habilidades), # Enviamos el mapa al JS
+        servicios=lista_servicios
     )
 
 # --- 2. RUTAS DE NAVEGACIÓN DEL CLIENTE ---
@@ -65,6 +90,16 @@ def inicio():
 # --- 1. FUNCIÓN PARA PROCESAR (La que recibe los datos del Loader) ---
 @appointment_bp.route('/reservar', methods=['POST'])
 def reservar():
+    
+    
+    empleado_id = request.form.get('empleado_id', 0)
+
+    if empleado_id == "0":
+        # Lógica de asignación automática (el que esté libre)
+        pass
+    else:
+    # Lógica de asignación fija al empleado_id seleccionado
+        pass
     try:
         # 1. EXTRACCIÓN DE DATOS
         if request.is_json:

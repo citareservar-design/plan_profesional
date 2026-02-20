@@ -157,12 +157,16 @@ input[type="checkbox"]:required:invalid + span {
     <label class="text-slate-500 text-[11px] font-black uppercase mb-2 block tracking-widest">Servicio</label>
     <div class="relative">
         <i class="fa-solid fa-sparkles absolute left-4 top-1/2 -translate-y-1/2 text-sky-500"></i>
+        
         <select name="tipo_una" id="select_servicio" required
-                class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none focus:border-sky-500">
+                class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none focus:border-sky-500 transition-all">
+            
             <option value="" disabled selected>Selecciona servicio</option>
+            
             {% for s in servicios %}
                 {% if s.ser_estado == 1 %}
                     <option value="{{ s.ser_nombre }}" 
+                            data-id="{{ s.ser_id }}"
                             data-tiempo="{{ s.ser_tiempo }}" 
                             data-precio="{{ s.ser_precio }}"
                             data-show-precio="{{ s.mostrar_precio }}"
@@ -171,19 +175,58 @@ input[type="checkbox"]:required:invalid + span {
                     </option>
                 {% endif %}
             {% endfor %}
+            
         </select>
+        
         <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
     </div>
 
-    <div id="detalles_servicio" class="mt-4 space-y-2 hidden">
-        </div>
+    <div id="detalles_servicio" class="mt-4 space-y-2 hidden"></div>
 </div>
 
 
+{% if mostrar_staff %}
+<div id="contenedor_empleado" class="animate-fade-in w-full mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <label class="text-slate-500 text-[11px] font-black uppercase tracking-[0.15em] ml-1">
+            ¿Quién prefieres que te atienda?
+        </label>
+        <span class="text-[10px] bg-sky-50 text-sky-600 px-2 py-1 rounded-lg font-bold uppercase tracking-tighter">Opcional</span>
+    </div>
 
+    <input type="hidden" name="empleado_id" id="empleado_id_input" value="0">
 
+    <div id="grid_empleados" class="flex flex-wrap gap-3">
+        <div onclick="seleccionarEmpleado(0, this)" 
+             class="item-empleado flex items-center gap-3 px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-sky-200 transition-all shadow-sm active:scale-95 border-sky-500 bg-sky-50/50 ring-2 ring-sky-500/20" 
+             data-id="0">
+            <div class="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white shrink-0">
+                <i class="fa-solid fa-users text-sm"></i>
+            </div>
+            <span class="font-bold text-slate-700 text-sm tracking-tight leading-tight">Primero disponible</span>
+        </div>
 
+        {% for e in empleados %}
+        <div onclick="seleccionarEmpleado('{{ e.empl_id }}', this)" 
+             class="item-empleado opcion-empleado flex items-center gap-3 px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-sky-200 transition-all shadow-sm active:scale-95"
+             data-id="{{ e.empl_id }}">
+            
+            <div class="w-10 h-10 rounded-full bg-sky-100 overflow-hidden flex items-center justify-center shrink-0 border border-sky-200">
+                {% if e.empl_foto %}
+                    <img src="{{ e.empl_foto }}" alt="{{ e.empl_nombre }}" class="w-full h-full object-cover">
+                {% else %}
+                    <span class="text-sky-600 font-black text-xs uppercase">{{ e.empl_nombre[:2] }}</span>
+                {% endif %}
+            </div>
 
+            <span class="font-bold text-slate-700 text-sm tracking-tight leading-tight">{{ e.empl_nombre }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+    <input type="hidden" name="empleado_id" value="0">
+{% endif %}
 
 
           </div>
@@ -249,6 +292,8 @@ input[type="checkbox"]:required:invalid + span {
       </div>
     </main>
   </div>
+
+  
 <script src="{{ url_for('static', filename='js/form_intro.js') }}"></script>
   <div id="loader-confirmacion" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm hidden items-center justify-center p-6">
     <div class="w-full max-w-xs bg-white rounded-[2.5rem] p-8 text-center shadow-2xl">
@@ -301,5 +346,55 @@ input[type="checkbox"]:required:invalid + span {
     
     <div class="mt-8 max-w-7xl mx-auto h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-50"></div>
 </footer>
+
+
+<div id="data-mapa" data-mapa='{{ mapa_habilidades | safe }}' style="display: none;"></div>
+
+
+<script>
+// Función para marcar visualmente la selección
+function seleccionarEmpleado(id, elemento) {
+    // 1. Actualizar el input oculto que se envía al servidor
+    document.getElementById('empleado_id_input').value = id;
+
+    // 2. Limpiar estilos de todos los demás
+    document.querySelectorAll('.item-empleado').forEach(el => {
+        el.classList.remove('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
+        el.classList.add('border-slate-100');
+    });
+
+    // 3. Aplicar estilo al seleccionado
+    elemento.classList.remove('border-slate-100');
+    elemento.classList.add('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const divData = document.getElementById('data-mapa');
+    const selectServicio = document.getElementById('select_servicio');
+
+    if (divData && selectServicio) {
+        const mapaHabilidades = JSON.parse(divData.getAttribute('data-mapa'));
+
+        selectServicio.addEventListener('change', function() {
+            const servicioNombre = this.value;
+            const idsPermitidos = mapaHabilidades[servicioNombre] || [];
+
+            // Resetear selección al cambiar servicio
+            seleccionarEmpleado(0, document.querySelector('.item-empleado[data-id="0"]'));
+
+            // Filtrar Tarjetas
+            document.querySelectorAll('.opcion-empleado').forEach(tarjeta => {
+                const idEmp = parseInt(tarjeta.getAttribute('data-id'));
+                
+                if (idsPermitidos.includes(idEmp)) {
+                    tarjeta.style.display = 'flex'; // Mostrar
+                } else {
+                    tarjeta.style.display = 'none'; // Ocultar
+                }
+            });
+        });
+    }
+});
+</script>
 </body>
 </html>
