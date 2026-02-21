@@ -40,20 +40,23 @@
                class="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
     </div>
 
-    <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-        <button onclick="aplicarFiltroRapido('todos', this)" class="btn-filtro active bg-sky-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-lg shadow-sky-500/20">
-            Todos
-        </button>
-        <button onclick="aplicarFiltroRapido('cumple', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
-            <span class="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span> Cumpleaños
-        </button>
-        <button onclick="aplicarFiltroRapido('riesgo', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
-            <span class="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></span> En Riesgo 
-        </button>
-        <button onclick="aplicarFiltroRapido('nuevo', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
-            <span class="w-2 h-2 bg-slate-500 rounded-full"></span> Nuevos
-        </button>
-    </div>
+<div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+    <button onclick="aplicarFiltroRapido('todos', this)" class="btn-filtro active bg-sky-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-lg shadow-sky-500/20">
+        Todos
+    </button>
+    
+    <button onclick="aplicarFiltroRapido('cumple-hoy', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
+        <span class="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span> Cumpleaños Hoy
+    </button>
+
+    <button onclick="aplicarFiltroRapido('pre-cumple', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
+        <span class="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></span> Cumpleaños Pronto
+    </button>
+
+    <button onclick="aplicarFiltroRapido('riesgo', this)" class="btn-filtro bg-white/5 text-slate-400 border border-white/10 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2">
+        <span class="w-2 h-2 bg-orange-500 rounded-full"></span> En Riesgo 
+    </button>
+</div>
 </div>
 
 <div id="banner-riesgo" class="hidden mb-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 shadow-xl shadow-amber-900/10">
@@ -108,151 +111,137 @@
                         <th class="px-8 py-6 text-right">Acciones</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-white/[0.03]">
-{% for cliente in clientes %}
-<tr id="cli-{{ cliente.cli_id }}" 
-    data-fecha="{{ cliente.cli_fecha_nacimiento.strftime('%Y-%m-%d') if cliente.cli_fecha_nacimiento else '' }}" 
-    class="cliente-row group hover:bg-white/[0.02] transition-all">
-<td class="px-8 py-6">
-    <div class="flex items-center gap-4">
-        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center font-black uppercase flex-shrink-0">
-            {{ cliente.cli_nombre[:1] }}
-        </div>
-
-        <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 mb-0.5">
-                <span class="font-bold text-white cli-nombre truncate">{{ cliente.cli_nombre }}</span>
-                
-                {% if cliente.cli_notas_personales %}
-                    <div class="group relative inline-flex">
-                        <i class="fa-solid fa-note-sticky text-amber-400 cursor-help animate-pulse text-[11px]"></i>
-                        
-                        <div class="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-900 border border-white/10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 text-[11px] text-slate-200 leading-relaxed backdrop-blur-md">
-                            <div class="font-black text-[9px] uppercase tracking-widest text-amber-500 mb-1 flex items-center gap-1">
-                                <i class="fa-solid fa-heart text-[8px]"></i> Nota de Confianza
-                            </div>
-                            {{ cliente.cli_notas_personales }}
-                            <div class="absolute -bottom-1 left-3 w-2 h-2 bg-slate-900 rotate-45 border-b border-r border-white/10"></div>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-2">
-                <span class="text-xs text-sky-400 font-medium cli-alias">{{ cliente.cli_alias or '' }}</span>
-            </div>
-
-            <div class="flex items-center gap-2 flex-wrap">
-                {% if cliente.es_cumpleanos %}
-                <span class="px-2 py-0.5 rounded-md bg-pink-500/20 text-pink-400 text-[9px] font-black uppercase tracking-wider border border-pink-500/30 animate-pulse flex items-center gap-1">
-                    ¡Cumpleaños! <i class="fa-solid fa-cake-candles text-[10px]"></i>
-                </span>
-                {% endif %}
-
-                {% if cliente.en_riesgo %}
-                <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-wider border border-amber-500/30 flex items-center gap-1 shadow-sm">
-                    <i class="fa-solid fa-triangle-exclamation animate-bounce"></i> En Riesgo 30+ Días
-                </span>
-                {% endif %}
-                
-                {% if cliente.num_reservas > 5 %}
-                    <span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-wider border border-purple-500/20 flex items-center">
-                        Fiel <i class="fa-solid fa-crown ml-1 text-[8px]"></i> 
-                        <span class="ml-1 text-purple-300/50">({{ cliente.num_reservas }})</span>
-                    </span>
-                {% elif cliente.num_reservas >= 2 %}
-                    <span class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[9px] font-black uppercase tracking-wider border border-sky-500/20">
-                        Frecuente <span class="ml-1 text-sky-300/50">({{ cliente.num_reservas }})</span>
-                    </span>
-                {% else %}
-                    <span class="px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-500 text-[9px] font-black uppercase tracking-wider border border-slate-500/20">
-                        Nuevo
-                    </span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</td>
-    <td class="px-8 py-6">
-        <div class="text-slate-300 text-sm cli-email">{{ cliente.cli_email }}</div>
-        <div class="text-slate-500 text-xs mt-1 cli-telefono">{{ cliente.cli_telefono }}</div>
-    </td>
-    
-    <td class="px-8 py-6 text-right">
-        <div class="flex justify-end gap-2">
-{% if cliente.cli_telefono %}
-    {# 1. LÓGICA DE MENSAJES ACTUALIZADA #}
-    {% if cliente.es_cumpleanos %}
-        {# Mensaje de Cumpleaños - CON DETALLE Y CURIOSIDAD #}
-        {% set mensaje_texto = "Hola " + cliente.cli_nombre + ". En " + nombre_negocio + " creemos que la vida se mide por los momentos especiales y hoy es uno de ellos. Te deseamos un muy feliz cumpleaños. ¡Te esperamos para consentirte en tu día! Queremos darte un detalle, ¿quieres saberlo?" %}
-        {% set clase_color = "bg-pink-500/20 text-pink-500 animate-bounce" %}
-        {% set icono = "fa-solid fa-cake-candles" %}
-
-    {% elif cliente.en_riesgo %}
-        {# Mensaje de Recuperación - INVITACIÓN CERCANA #}
-        {% set mensaje_texto = "Hola " + cliente.cli_nombre + ", te extrañamos en " + nombre_negocio + ". Hace " + (cliente.dias_ausente|string) + " días que no nos visitas y nos encantaría volver a verte por aquí. Te esperamos con los brazos abiertos, escríbenos si deseas agendar de nuevo con nosotros." %}
-        {% set clase_color = "bg-amber-500/20 text-amber-500 animate-bounce" %}
-        {% set icono = "fa-solid fa-triangle-exclamation" %}
-
-    {% else %}
-        {# Saludo estándar #}
-        {% set mensaje_texto = "Hola " + cliente.cli_nombre + ", te contactamos de " + nombre_negocio + " para saludarte y ponernos a tu disposición para tu próxima cita." %}
-        {% set clase_color = "bg-emerald-500/10 text-emerald-500" %}
-        {% set icono = "fa-brands fa-whatsapp" %}
-    {% endif %}
-
-    {# 2. BOTÓN DE ACCIÓN #}
-    <a href="https://wa.me/57{{ cliente.cli_telefono|replace(' ', '') }}?text={{ mensaje_texto | urlencode }}" 
-       target="_blank"
-       onclick="marcarContactado(this)"
-       title="Enviar mensaje personalizado"
-       class="w-10 h-10 rounded-2xl {{ clase_color }} flex items-center justify-center transition-all shadow-md hover:scale-110">
+<tbody class="divide-y divide-white/[0.03]">
+    {% for cliente in clientes %}
+    <tr id="cli-{{ cliente.cli_id }}" 
+        class="cliente-row border-b border-white/5 transition-all hover:bg-white/[0.02] group" 
+        data-cumple="{{ 'true' if cliente.es_cumpleanos else 'false' }}"
+        data-precumple="{{ 'true' if cliente.es_pre_cumple else 'false' }}"
+        data-riesgo="{{ 'true' if cliente.en_riesgo else 'false' }}">
         
-        <i class="{{ icono }} text-lg"></i>
-    </a>
-{% endif %}
+        <td class="px-8 py-6">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center font-black uppercase flex-shrink-0">
+                    {{ cliente.cli_nombre[:1] }}
+                </div>
 
-<button onclick='abrirModalEditar({{ {
-    "id": cliente.cli_id,
-    "nombre": cliente.cli_nombre,
-    "alias": cliente.cli_alias,
-    "email": cliente.cli_email,
-    "telefono": cliente.cli_telefono,
-    "fecha_nacimiento": cliente.cli_fecha_nacimiento.strftime("%Y-%m-%d") if cliente.cli_fecha_nacimiento else "",
-    "notas_personales": cliente.cli_notas_personales or ""
-}|tojson }})' 
-title="Editar datos del cliente"
-class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 transition-all flex items-center justify-center">
-    <i class="fa-solid fa-pen-to-square"></i>
-</button>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <span class="font-bold text-white cli-nombre truncate">{{ cliente.cli_nombre }}</span>
+                        {% if cliente.es_cumpleanos %}
+                            <span class="px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-500 text-[8px] font-black animate-pulse">CUMPLEAÑOS HOY</span>
+                        {% elif cliente.es_pre_cumple %}
+                            <span class="px-1.5 py-0.5 rounded bg-yellow-200/20 text-yellow-300 text-[8px] font-black">CUMPLEAÑOS PRONTO</span>
+                        {% endif %}
+                    </div>
 
-            {% if cliente.cli_activo %}
-                <button onclick="desactivarCliente('{{ cliente.cli_id }}')" 
-                        title="Desactivar Cliente"
-                        class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white transition-all">
-                    <i class="fa-solid fa-eye-slash text-xs"></i>
+                    <div class="mb-1">
+                        <span class="text-xs text-sky-400 font-medium cli-alias">{{ cliente.cli_alias or '' }}</span>
+                    </div>
+
+                    {% if cliente.cli_notas_personales %}
+                    <div class="flex items-start gap-1.5 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10 max-w-[250px]">
+                        <i class="fa-solid fa-handshake-angle text-amber-500 text-[10px] mt-0.5"></i>
+                        <p class="text-[10px] text-amber-200/70 leading-tight italic">
+                            {{ cliente.cli_notas_personales }}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </td>
+
+        <td class="px-8 py-6">
+            <div class="text-slate-300 text-sm cli-email">{{ cliente.cli_email }}</div>
+            <div class="text-slate-500 text-xs mt-1 cli-telefono">{{ cliente.cli_telefono }}</div>
+
+            {% if cliente.cli_descuento_cantidad > 0 %}
+    <div class="mt-2 flex items-center gap-2">
+        <span class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+            <i class="fa-solid fa-tag mr-1"></i>
+            {{ cliente.cli_descuento|int }}% OFF
+        </span>
+        <span class="text-[10px] text-slate-500">
+            Válido por <b>{{ cliente.cli_descuento_cantidad }}</b> citas
+        </span>
+    </div>
+    {% endif %}
+        </td>
+
+
+
+
+
+
+
+
+
+        <td class="px-8 py-6 text-right">
+            <div class="flex justify-end gap-2">
+
+                {# BOTÓN WHATSAPP #}
+                {% if cliente.cli_telefono %}
+                <button onclick="abrirSelectorPlantillas('{{ cliente.cli_id }}', '{{ cliente.cli_nombre }}', {{ 'true' if cliente.es_cumpleanos else 'false' }}, '{{ cliente.cli_telefono }}', {{ 'true' if cliente.es_pre_cumple else 'false' }})"
+                        title="{{ '¡Cumpleaños Hoy!' if cliente.es_cumpleanos else '¡Próximo Cumpleaños!' if cliente.es_pre_cumple else 'Enviar WhatsApp' }}"
+                        class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-md hover:scale-110 
+                        {% if cliente.es_cumpleanos %}
+                            bg-pink-500/20 text-pink-500 animate-bounce
+                        {% elif cliente.es_pre_cumple %}
+                            bg-yellow-500/20 text-yellow-500 animate-pulse border border-yellow-500/40
+                        {% else %}
+                            bg-emerald-500/10 text-emerald-500
+                        {% endif %}">
+                    <i class="fa-brands fa-whatsapp text-lg"></i>
                 </button>
-            {% else %}
-                <button onclick="reactivarCliente('{{ cliente.cli_id }}')" 
-                        title="Reactivar Cliente"
-                        class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all">
-                    <i class="fa-solid fa-eye text-xs"></i>
+                {% endif %}
+
+                {# BOTÓN EDITAR #}
+                <button onclick='abrirModalEditar({{ {
+                    "id": cliente.cli_id,
+                    "nombre": cliente.cli_nombre,
+                    "alias": cliente.cli_alias,
+                    "email": cliente.cli_email,
+                    "telefono": cliente.cli_telefono,
+                    "fecha_nacimiento": cliente.cli_fecha_nacimiento.strftime("%Y-%m-%d") if cliente.cli_fecha_nacimiento else "",
+                    "notas_personales": cliente.cli_notas_personales or "",
+                    "descuento": cliente.cli_descuento|float,
+                    "descuento_cantidad": cliente.cli_descuento_cantidad
+                }|tojson }})' 
+                title="Editar datos del cliente"
+                class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 transition-all flex items-center justify-center">
+                    <i class="fa-solid fa-pen-to-square"></i>
                 </button>
-            {% endif %}
-            
-            <button onclick="eliminarCliente('{{ cliente.cli_id }}')" 
-                    title="Eliminar cliente permanentemente"
-                    class="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
-                <i class="fa-solid fa-trash-can text-xs"></i>
-            </button>
-        </div>
-    </td>
-</tr>
-{% else %}
-<tr>
-    <td colspan="3" class="px-8 py-10 text-center text-slate-500 italic">No hay clientes registrados aún.</td>
-</tr>
-{% endfor %}
+
+                {# BOTÓN ESTADO (Activo/Inactivo) #}
+                {% if cliente.cli_activo %}
+                    <button onclick="desactivarCliente('{{ cliente.cli_id }}')" 
+                            title="Desactivar Cliente"
+                            class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center">
+                        <i class="fa-solid fa-user-slash text-xs"></i>
+                    </button>
+                {% else %}
+                    <button onclick="reactivarCliente('{{ cliente.cli_id }}')" 
+                            title="Reactivar Cliente"
+                            class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/20">
+                        <i class="fa-solid fa-user-check text-xs"></i>
+                    </button>
+                {% endif %}
+
+                {# BOTÓN ELIMINAR #}
+                <button onclick="eliminarCliente('{{ cliente.cli_id }}')" 
+                        title="Eliminar cliente"
+                        class="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="3" class="px-8 py-10 text-center text-slate-500 italic">No hay clientes registrados aún.</td>
+    </tr>
+    {% endfor %}
+</tbody>
             </table>
         </div>
     </div>
@@ -275,6 +264,26 @@ class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-
                 <input type="date" id="edit_fecha_nacimiento" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white outline-none focus:ring-2 focus:ring-sky-500/50 mt-1">
             </div>
 
+            <div class="grid grid-cols-2 gap-4 mt-4 p-4 rounded-2xl bg-sky-500/5 border border-sky-500/10">
+                <div class="col-span-2">
+                    <label class="text-[10px] uppercase font-black text-sky-500 mb-1 block">Promoción Especial</label>
+                </div>
+                
+                <div>
+                    <label class="text-xs text-slate-400 mb-1 block">Descuento (%)</label>
+                    <input type="number" id="edit_descuento" name="descuento" 
+                        class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white outline-none focus:border-sky-500 transition-all" 
+                        placeholder="Ej: 10">
+                </div>
+
+                <div>
+                    <label class="text-xs text-slate-400 mb-1 block">¿Cuántas citas?</label>
+                    <input type="number" id="edit_descuento_cantidad" name="descuento_cantidad" 
+                        class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white outline-none focus:border-sky-500 transition-all" 
+                        placeholder="Ej: 3">
+                </div>
+            </div>
+
             <div>
                 <label class="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Alias / Apodo</label>
                 <input type="text" id="edit_alias" placeholder="Ej: Don Juan" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white outline-none focus:ring-2 focus:ring-sky-500/50 mt-1">
@@ -283,6 +292,11 @@ class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-
             <div>
                 <label class="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Correo</label>
                 <input type="email" id="edit_email" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white outline-none focus:ring-2 focus:ring-sky-500/50 mt-1">
+            </div>
+
+             <div>
+                <label class="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Teléfono</label>
+                <input type="number" id="edit_telefono" oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white outline-none focus:ring-2 focus:ring-sky-500/50 mt-1">
             </div>
 
             <div class="space-y-2 mb-4">
@@ -294,10 +308,7 @@ class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-
                         class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-sky-500/50 transition-all min-h-[100px]"></textarea>
             </div>
 
-            <div>
-                <label class="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Teléfono</label>
-                <input type="number" id="edit_telefono" oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white outline-none focus:ring-2 focus:ring-sky-500/50 mt-1">
-            </div>
+
         </div>
 
         <div class="flex gap-3 mt-8">
@@ -353,10 +364,30 @@ class="w-9 h-9 rounded-xl bg-white/5 text-slate-400 hover:text-sky-400 hover:bg-
         </div>
     </div>
 </div>
-<button onclick="abrirAyudaClientes()" 
-        class="fixed bottom-6 right-6 w-12 h-12 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-full shadow-2xl border border-white/10 flex items-center justify-center transition-all active:scale-90 z-40">
-    <i class="fa-solid fa-question text-lg"></i>
-</button>
 
 <script src="{{ url_for('static', filename='js/clientes.js') }}"></script>
+<div id="modalSelectorPlantillas" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in duration-300">
+        <div class="p-8">
+            <div class="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i class="fa-brands fa-whatsapp text-3xl"></i>
+            </div>
+            <h2 class="text-xl font-black text-white mb-1 text-center italic">Enviar Mensaje</h2>
+            <p id="nombreClienteMensaje" class="text-slate-500 text-[10px] text-center mb-6 uppercase tracking-[0.2em] font-black"></p>
+            
+            <div id="listaPlantillasDisponibles" class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                </div>
+
+            <button onclick="cerrarSelector()" class="w-full mt-6 py-4 rounded-2xl bg-white/5 text-slate-400 font-black hover:bg-white/10 transition-all tracking-widest text-[10px]">
+                CANCELAR
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+</style>
 {% endblock %}

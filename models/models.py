@@ -109,18 +109,32 @@ USUARIO_PERMISOS = db.Table('USUARIO_PERMISOS',
 
 class Cliente(db.Model):
     __tablename__ = 'CLIENTES'
+    
     cli_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     cli_nombre = db.Column(db.String(100), nullable=False)
     cli_email = db.Column(db.String(100), unique=True, nullable=False)
     cli_telefono = db.Column(db.String(20), nullable=False)
-    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
-    # Relación: Un cliente tiene muchas reservas
-    reservas = db.relationship('Reserva', backref='cliente', lazy=True)
-    cli_notas_personales = db.Column(db.Text, nullable=True)
+    cli_alias = db.Column(db.String(50), nullable=True)
     cli_fecha_nacimiento = db.Column(db.Date, nullable=True)
-    cli_alias = db.Column(db.String(50))
-    cli_activo = db.Column(db.Boolean, default=True)
+    cli_notas_personales = db.Column(db.Text, nullable=True)
     
+    # Empresa a la que pertenece
+    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
+    
+    # Estado y Descuentos
+    cli_activo = db.Column(db.Boolean, default=True)
+    cli_descuento = db.Column(db.Numeric(10, 2), default=0.00) # Porcentaje o monto
+    cli_descuento_cantidad = db.Column(db.Integer, default=0) # Citas restantes
+
+    # Relación
+    reservas = db.relationship('Reserva', backref='cliente_rel', lazy=True)
+
+    def tiene_descuento_disponible(self):
+        """Método de ayuda para verificar saldo"""
+        return self.cli_activo and self.cli_descuento_cantidad > 0
+
+    def __repr__(self):
+        return f'<Cliente {self.cli_nombre}>'
     
 
 class Reserva(db.Model):

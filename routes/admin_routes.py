@@ -11,7 +11,7 @@ from io import BytesIO
 from werkzeug.security import generate_password_hash
 import smtplib
 from email.message import EmailMessage
-from sqlalchemy import func
+from sqlalchemy import func, text
 import shutil
 import json
 from werkzeug.utils import secure_filename
@@ -839,6 +839,83 @@ def cambiar_visibilidad_staff():
     
 # --- 4. GESTIÓN DE CLIENTES ---
 
+@admin_bp.route('/obtener_plantillas')
+@login_required
+def obtener_plantillas():
+    try:
+        # 1. Consultar el nombre de la empresa (tomamos la primera fila)
+        sql_empresa = text("SELECT emp_razon_social FROM EMPRESAS LIMIT 1")
+        res_empresa = db.session.execute(sql_empresa).fetchone()
+        nombre_empresa = res_empresa.emp_razon_social if res_empresa else "Nuestra Empresa"
+
+        # 2. Consultar las plantillas
+        sql_plantillas = text("SELECT plan_nombre, plan_mensaje, plan_tipo FROM PLANTILLAS_WHATSAPP WHERE plan_activo = 1")
+        res_plantillas = db.session.execute(sql_plantillas)
+        
+        plantillas = []
+        for fila in res_plantillas:
+            plantillas.append({
+                "plan_nombre": fila.plan_nombre,
+                "plan_mensaje": fila.plan_mensaje,
+                "plan_tipo": fila.plan_tipo
+            })
+        
+        # Enviamos un objeto que contiene AMBAS cosas
+        return jsonify({
+            "empresa": nombre_empresa,
+            "plantillas": plantillas
+        })
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": "Error al cargar datos"}), 500
+    
+
+@admin_bp.route('/api/preparar_mensaje_whatsapp')
+@login_required
+def preparar_mensaje_whatsapp():
+    cliente_id = request.args.get('cliente_id')
+    plantilla_id = request.args.get('plantilla_id')
+    
+    cliente = Cliente.query.get_or_404(cliente_id)
+    plantilla = PlantillaWhatsApp.query.get_or_404(plantilla_id)
+    
+    # Obtenemos el nombre del negocio (usando tu lógica existente)
+    sql = "SELECT emp_razon_social FROM EMPRESAS WHERE emp_id = :id"
+    resultado = db.session.execute(db.text(sql), {'id': str(current_user.emp_id)}).fetchone()
+    negocio_nombre = resultado[0] if resultado else "Nuestro Negocio"
+
+    mensaje = plantilla.plan_mensaje
+    
+    # --- PROCESO DE REEMPLAZO (The Magic) ---
+    # Reemplazamos las variables que definimos antes
+    mensaje = mensaje.replace('{cliente}', cliente.cli_nombre)
+    mensaje = mensaje.replace('{empresa}', negocio_nombre)
+    
+    # Como estamos en el módulo clientes, fecha/hora/servicio pueden ser genéricos 
+    # o puedes buscar la última cita si quisieras ser más específico
+    mensaje = mensaje.replace('{fecha}', 'próximamente') 
+    
+    # Limpiar el número de teléfono (quitar espacios, +, etc)
+    telefono = "".join(filter(str.isdigit, cliente.cli_telefono))
+    
+    # Si el teléfono no tiene código de país, podrías añadir el de tu país por defecto (ej: 57 para Colombia)
+    if len(telefono) == 10: # Ejemplo para números de 10 dígitos
+        telefono = "57" + telefono
+
+    # Retornamos el link de WhatsApp Web / App
+    # El mensaje debe estar codificado para URL
+    import urllib.parse
+    mensaje_codificado = urllib.parse.quote(mensaje)
+    link = f"https://wa.me/{telefono}?text={mensaje_codificado}"
+    
+    return jsonify({
+        "status": "success",
+        "link": link,
+        "mensaje_previa": mensaje
+    })
+
+
 @admin_bp.route('/clientes')
 @login_required
 def gestion_clientes():
@@ -851,34 +928,43 @@ def gestion_clientes():
         lista_clientes = query.filter_by(cli_activo=True).all()
     
     from app import db 
+    from datetime import datetime, date
+    
+    # 1. Obtener nombre del negocio (Optimizado)
     try:
-        sql = "SELECT emp_razon_social FROM EMPRESAS WHERE emp_id = :id"
-        resultado = db.session.execute(db.text(sql), {'id': str(current_user.emp_id)}).fetchone()
-        if resultado and resultado[0]:
-            negocio_nombre = resultado[0]
-        else:
-            sql_alt = "SELECT emp_razon_social FROM empresas WHERE emp_id = :id"
-            res_alt = db.session.execute(db.text(sql_alt), {'id': str(current_user.emp_id)}).fetchone()
-            negocio_nombre = res_alt[0] if res_alt else "Nuestro Negocio"
+        sql = text("SELECT emp_razon_social FROM EMPRESAS WHERE emp_id = :id")
+        resultado = db.session.execute(sql, {'id': str(current_user.emp_id)}).fetchone()
+        negocio_nombre = resultado[0] if resultado else "Nuestro Negocio"
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error BD Empresa: {e}")
         negocio_nombre = "Nuestro Negocio"
     
-    hoy = datetime.now()
+    hoy = date.today() # Usamos .today() para comparar solo fechas
     
     for cliente in lista_clientes:
-        # 1. Contamos reservas (ya lo tenías)
+        # --- A. CONTEO DE RESERVAS ---
         cliente.num_reservas = Reserva.query.filter_by(cli_id=cliente.cli_id).count()
         
-        # 2. Lógica de cumpleaños (ya la tenías)
+        # --- B. LÓGICA DE CUMPLEAÑOS (Hoy y 2 días antes) ---
         cliente.es_cumpleanos = False
+        cliente.es_pre_cumple = False
+        
         if cliente.cli_fecha_nacimiento:
-            if (cliente.cli_fecha_nacimiento.day == hoy.day and 
-                cliente.cli_fecha_nacimiento.month == hoy.month):
-                cliente.es_cumpleanos = True
+            # Creamos la fecha del cumple en el año actual para comparar
+            try:
+                # El replace(year=hoy.year) puede fallar el 29 de feb, por eso el try
+                cumple_actual = cliente.cli_fecha_nacimiento.replace(year=hoy.year)
+            except ValueError:
+                cumple_actual = cliente.cli_fecha_nacimiento.replace(year=hoy.year, day=28)
 
-        # --- NUEVO: LÓGICA DE CLIENTE EN RIESGO (45 DÍAS) ---
-        # Buscamos su última reserva (solo la fecha)
+            diferencia = (cumple_actual - hoy).days
+            
+            if diferencia == 0:
+                cliente.es_cumpleanos = True
+            elif 1 <= diferencia <= 2:
+                cliente.es_pre_cumple = True
+
+        # --- C. LÓGICA DE CLIENTE EN RIESGO ---
         ultima_reserva = Reserva.query.filter_by(cli_id=cliente.cli_id)\
             .order_by(Reserva.res_fecha.desc()).first()
         
@@ -886,55 +972,63 @@ def gestion_clientes():
         cliente.dias_ausente = 0
         
         if ultima_reserva:
-            # Calculamos la diferencia de días entre hoy y la última cita
-            # Aseguramos que ambos sean objetos date para restar
-            diferencia = hoy.date() - ultima_reserva.res_fecha
-            cliente.dias_ausente = diferencia.days
+            diferencia_riesgo = hoy - ultima_reserva.res_fecha
+            cliente.dias_ausente = diferencia_riesgo.days
             
             if cliente.dias_ausente > 30:
                 cliente.en_riesgo = True
-            elif cliente.dias_ausente > 30:
-                    cliente.estado_riesgo = 'alerta'
-        
-        # ----------------------------------------------------
     
-    # Ordenamos: Cumpleaños primero, luego Riesgo, luego Reservas
-    lista_clientes.sort(key=lambda x: (x.es_cumpleanos, x.en_riesgo, x.num_reservas), reverse=True)
+    # Ordenamos: Cumpleaños Hoy > Pre-Cumple > En Riesgo > Más Reservas
+    lista_clientes.sort(
+        key=lambda x: (x.es_cumpleanos, x.es_pre_cumple, x.en_riesgo, x.num_reservas), 
+        reverse=True
+    )
     
     return render_template('admin/clientes.html',
                            clientes=lista_clientes,
                            nombre_negocio=negocio_nombre)
     
     
-@admin_bp.app_context_processor
+    
+    
+@admin_bp.context_processor
 def inject_cumpleanos():
-    # Importamos datetime aquí mismo para evitar errores de carga
-    from datetime import datetime
+    from models.models import Cliente
+    from datetime import date
+    import sqlalchemy # Por si usas text()
     
-    hay_cumpleanos = False
+    hay_hoy = False
+    hay_pre = False
     
-    # Verificamos si el usuario está logueado
     if current_user.is_authenticated:
-        try:
-            hoy = datetime.now()
-            # Buscamos clientes que cumplan hoy
-            # Nota: Usamos Cliente que ya debe estar importado en tus rutas
-            cumpleaneros = Cliente.query.filter_by(
-                emp_id=current_user.emp_id, 
-                cli_activo=True
-            ).all()
-            
-            hay_cumpleanos = any(
-                c.cli_fecha_nacimiento and 
-                c.cli_fecha_nacimiento.day == hoy.day and 
-                c.cli_fecha_nacimiento.month == hoy.month 
-                for c in cumpleaneros
-            )
-        except Exception as e:
-            print(f"Error en inject_cumpleanos: {e}")
-            hay_cumpleanos = False
-            
-    return dict(hay_cumpleanos_global=hay_cumpleanos)
+        hoy = date.today()
+        # Traemos solo los activos de la empresa actual
+        clientes = Cliente.query.filter_by(emp_id=current_user.emp_id, cli_activo=True).all()
+        
+        for c in clientes:
+            if c.cli_fecha_nacimiento:
+                # Ajustar al año actual
+                try:
+                    cumple_este_ano = c.cli_fecha_nacimiento.replace(year=hoy.year)
+                except ValueError: # Caso 29 de febrero
+                    cumple_este_ano = c.cli_fecha_nacimiento.replace(year=hoy.year, day=28)
+                
+                diff = (cumple_este_ano - hoy).days
+                
+                if diff == 0:
+                    hay_hoy = True
+                elif 1 <= diff <= 2:
+                    hay_pre = True
+                    
+                # Si ya encontramos ambos, podemos dejar de buscar para ahorrar energía
+                if hay_hoy and hay_pre:
+                    break
+
+    # ESTO ES VITAL: Los nombres aquí deben coincidir con tu HTML
+    return {
+        'hay_cumpleanos_global': hay_hoy,
+        'hay_precumpleanos_global': hay_pre
+    }
 
 
 @admin_bp.route('/api/cliente/nuevo', methods=['POST'])
@@ -951,8 +1045,11 @@ def nuevo_cliente():
             cli_alias=data.get('alias'),
             cli_telefono=data.get('telefono'),
             cli_fecha_nacimiento=fecha_obj,
-            # --- AGREGADO ---
             cli_notas_personales=data.get('notas_personales'), 
+            # --- NUEVOS CAMPOS ---
+            cli_descuento=float(data.get('descuento', 0)),
+            cli_descuento_cantidad=int(data.get('descuento_cantidad', 0)),
+            # ---------------------
             emp_id=current_user.emp_id,
             cli_activo=True
         )
@@ -962,6 +1059,8 @@ def nuevo_cliente():
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)})
+    
+    
 
 @admin_bp.route('/api/cliente/editar/<int:cli_id>', methods=['POST'])
 @login_required
@@ -974,56 +1073,51 @@ def editar_cliente(cli_id):
         cliente.cli_alias = data.get('alias')
         cliente.cli_email = data.get('email')
         cliente.cli_telefono = data.get('telefono')
-        # --- AGREGADO ---
         cliente.cli_notas_personales = data.get('notas_personales') 
+        
+        # --- NUEVOS CAMPOS ---
+        cliente.cli_descuento = float(data.get('descuento', 0))
+        cliente.cli_descuento_cantidad = int(data.get('descuento_cantidad', 0))
+        # ---------------------
         
         fecha_nac = data.get('fecha_nacimiento')
         if fecha_nac:
             cliente.cli_fecha_nacimiento = datetime.strptime(fecha_nac, '%Y-%m-%d').date()
+        else:
+            cliente.cli_fecha_nacimiento = None # Por si quieren borrar la fecha
         
         db.session.commit()
         return jsonify({"status": "success", "message": "Cliente actualizado correctamente"})
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-    
 
 
 
-@admin_bp.route('/api/cliente/desactivar/<int:cli_id>', methods=['POST'])
+@admin_bp.route('/api/cliente/desactivar/<int:id>', methods=['POST'])
 @login_required
-def desactivar_cliente(cli_id):
-    
-    
-    # Buscamos al cliente por ID y que pertenezca a la empresa del admin logueado
-    cliente = Cliente.query.filter_by(cli_id=cli_id, emp_id=current_user.emp_id).first_or_404()
-    
+def api_desactivar_cliente(id):
     try:
-        cliente.cli_activo = False  # Cambiamos el estado a desactivado
+        sql = text("UPDATE CLIENTES SET cli_activo = 0 WHERE cli_id = :id")
+        db.session.execute(sql, {"id": id})
         db.session.commit()
         return jsonify({"status": "success", "message": "Cliente desactivado correctamente"})
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
     
-    
-    
-@admin_bp.route('/api/cliente/activar/<int:cli_id>', methods=['POST'])
+
+@admin_bp.route('/api/cliente/activar/<int:id>', methods=['POST'])
 @login_required
-def activar_cliente(cli_id):
-    
-    
-    # Buscamos el cliente desactivado de la empresa actual
-    cliente = Cliente.query.filter_by(cli_id=cli_id, emp_id=current_user.emp_id).first_or_404()
-    
+def api_activar_cliente(id):
     try:
-        cliente.cli_activo = True  # <--- Cambiamos a True para activar
+        sql = text("UPDATE CLIENTES SET cli_activo = 1 WHERE cli_id = :id")
+        db.session.execute(sql, {"id": id})
         db.session.commit()
-        return jsonify({"status": "success", "message": "Cliente reactivado correctamente"})
+        return jsonify({"status": "success", "message": "Cliente activado correctamente"})
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-    
     
 
 

@@ -88,6 +88,7 @@ def inicio():
     return render_template('form.html', empresa=empresa_data, servicios=lista_servicios)
 
 # --- 1. FUNCIÓN PARA PROCESAR (La que recibe los datos del Loader) ---
+
 @appointment_bp.route('/reservar', methods=['POST'])
 def reservar():
     
@@ -106,6 +107,24 @@ def reservar():
             datos = request.get_json()
         else:
             datos = request.form.to_dict()
+            
+            # --- NUEVA SECCIÓN: VALIDACIÓN DE CLIENTE ACTIVO ---
+        from models.models import Cliente, db # Asegúrate de importar Cliente
+        
+        email_cliente = datos.get('email')
+        telefono_cliente = datos.get('telefono')
+        
+        # Buscamos si existe un cliente con ese email o teléfono
+        cliente_check = Cliente.query.filter(
+            (Cliente.cli_email == email_cliente) | (Cliente.cli_telefono == telefono_cliente)
+        ).first()
+
+        # Si el cliente existe y está inactivo (0), bloqueamos la reserva de inmediato
+        if cliente_check and cliente_check.cli_activo == 0:
+            return jsonify({
+                "status": "error", 
+                "message": f"Lo sentimos {cliente_check.cli_nombre}, tu cuenta está inactiva. Por favor contacta con administración."
+            }), 403
         
         fecha_valor = datos.get('date') or datos.get('fecha_reserva')
         hora_valor = datos.get('hora')
@@ -179,16 +198,46 @@ def reservar():
         resultado = crear_cita(datos, request.host_url)
 
         if resultado.get('status') == 'success':
-            # --- ENVÍO DE CORREO REPARADO ---
+            # 1. Definimos un mensaje por defecto
+            mensaje_descuento = ""
+
+            # 2. LÓGICA DE DESCUENTOS
             try:
-                # 1. Importamos desde el archivo correcto (appointment_service)
+                print(f"DEBUG: Procesando descuentos para resultado exitoso...")
+                
+                # Verificamos si el objeto existe y tiene saldo
+                if cliente_check:
+                    print(f"DEBUG: Saldo actual de {cliente_check.cli_nombre}: {cliente_check.cli_descuento_cantidad}")
+                    
+                    if cliente_check.cli_descuento_cantidad > 0:
+                        # RESTAMOS LA CITA
+                        cliente_check.cli_descuento_cantidad -= 1
+                        
+                        # Preparamos el mensaje según el saldo restante
+                        if cliente_check.cli_descuento_cantidad > 0:
+                            mensaje_descuento = f"¡Descuento aplicado! Te quedan {cliente_check.cli_descuento_cantidad} citas con este beneficio."
+                        else:
+                            # SI LLEGÓ A CERO, LIMPIAMOS EL PORCENTAJE
+                            cliente_check.cli_descuento = 0.00
+                            mensaje_descuento = "¡Has aprovechado tu último descuento disponible!"
+                        
+                        # GUARDAMOS CAMBIOS EN LA BASE DE DATOS
+                        db.session.commit() 
+                        print(f"✅ DB Actualizada con éxito para {cliente_check.cli_nombre}")
+                    else:
+                        print("ℹ️ El cliente existe pero tiene saldo 0 de descuentos.")
+                else:
+                    print("⚠️ No se pudo aplicar descuento: cliente_check es None (No se encontró el cliente).")
+                
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error CRÍTICO al actualizar descuento: {e}")
+
+            # 3. ENVÍO DE CORREO
+            try:
                 from services.appointment_service import enviar_correo_confirmacion
                 from models.models import Empresa
-
-                # 2. Obtenemos el objeto empresa para el SMTP
                 empresa_obj = Empresa.query.filter_by(emp_id='01').first()
-                
-                # 3. Llamamos a la función con los 5 parámetros que pide tu def
                 enviar_correo_confirmacion(
                     email_cliente=datos.get('email'),
                     nombre_cliente=datos.get('nombre'),
@@ -196,25 +245,24 @@ def reservar():
                     hora=hora_valor,
                     empresa=empresa_obj
                 )
-                
-               
-                            
-                
             except Exception as e:
-                # Si el correo falla, imprimimos el error pero la reserva sigue exitosa en web
-                print(f"⚠️ Alerta: Reserva OK, pero error en correo: {e}")
+                print(f"⚠️ Error correo: {e}")
 
-            return jsonify({"status": "success", "message": "Reserva confirmada"}), 200
-        
+            # 4. RESPUESTA FINAL
+            print(f"📤 Enviando respuesta al JS. Info descuento: '{mensaje_descuento}'")
+            return jsonify({
+                "status": "success", 
+                "message": "Reserva confirmada",
+                "info_descuento": mensaje_descuento
+            }), 200
+        # Este return es por si 'resultado' NO fue success (alineado con el IF inicial)
         return jsonify({"status": "error", "message": "Error al guardar"}), 400
 
     except Exception as e:
         import traceback
-        print(f"Error: {e}")
+        print(f"Error general: {e}")
         print(traceback.format_exc())
         return jsonify({"status": "error", "message": "Error interno"}), 500
-    
-    
     
     
     

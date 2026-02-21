@@ -2,26 +2,39 @@ console.log('CARGO EL ARCHIVO JS DE CLIENTES')
 
 // --- LÓGICA MODALES ---
 function abrirModalEditar(cliente) {
-    // 1. Llenamos los IDs y campos básicos
-    document.getElementById('edit_cli_id').value = cliente.id;
-    document.getElementById('edit_nombre').value = cliente.nombre;
-    document.getElementById('edit_alias').value = cliente.alias || '';
-    document.getElementById('edit_email').value = cliente.email || '';
-    document.getElementById('edit_telefono').value = cliente.telefono || '';
-    document.getElementById('edit_fecha_nacimiento').value = cliente.fecha_nacimiento || '';
+    // 1. Buscamos el modal único (usando el ID que confirmaste: modalEditar)
+    const modal = document.getElementById('modalEditar');
     
-    // 2. Llenamos las Notas de Confianza
-    const inputNotas = document.getElementById('edit_notas_personales');
-    if (inputNotas) {
-        inputNotas.value = cliente.notas_personales || '';
+    if (!modal) {
+        console.error("Error: No se encontró el modal con ID 'modalEditar'");
+        return; 
     }
 
-    // 3. Mostramos el modal (ajusta el ID si es diferente)
-    const modal = document.getElementById('modalEditar');
-    if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex'); // Si usas flex para centrar
+    // 2. Llenamos los campos básicos
+    // (Asegúrate de que estos IDs existan dentro de tu modalEditar)
+    const fieldMap = {
+        'edit_cli_id': cliente.id,
+        'edit_nombre': cliente.nombre,
+        'edit_alias': cliente.alias || '',
+        'edit_email': cliente.email || '',
+        'edit_telefono': cliente.telefono || '',
+        'edit_fecha_nacimiento': cliente.fecha_nacimiento || '',
+        'edit_descuento': cliente.descuento || 0,
+        'edit_descuento_cantidad': cliente.descuento_cantidad || 0,
+        'edit_notas_personales': cliente.notas_personales || ''
+    };
+
+    // Llenamos cada campo solo si existe en el HTML para evitar errores de "null"
+    for (const [id, value] of Object.entries(fieldMap)) {
+        const input = document.getElementById(id);
+        if (input) {
+            input.value = value;
+        }
     }
+
+    // 3. Mostramos el modal correctamente
+    modal.classList.remove('hidden');
+    modal.classList.add('flex'); 
 }
 
 function cerrarModal() { document.getElementById('modalEditar').classList.add('hidden'); }
@@ -54,7 +67,9 @@ function guardarCambiosCliente() {
         telefono: document.getElementById('edit_telefono').value,
         fecha_nacimiento: document.getElementById('edit_fecha_nacimiento').value,
         // Captura las notas o envía vacío si no hay nada
-        notas_personales: document.getElementById('edit_notas_personales')?.value || ''
+        notas_personales: document.getElementById('edit_notas_personales')?.value || '',
+        descuento: document.getElementById('edit_descuento')?.value || 0,
+        descuento_cantidad: document.getElementById('edit_descuento_cantidad')?.value || 0
     };
 
 
@@ -133,7 +148,9 @@ function crearCliente() {
         telefono: document.getElementById('new_telefono')?.value || '',
         // Si el campo no existe o está vacío, enviamos null o vacío
         fecha_nacimiento: inputFecha ? inputFecha.value : '',
-        notas_personales: inputNotas ? inputNotas.value : ''
+        notas_personales: inputNotas ? inputNotas.value : '',
+        descuento: document.getElementById('new_descuento')?.value || 0,
+        descuento_cantidad: document.getElementById('new_descuento_cantidad')?.value || 0
     };
 
     if(!datos.nombre) {
@@ -395,93 +412,6 @@ function actualizarContador() {
 }
 
 
-function abrirAyudaClientes() {
-    Swal.fire({
-        title: '<span class="text-sky-500 font-black text-2xl">Manual de Éxito</span>',
-        html: `
-            <div class="text-left space-y-5 text-slate-300 text-sm leading-relaxed">
-                
-                <div class="space-y-2">
-                    <p><strong class="text-white border-b border-sky-500/30 pb-1">🏆 Niveles de Fidelidad:</strong></p>
-                    <ul class="space-y-2 ml-2 mt-2">
-                        <li class="flex items-start gap-2">
-                            <span class="text-purple-400 font-bold min-w-[75px]">👑 Fiel:</span> 
-                            <span>+5 reservas. Son tus clientes VIP, ¡cuídalos!</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="text-sky-400 font-bold min-w-[75px]">⭐ Frecuente:</span> 
-                            <span>2 a 5 reservas. Clientes en crecimiento.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="text-slate-400 font-bold min-w-[75px]">🆕 Nuevo:</span> 
-                            <span>Primera visita al salón.</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <hr class="border-white/5">
-
-                <div class="space-y-3">
-                    <p><strong class="text-white border-b border-pink-500/30 pb-1">💡 Herramientas de Fidelización:</strong></p>
-                    <div class="grid grid-cols-1 gap-3 mt-2">
-                        <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-                            <i class="fa-solid fa-note-sticky text-amber-400 text-lg animate-pulse"></i>
-                            <div>
-                                <p class="text-amber-400 font-bold text-xs uppercase tracking-wider">Notas de Confianza</p>
-                                <p class="text-[11px] text-slate-400">Guarda gustos personales (ej: café sin azúcar) para un trato VIP.</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-                            <i class="fa-solid fa-cake-candles text-pink-400 text-lg"></i>
-                            <div>
-                                <p class="text-pink-400 font-bold text-xs uppercase tracking-wider">Cumpleaños Hoy</p>
-                                <p class="text-[11px] text-slate-400">Brillan en rosa. ¡Es el momento perfecto para un regalo o mensaje!</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-                            <i class="fa-solid fa-triangle-exclamation text-orange-400 text-lg"></i>
-                            <div>
-                                <p class="text-orange-400 font-bold text-xs uppercase tracking-wider">Clientes en Riesgo</p>
-                                <p class="text-[11px] text-slate-400">No han vuelto en +30 días. ¡Contáctalos antes de perderlos!</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="border-white/5">
-
-                <div class="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                    <p class="mb-1"><strong class="text-emerald-500 italic">📥 Importación Inteligente:</strong></p>
-                    <p class="text-[11px] mb-3 text-slate-400">Si el email ya existe, actualiza los datos; si no, crea un cliente nuevo.</p>
-                    <a href="/admin/clientes/plantilla" class="flex items-center justify-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 py-2 rounded-xl transition-all font-bold text-xs border border-emerald-500/20">
-                        <i class="fa-solid fa-download"></i> Obtener Plantilla Excel
-                    </a>
-                </div>
-
-                <div class="flex flex-wrap gap-4 text-xs pt-2">
-                    <p><strong class="text-sky-500 uppercase">📤 Exportar:</strong> Respaldo en Excel.</p>
-                    <p><strong class="text-emerald-400 uppercase">💬 WhatsApp:</strong> Chat directo sin agendar.</p>
-                </div>
-
-            </div>
-        `,
-        icon: 'info',
-        background: '#0f172a',
-        color: '#ffffff',
-        confirmButtonText: '¡Entendido, a vender!',
-        confirmButtonColor: '#0ea5e9',
-        customClass: {
-            popup: 'rounded-[2.5rem] border border-white/10 shadow-2xl backdrop-blur-xl',
-            title: 'pt-6'
-        },
-        showClass: {
-            popup: 'animate__animated animate__fadeInUp animate__faster'
-        },
-        hideClass: {
-            popup: 'animate__animated animate__fadeOutDown animate__faster'
-        }
-    });
-}
 
 // Ejecutar al cargar la página para mostrar el total inicial
 document.addEventListener('DOMContentLoaded', actualizarContador);
@@ -491,7 +421,7 @@ document.addEventListener('DOMContentLoaded', actualizarContador);
 let indiceEnvio = 0;
 
 function aplicarFiltroRapido(tipo, elemento) {
-    // 1. Cambiar estado visual de los botones (Tu lógica original)
+    // 1. Cambiar estado visual de los botones
     document.querySelectorAll('.btn-filtro').forEach(btn => {
         btn.classList.remove('active', 'bg-sky-500', 'text-white', 'shadow-lg', 'shadow-sky-500/20');
         btn.classList.add('bg-white/5', 'text-slate-400', 'border-white/10');
@@ -505,23 +435,28 @@ function aplicarFiltroRapido(tipo, elemento) {
     const banner = document.getElementById('banner-riesgo');
     let contadorRiesgoVisibles = 0;
 
-    // Resetear el índice cuando cambias de filtro para empezar de cero
     indiceEnvio = 0;
 
     filas.forEach(fila => {
-        const textoFila = fila.innerText.toUpperCase();
         const nombre = fila.querySelector('.cli-nombre').innerText.toLowerCase();
         
-        let cumple = textoFila.includes('CUMPLEAÑOS');
-        let riesgo = textoFila.includes('RIESGO');
-        let nuevo = textoFila.includes('NUEVO');
-        let coincideBusqueda = nombre.includes(busqueda);
+        // --- CIRUGÍA AQUÍ: Usamos los data-attributes que enviamos desde Flask ---
+        const esCumpleHoy = fila.dataset.cumple === 'true';
+        const esPreCumple = fila.dataset.precumple === 'true';
+        const esRiesgo    = fila.dataset.riesgo === 'true';
+        const coincideBusqueda = nombre.includes(busqueda);
 
         let coincideFiltro = false;
-        if (tipo === 'todos') coincideFiltro = true;
-        if (tipo === 'cumple' && cumple) coincideFiltro = true;
-        if (tipo === 'riesgo' && riesgo) coincideFiltro = true;
-        if (tipo === 'nuevo' && nuevo) coincideFiltro = true;
+
+        if (tipo === 'todos') {
+            coincideFiltro = true;
+        } else if (tipo === 'cumple-hoy') {
+            coincideFiltro = esCumpleHoy;
+        } else if (tipo === 'pre-cumple') {
+            coincideFiltro = esPreCumple;
+        } else if (tipo === 'riesgo') {
+            coincideFiltro = esRiesgo;
+        }
 
         const visible = (coincideFiltro && coincideBusqueda);
         fila.style.display = visible ? "" : "none";
@@ -531,11 +466,10 @@ function aplicarFiltroRapido(tipo, elemento) {
         }
     });
 
-    // 3. ACTUALIZACIÓN: Mostrar contador en el banner
+    // 3. Banner de Riesgo
     if (banner) {
         if (tipo === 'riesgo' && contadorRiesgoVisibles > 0) {
             banner.classList.remove('hidden');
-            // Buscamos un elemento para poner el texto (puedes añadir un id="total-riesgo" en tu HTML)
             const p = banner.querySelector('p');
             p.innerHTML = `Tienes <b class="text-white">${contadorRiesgoVisibles}</b> clientes inactivos para recuperar.`;
         } else {
@@ -543,6 +477,7 @@ function aplicarFiltroRapido(tipo, elemento) {
         }
     }
 }
+
 
 function enviarRecordatorioMasivo() {
     const filasVisibles = Array.from(document.querySelectorAll('.cliente-row'))
@@ -604,4 +539,111 @@ function filtrarClientes() {
                  textoBoton.includes('riesgo') ? 'riesgo' :
                  textoBoton.includes('nuevo') ? 'nuevo' : 'todos';
     aplicarFiltroRapido(tipo, activeBtn);
+}
+
+// --- LÓGICA DE WHATSAPP DINÁMICO (SELECTOR DE PLANTILLAS) ---
+
+// Añadimos esPreCumple como quinto parámetro
+function abrirSelectorPlantillas(id, nombre, esCumple, telefono, esPreCumple) {
+    const lista = document.getElementById('listaPlantillasDisponibles');
+    lista.innerHTML = '<div class="text-center py-4 text-slate-500"><i class="fa-solid fa-circle-notch animate-spin"></i> Cargando plantillas...</div>';
+    
+    document.getElementById('modalSelectorPlantillas').classList.remove('hidden');
+
+    fetch('/admin/obtener_plantillas')
+        .then(response => response.json())
+        .then(data => {
+            lista.innerHTML = '';
+            const nombreEmpresa = data.empresa;
+            const plantillas = data.plantillas;
+
+            // --- CIRUGÍA DE FILTRADO ---
+            const filtradas = plantillas.filter(p => {
+                const tipo = p.plan_tipo ? p.plan_tipo.toLowerCase() : '';
+                
+                if (esCumple) {
+                    return tipo === 'cumpleaños';
+                } else if (esPreCumple) {
+                    return tipo === 'pre-cumple';
+                } else {
+                    // Si no es ninguna de las anteriores, mostramos las normales
+                    return tipo !== 'cumpleaños' && tipo !== 'pre-cumple';
+                }
+            });
+            // ---------------------------
+
+            if (filtradas.length === 0) {
+                lista.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">No hay plantillas configuradas para este estado.</div>';
+                return;
+            }
+
+            filtradas.forEach(plan => {
+                let msj = plan.plan_mensaje;
+                
+                msj = msj.replace(/{cliente}/gi, nombre);
+                msj = msj.replace(/{empresa}/gi, nombreEmpresa);
+                msj = msj.replace(/{fecha}/gi, new Date().toLocaleDateString());
+                msj = msj.replace(/{hora}/gi, new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+
+                const btn = document.createElement('button');
+                
+                // Color dinámico del botón según el tipo
+                let colorClase = "text-emerald-500";
+                if (esCumple) colorClase = "text-pink-500";
+                if (esPreCumple) colorClase = "text-sky-500";
+
+                btn.className = "w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-left hover:bg-white/10 transition-all mb-3 group border-l-4 " + (esCumple ? "border-l-pink-500" : esPreCumple ? "border-l-sky-500" : "border-l-emerald-500");
+                
+                btn.onclick = () => {
+                    window.open(`https://wa.me/57${telefono}?text=${encodeURIComponent(msj)}`, '_blank');
+                    cerrarSelector();
+                };
+
+                btn.innerHTML = `
+                    <div class="${colorClase} font-black text-[10px] uppercase tracking-wider mb-1">${plan.plan_nombre}</div>
+                    <div class="text-slate-300 text-xs leading-relaxed">${msj}</div>
+                `;
+                lista.appendChild(btn);
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            lista.innerHTML = '<div class="text-red-500 text-center text-xs">Error al conectar con el servidor.</div>';
+        });
+}
+
+/**
+ * Envía la orden al servidor para procesar el mensaje (reemplazar etiquetas) y abre el link
+ */
+function enviarWhatsAppConPlantilla(clienteId, plantillaId) {
+    // Usamos la API que procesa el mensaje (reemplaza {nombre}, etc)
+    fetch(`/api/preparar_mensaje_whatsapp?cliente_id=${clienteId}&plantilla_id=${plantillaId}`)
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            window.open(data.link, '_blank');
+            cerrarSelector();
+            
+            // Reutilizamos tu función de marcar contactado
+            const fila = document.getElementById(`cli-${clienteId}`);
+            if (fila) {
+                const btnOriginal = fila.querySelector('button[onclick*="abrirSelector"]');
+                if (btnOriginal) marcarContactado(btnOriginal);
+            }
+        } else {
+            Swal.fire('Error', 'No se pudo generar el mensaje: ' + data.message, 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        Swal.fire('Error', 'Hubo un problema al procesar el envío.', 'error');
+    });
+}
+
+function cerrarSelector() {
+    const modal = document.getElementById('modalSelectorPlantillas');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
 }

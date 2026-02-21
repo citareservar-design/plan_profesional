@@ -300,14 +300,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (response.ok) {
+                    const data = await response.json(); // Leemos la respuesta del servidor
+                    
                     clearInterval(intervalo);
                     if (progressBar) progressBar.style.width = "100%";
-                    if (loaderMsg) loaderMsg.innerHTML = "<span class='text-emerald-500 font-bold'>¡Cita Confirmada!</span>";
                     
-                    // Redirigir al éxito
+                    // Si el servidor mandó info de descuento, la mostramos antes de redirigir
+                    if (data.info_descuento) {
+                        if (loaderMsg) loaderMsg.innerHTML = `<span class='text-emerald-500 font-bold'>${data.info_descuento}</span>`;
+                        
+                        // Usamos SweetAlert para que el usuario alcance a leerlo
+                        await Swal.fire({
+                            title: '¡Cita Confirmada!',
+                            text: data.info_descuento,
+                            icon: 'success',
+                            background: '#1e293b',
+                            color: '#fff',
+                            confirmButtonColor: '#10b981',
+                            confirmButtonText: 'Excelente'
+                        });
+                    } else {
+                        if (loaderMsg) loaderMsg.innerHTML = "<span class='text-emerald-500 font-bold'>¡Cita Confirmada!</span>";
+                    }
+                    
+                    // Redirigir al éxito después de mostrar el mensaje
                     setTimeout(() => {
                         window.location.href = window.location.origin + "/reserva_exitosa";
-                    }, 800);
+                    }, 500);
+
                 } else {
                     const errorData = await response.json();
                     throw new Error(errorData.message || "Error al procesar la reserva");
