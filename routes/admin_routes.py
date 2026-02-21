@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, make_response,current_app
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, make_response,current_app,send_from_directory
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
@@ -12,7 +12,11 @@ from werkzeug.security import generate_password_hash
 import smtplib
 from email.message import EmailMessage
 from sqlalchemy import func
+import shutil
 import json
+from werkzeug.utils import secure_filename
+import os
+
 
 
 # Definición del Blueprint para Administración
@@ -428,6 +432,29 @@ def check_last_reserva():
 
 # --- 3. GESTIÓN DE EMPLEADOS ---
 
+
+@admin_bp.route('/foto_empleado/<cedula>/<filename>')
+def serve_emp_photo(cedula, filename):
+    try:
+        from models.models import Empresa # Asegúrate de importar tu modelo
+        # Obtenemos la empresa (asumiendo que es la primera o la del usuario actual)
+        empresa = Empresa.query.first() 
+        
+        # Ruta base: C:\Apps\cocoanails
+        ruta_base = (empresa.emp_ruta_recursos).strip()
+        
+        # Construimos: C:\Apps\cocoanails\empleados\10888304344
+        directorio_final = os.path.join(ruta_base, 'empleados', str(cedula))
+        
+        print(f"--- Buscando archivo: {filename} en {directorio_final} ---")
+        
+        return send_from_directory(directorio_final, filename)
+    except Exception as e:
+        print(f"❌ Error en serve_emp_photo: {str(e)}")
+        return "No encontrada", 404
+    
+    
+    
 @admin_bp.route('/empleados')
 @login_required
 def gestion_empleados():
@@ -449,123 +476,176 @@ def gestion_empleados():
                            conteo=len(activos), 
                            limite=LIMITE_EMPLEADOS,
                            servicios=lista_servicios) # Enviar servicios al HTML
+    
+    
+    
 
-@admin_bp.route('/api/empleado/nuevo', methods=['POST'])
-@login_required
 def nuevo_empleados():
     from models.models import Empleado, Servicio, Empresa, db
-    data = request.get_json()
-    if not data:
-        return jsonify({'status': 'error', 'message': 'No se recibió información'}), 400
+    
+    # 1. Recibimos los datos (Usamos request.form porque ahora enviamos archivos)
+    nombre = request.form.get('nombre', '').strip()
+    cedula = str(request.form.get('cedula', '')).strip()
+    servicios_ids = request.form.getlist('servicios[]') 
+    foto_archivo = request.files.get('foto') 
 
-    nombre = data.get('nombre', '').strip()
-    cedula = str(data.get('cedula', '')).strip()
-    servicios_ids = data.get('servicios', []) 
-
-    # 1. Validar campos obligatorios
     if not nombre or not cedula:
         return jsonify({'status': 'error', 'message': 'Nombre y Cédula son obligatorios'}), 400
 
-    # 2. VALIDACIÓN DE LÍMITE (Solo contamos los activos)
+    # 2. Obtenemos la empresa del usuario actual
     empresa = Empresa.query.get(current_user.emp_id)
-    limite_db = empresa.emp_max_usuarios if empresa else 1
-    # IMPORTANTE: Contamos solo empleados activos de esta empresa
-    conteo_activos = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=True).count()
     
-    if conteo_activos >= limite_db: 
-        return jsonify({'status': 'error', 'message': f'Límite de plan alcanzado ({limite_db} usuarios activos).'}), 400
+    if not empresa or not empresa.emp_ruta_recursos:
+        return jsonify({'status': 'error', 'message': 'La empresa no tiene una ruta de recursos configurada'}), 400
 
-    # 3. Validar si la cédula ya existe EN ESTA EMPRESA
-    if Empleado.query.filter_by(empl_cedula=cedula, emp_id=current_user.emp_id).first():
-        return jsonify({'status': 'error', 'message': 'Esta cédula ya está registrada para otro empleado.'}), 400
+    # 3. LÓGICA DINÁMICA DE CARPETAS
+    # Usamos la ruta de la DB como punto de partida inicial
+    ruta_raiz_empresa = empresa.emp_ruta_recursos.strip()
+    nombre_foto_db = None
 
+    if foto_archivo:
+        try:
+            # Construimos: [ruta_de_la_db]/empleados/[cedula]/
+            carpeta_empleado = os.path.join(ruta_raiz_empresa, 'empleados', cedula)
+            
+            # El código crea lo que falta (empleados y la carpeta de la cedula)
+            if not os.path.exists(carpeta_empleado):
+                os.makedirs(carpeta_empleado, exist_ok=True)
+            
+            # Limpiamos el nombre de la foto (ej: mi foto.jpg -> mi_foto.jpg)
+            filename = secure_filename(foto_archivo.filename)
+            ruta_fisica_final = os.path.join(carpeta_empleado, filename)
+            
+            # Guardamos físicamente
+            foto_archivo.save(ruta_fisica_final)
+            
+            # Guardamos en DB la ruta relativa: 'empleados/10888/foto.jpg'
+            nombre_foto_db = f"empleados/{cedula}/{filename}"
+            
+        except Exception as e:
+            print(f"❌ Error al crear carpetas o guardar: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'Error al gestionar archivos: {str(e)}'}), 500
+
+    # 4. Guardado en la base de datos del Empleado
     try:
-        # Creamos la instancia
         nuevo_emp = Empleado(
             empl_nombre=nombre,
             empl_cedula=cedula,
-            empl_telefono=data.get('telefono'),
-            empl_porcentaje=data.get('porcentaje', 40),
-            empl_cargo=data.get('cargo', 'Multiservicio'), # Usamos el cargo que viene del modal
+            empl_telefono=request.form.get('telefono'),
+            empl_porcentaje=request.form.get('porcentaje', 40),
+            empl_cargo=request.form.get('cargo', 'Especialista'),
+            empl_foto=nombre_foto_db, # Aquí queda la ruta relativa
             emp_id=current_user.emp_id,
             empl_activo=True
         )
         
         db.session.add(nuevo_emp)
-        db.session.flush() 
+        db.session.flush()
 
-        # 4. GUARDAR RELACIÓN MUCHOS A MUCHOS
+        # Relación de servicios
         if servicios_ids:
             for s_id in servicios_ids:
-                servicio = Servicio.query.filter_by(
-                    ser_id=s_id, 
-                    emp_id=current_user.emp_id, 
-                    ser_estado=1
-                ).first()
-                
+                servicio = Servicio.query.filter_by(ser_id=s_id, emp_id=current_user.emp_id).first()
                 if servicio:
-                    nuevo_emp.servicios.append(servicio) 
+                    nuevo_emp.servicios.append(servicio)
 
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Empleado registrado correctamente'})
+        return jsonify({'status': 'success', 'message': 'Empleado y carpeta creados correctamente'})
     
     except Exception as e:
         db.session.rollback()
-        print(f"Error en nuevo_empleado: {str(e)}") # Para ver el error real en consola
-        return jsonify({'status': 'error', 'message': f'Error en el registro: {str(e)}'}), 500
+        return jsonify({'status': 'error', 'message': f'Error en DB: {str(e)}'}), 500
     
 
 
 @admin_bp.route('/api/empleado/editar/<int:id>', methods=['POST'])
 @login_required
 def editar_empleado(id):
-    # Buscamos al empleado asegurando que pertenezca a la empresa del administrador
+    from models.models import Empleado, Servicio, Empresa, db
+    import os
+    from werkzeug.utils import secure_filename
+
+    # Configuración de extensiones permitidas
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    # 1. Buscar empleado y empresa
     emp = Empleado.query.filter_by(empl_id=id, emp_id=current_user.emp_id).first()
-    
     if not emp:
         return jsonify({'status': 'error', 'message': 'Empleado no encontrado'}), 404
 
-    data = request.get_json()
-    if not data:
-        return jsonify({'status': 'error', 'message': 'No se recibió información'}), 400
+    empresa = Empresa.query.get(current_user.emp_id)
+    ruta_raiz = empresa.emp_ruta_recursos.strip()
 
-    nombre = data.get('nombre', '').strip()
-    cedula = str(data.get('cedula', '')).strip()
-    servicios_ids = data.get('servicios', []) # Lista de IDs de los checkboxes
+    # 2. Recibir datos
+    nombre = request.form.get('nombre', '').strip()
+    cedula_nueva = str(request.form.get('cedula', '')).strip()
+    cedula_anterior = str(emp.empl_cedula)
+    foto_nueva = request.files.get('foto')
 
-    if not nombre or not cedula:
+    if not nombre or not cedula_nueva:
         return jsonify({'status': 'error', 'message': 'Nombre y Cédula son obligatorios'}), 400
 
     try:
-        # 1. Actualizamos datos básicos
+        # --- LÓGICA DE CARPETAS (Si cambia la cédula) ---
+        ruta_vieja = os.path.join(ruta_raiz, 'empleados', cedula_anterior)
+        ruta_nueva = os.path.join(ruta_raiz, 'empleados', cedula_nueva)
+
+        if cedula_nueva != cedula_anterior:
+            if os.path.exists(ruta_vieja):
+                # Si la carpeta nueva ya existe por error, la borramos o manejamos
+                os.rename(ruta_vieja, ruta_nueva)
+            
+        # Asegurar que la carpeta (nueva o vieja) existe
+        if not os.path.exists(ruta_nueva):
+            os.makedirs(ruta_nueva, exist_ok=True)
+
+        # --- LÓGICA DE LA FOTO (Renombrar a la cédula) ---
+        if foto_nueva and foto_nueva.filename != '':
+            # Validar extensión
+            if not allowed_file(foto_nueva.filename):
+                return jsonify({'status': 'error', 'message': 'Solo se permiten imágenes (JPG, PNG, WEBP)'}), 400
+
+            # Extraer extensión original
+            extension = foto_nueva.filename.rsplit('.', 1)[1].lower()
+            
+            # Nombre final: "10888304344.png" (por ejemplo)
+            nombre_foto = f"{cedula_nueva}.{extension}"
+            ruta_destino = os.path.join(ruta_nueva, nombre_foto)
+
+            # Si ya existía una foto con otro nombre o extensión, podrías borrarla aquí
+            # Pero lo más limpio es guardar la nueva:
+            foto_nueva.save(ruta_destino)
+            
+            # Guardamos solo el nombre del archivo en la DB
+            emp.empl_foto = nombre_foto
+
+        # 3. Actualizar datos básicos
         emp.empl_nombre = nombre
-        emp.empl_cedula = cedula
-        emp.empl_telefono = data.get('telefono')
-        emp.empl_porcentaje = data.get('porcentaje', 40)
+        emp.empl_cedula = cedula_nueva
+        emp.empl_telefono = request.form.get('telefono')
+        emp.empl_porcentaje = request.form.get('porcentaje', 40)
+        emp.empl_cargo = request.form.get('cargo', 'Especialista')
 
-        # 2. ACTUALIZAR RELACIÓN DE SERVICIOS
-        # Primero limpiamos los que tiene actualmente
+        # 4. Actualizar Servicios
+        servicios_ids = request.form.getlist('servicios[]')
         emp.servicios = [] 
-
-        # Luego agregamos solo los que vienen en el JSON y que ESTÉN ACTIVOS
         if servicios_ids:
-            for s_id in servicios_ids:
-                servicio_valido = Servicio.query.filter_by(
-                    ser_id=s_id, 
-                    emp_id=current_user.emp_id, 
-                    ser_estado=1 # Solo servicios no archivados
-                ).first()
-                
-                if servicio_valido:
-                    emp.servicios.append(servicio_valido)
+            servicios_validos = Servicio.query.filter(
+                Servicio.ser_id.in_(servicios_ids), 
+                Servicio.emp_id == current_user.emp_id
+            ).all()
+            emp.servicios = servicios_validos
 
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Empleado actualizado correctamente'})
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error al editar: {str(e)}") # Esto lo verás en la terminal
         return jsonify({'status': 'error', 'message': f'Error técnico: {str(e)}'}), 500
+    
+    
     
     
 @admin_bp.route('/api/empleado/estado/<int:id>', methods=['POST'])

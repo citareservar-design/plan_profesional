@@ -22,6 +22,7 @@ class Empresa(db.Model):
     emp_clave_cuenta_smtp = db.Column(db.String(500))
     emp_max_usuarios = db.Column(db.Integer, default=1)
     emp_tipo_plan = db.Column(db.String(20))
+    emp_ruta_recursos = db.Column(db.String(500), nullable=True)
     # ---------------------------------------
 
     # Relaciones

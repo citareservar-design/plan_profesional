@@ -65,7 +65,7 @@ function guardarEmpleado() {
     const modal = document.getElementById('modalEmpleado');
     if (!modal) return;
 
-    // 1. Limpieza estricta del ID para evitar URLs rotas
+    // 1. Limpieza de ID
     let id = modal.getAttribute('data-id'); 
     if (id === "null" || id === "undefined" || id === "" || !id) {
         id = null;
@@ -74,24 +74,33 @@ function guardarEmpleado() {
     // 2. Construcción de la URL
     const url = id ? `/admin/api/empleado/editar/${id}` : '/admin/api/empleado/nuevo';
 
-    // 3. Recolección segura de servicios
+    // --- CAMBIO CLAVE: Usamos FormData en lugar de un objeto plano ---
+    const formData = new FormData();
+
+    // 3. Agregamos los campos de texto
+    formData.append('nombre', document.getElementById('empl_nombre')?.value.trim() || '');
+    formData.append('cedula', document.getElementById('empl_cedula')?.value.trim() || '');
+    formData.append('telefono', document.getElementById('empl_telefono')?.value || '');
+    formData.append('porcentaje', document.getElementById('empl_porcentaje')?.value || '40');
+    formData.append('cargo', document.getElementById('empl_cargo')?.value || 'Especialista');
+
+    // 4. Agregamos la Foto (Asegúrate que tu input file tenga el id="empl_foto")
+    const fotoInput = document.getElementById('empl_foto');
+    if (fotoInput && fotoInput.files[0]) {
+        formData.append('foto', fotoInput.files[0]);
+    }
+
+    // 5. Agregamos los Servicios (como array para Python)
     const checkboxes = document.querySelectorAll('input[name="servicios_empleado"]:checked');
-    const serviciosSeleccionados = Array.from(checkboxes)
-        .map(cb => parseInt(cb.value))
-        .filter(val => !isNaN(val)); // Filtra solo números válidos
+    checkboxes.forEach(cb => {
+        formData.append('servicios[]', cb.value); // Nota el uso de [] para que Flask lo reciba como lista
+    });
 
-    // 4. Construcción del objeto de datos
-    const datos = {
-        nombre: document.getElementById('empl_nombre')?.value.trim() || '',
-        cedula: document.getElementById('empl_cedula')?.value.trim() || '',
-        telefono: document.getElementById('empl_telefono')?.value || '',
-        porcentaje: document.getElementById('empl_porcentaje')?.value || '40',
-        cargo: document.getElementById('empl_cargo')?.value || 'Especialista',
-        servicios: serviciosSeleccionados 
-    };
+    // 6. Validación previa básica
+    const nombre = document.getElementById('empl_nombre')?.value.trim();
+    const cedula = document.getElementById('empl_cedula')?.value.trim();
 
-    // 5. Validación previa
-    if (!datos.nombre || !datos.cedula) {
+    if (!nombre || !cedula) {
         Swal.fire({ 
             title: 'Atención', 
             text: 'El nombre y la cédula son campos obligatorios', 
@@ -102,31 +111,26 @@ function guardarEmpleado() {
         return;
     }
 
-    // Log para depuración (puedes verlo en F12)
-    console.log("Intentando guardar en:", url, "Datos:", datos);
-
-    // 6. Petición al servidor
-fetch(url, {
+    // 7. Petición al servidor
+    // NOTA: Quitamos el 'Content-Type': 'application/json' de los headers.
+    // El navegador detectará que es FormData y pondrá el "multipart/form-data" automáticamente.
+    fetch(url, {
         method: 'POST',
         headers: { 
-            'Content-Type': 'application/json',
             'Accept': 'application/json'
+            // No pongas Content-Type aquí
         },
-        body: JSON.stringify(datos)
+        body: formData 
     })
     .then(res => {
-        // Intentamos leer el JSON siempre, sea error o éxito
         return res.json().then(data => {
             if (!res.ok) {
-                // Si el servidor mandó un error (400, 404, 500), 
-                // lanzamos el mensaje que viene en el JSON de Python
                 throw new Error(data.message || `Error ${res.status}`);
             }
             return data;
         });
     })
     .then(data => {
-        // Si llegamos aquí, es porque res.ok fue true (200-299)
         if (data.status === 'success') {
             if (typeof cerrarModal === 'function') cerrarModal();
             
@@ -142,18 +146,15 @@ fetch(url, {
             
             setTimeout(() => { window.location.reload(); }, 1600);
         } else {
-            // Este caso es por si Python manda un 200 pero con status: error
             throw new Error(data.message || 'Ocurrió un error inesperado');
         }
     })
     .catch(error => {
-        // Aquí caerán: Errores 400, 500 (vía throw) y errores de red/internet
         console.error('Error detallado:', error);
-        
         Swal.fire({ 
             title: 'Atención', 
-            text: error.message, // Mostrará: "Límite de plan alcanzado..."
-            icon: error.message.includes('Límite') ? 'warning' : 'error', 
+            text: error.message, 
+            icon: 'error', 
             background: '#0f172a', 
             color: '#fff' 
         });
@@ -245,18 +246,17 @@ function buscarTabla() {
 function cerrarModal() {
     const modal = document.getElementById('modalEmpleado');
     if (modal) {
-        // Ocultamos el modal
         modal.classList.remove('flex');
         modal.classList.add('hidden');
-        
-        // Limpiamos el ID para que no se quede pegado el de la edición anterior
         modal.removeAttribute('data-id');
         
-        // Opcional: Limpiar los errores de validación si tuvieras
-        console.log("Modal cerrado y limpiado");
+        // Limpiar inputs y foto
+        document.getElementById('empl_foto').value = '';
+        document.getElementById('img_preview').src = '';
+        document.getElementById('img_preview').classList.add('hidden');
+        document.getElementById('img_icon').classList.remove('hidden');
     }
 }
-
 
 // Función de ayuda para la sección de Equipo
 function abrirAyudaEquipo() {
@@ -669,3 +669,31 @@ fetch('/admin/api/configuracion/visibilidad-empleados', {
     });
 }
 
+
+function previsualizarImagen(input) {
+    const file = input.files[0];
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+
+    if (file) {
+        // VALIDACIÓN DE FORMATO
+        if (!tiposPermitidos.includes(file.type)) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Archivo no válido',
+                text: 'Solo se permiten imágenes (JPG, PNG, WEBP).',
+                confirmButtonColor: '#0ea5e9'
+            });
+            input.value = ''; // Limpia el input
+            return false;
+        }
+
+        // Si es válido, mostrar la miniatura
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('img_preview').src = e.target.result;
+            document.getElementById('img_preview').classList.remove('hidden');
+            document.getElementById('img_icon').classList.add('hidden');
+        }
+        reader.readAsDataURL(file);
+    }
+}

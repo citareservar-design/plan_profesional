@@ -113,93 +113,99 @@
 
 </div>
 
-    <div class="bg-white/[0.02] backdrop-blur-xl border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse" id="tablaEmpleados">
-<thead>
-    <tr class="text-slate-500 text-xs uppercase tracking-wider">
-        <th class="px-8 py-4 font-semibold">Personal / Cargo</th>
-        <th class="px-8 py-4 font-semibold">Identificación</th>
-        <th class="px-8 py-4 font-semibold">Teléfono</th> <th class="px-8 py-4 font-semibold text-center">Comisión</th>
-        <th class="px-8 py-4 font-semibold text-right">Acciones</th>
-    </tr>
-</thead>
-<tbody class="divide-y divide-white/[0.03]">
-    {% for emp in empleados %}
-    <tr class="group hover:bg-white/[0.02] transition-all border-t border-white/5" 
-        data-servicios="{% for s in emp.servicios %}{{ s.ser_nombre }}{% if not loop.last %}, {% endif %}{% endfor %}">
-        <td class="px-8 py-6">
-            <div class="flex items-center gap-4">
-                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-500/20 to-sky-500/5 text-sky-400 flex items-center justify-center font-black border border-sky-500/10 uppercase shadow-inner">
-                    {{ emp.empl_nombre[:1] }}
-                </div>
-                <div class="flex flex-col">
-                    <span class="font-bold text-white group-hover:text-sky-400 transition-colors text-sm">{{ emp.empl_nombre }}</span>
-                    <span class="text-[9px] bg-sky-500/10 text-sky-500 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter w-fit mt-1 border border-sky-500/10">
-                        {{ emp.empl_cargo or 'General' }}
-                    </span>
-                </div>
-            </div>
-        </td>
+<div class="bg-white/[0.02] backdrop-blur-xl border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="tablaEmpleados">
+            <thead>
+                <tr class="text-slate-500 text-xs uppercase tracking-wider">
+                    <th class="px-8 py-4 font-semibold">Personal / Cargo</th>
+                    <th class="px-8 py-4 font-semibold">Identificación</th>
+                    <th class="px-8 py-4 font-semibold">Teléfono</th>
+                    <th class="px-8 py-4 font-semibold text-center">Comisión</th>
+                    <th class="px-8 py-4 font-semibold text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-white/[0.03]">
+                {% for emp in empleados %}
+                <tr class="group hover:bg-white/[0.02] transition-all border-t border-white/5" 
+                    data-servicios="{% for s in emp.servicios %}{{ s.ser_nombre }}{% if not loop.last %}, {% endif %}{% endfor %}">
+                    
+                    <td class="px-8 py-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-11 h-11 rounded-2xl bg-slate-800 flex items-center justify-center overflow-hidden border border-white/10 shadow-inner shrink-0">
+                                {# Intentamos cargar la foto por cédula. Si no existe, el onerror pone la inicial #}
+                                <img src="/admin/foto_empleado/{{ emp.empl_cedula }}/{{ emp.empl_foto if emp.empl_foto else emp.empl_cedula ~ '.jpg' }}" 
+                                     class="w-full h-full object-cover"
+                                     onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'text-sky-400 font-bold\'>{{ emp.empl_nombre[:1] }}</span>';">
+                            </div>
 
-        <td class="px-8 py-6">
-            <span class="text-slate-300 font-mono text-xs tracking-tighter">'{{ emp.empl_cedula }}</span>
-        </td>
+                            <div class="flex flex-col">
+                                <span class="font-bold text-white group-hover:text-sky-400 transition-colors text-sm">{{ emp.empl_nombre }}</span>
+                                <span class="text-[9px] bg-sky-500/10 text-sky-500 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter w-fit mt-1 border border-sky-500/10">
+                                    {{ emp.empl_cargo or 'General' }}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
 
-        <td class="px-8 py-6">
-            <span class="text-[10px] text-slate-500 font-medium">{{ emp.empl_telefono }}</span>
-        </td>
+                    <td class="px-8 py-6">
+                        <span class="text-slate-300 font-mono text-xs tracking-tighter">'{{ emp.empl_cedula }}</span>
+                    </td>
 
-        <td class="px-8 py-6 text-center">
-            <span class="inline-flex items-center justify-center bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-xl font-black text-xs border border-emerald-500/10 shadow-sm">
-                {{ emp.empl_porcentaje }}%
-            </span>
-        </td>
+                    <td class="px-8 py-6">
+                        <span class="text-[10px] text-slate-500 font-medium">{{ emp.empl_telefono }}</span>
+                    </td>
 
-       <td class="px-8 py-6 text-right">
-    <div class="flex justify-end gap-3">
-        <a href="https://wa.me/57{{ emp.empl_telefono }}" 
-           target="_blank"
-           title="Contactar por WhatsApp"
-           class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500/70 hover:text-emerald-400 hover:bg-emerald-500/20 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all border border-emerald-500/20 flex items-center justify-center">
-            <i class="fa-brands fa-whatsapp text-lg"></i>
-        </a>
+                    <td class="px-8 py-6 text-center">
+                        <span class="inline-flex items-center justify-center bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-xl font-black text-xs border border-emerald-500/10 shadow-sm">
+                            {{ emp.empl_porcentaje }}%
+                        </span>
+                    </td>
 
-        <button type="button" 
-                onclick="prepararDuplicacion('{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }})" 
-                title="Duplicar Empleado"
-                class="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500/70 hover:text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all border border-violet-500/20 flex items-center justify-center">
-            <i class="fa-solid fa-copy text-lg"></i>
-        </button>
+                    <td class="px-8 py-6 text-right">
+                        <div class="flex justify-end gap-3">
+                            <a href="https://wa.me/57{{ emp.empl_telefono }}" 
+                               target="_blank"
+                               title="Contactar por WhatsApp"
+                               class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500/70 hover:text-emerald-400 hover:bg-emerald-500/20 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all border border-emerald-500/20 flex items-center justify-center">
+                                <i class="fa-brands fa-whatsapp text-lg"></i>
+                            </a>
 
-        <button type="button" 
-                onclick="prepararEdicion('{{ emp.empl_id }}', '{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_cedula }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }})"
-                title="Editar Empleado"
-                class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500/70 hover:text-sky-400 hover:bg-sky-500/20 hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all border border-sky-500/20 flex items-center justify-center">
-            <i class="fa-solid fa-pen-to-square text-lg"></i>
-        </button>
+                            <button type="button" 
+                                    onclick="prepararDuplicacion('{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }})" 
+                                    title="Duplicar Empleado"
+                                    class="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500/70 hover:text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all border border-violet-500/20 flex items-center justify-center">
+                                <i class="fa-solid fa-copy text-lg"></i>
+                            </button>
 
-        {% if emp.empl_activo %}
-            <button onclick="cambiarEstadoEmpleado('{{ emp.empl_id }}', false)" 
-                    title="Inactivar Empleado"
-                    class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/20 transition-all border border-amber-500/20 flex items-center justify-center">
-                <i class="fa-solid fa-user-slash"></i>
-            </button>
-        {% else %}
-            <button onclick="cambiarEstadoEmpleado('{{ emp.empl_id }}', true)" 
-                    title="Activar Empleado"
-                    class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500/70 hover:text-emerald-400 hover:bg-emerald-500/20 transition-all border border-emerald-500/20 flex items-center justify-center">
-                <i class="fa-solid fa-user-check"></i>
-            </button>
-        {% endif %}
+                            <button type="button" 
+                                    onclick="prepararEdicion('{{ emp.empl_id }}', '{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_cedula }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }})"
+                                    title="Editar Empleado"
+                                    class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500/70 hover:text-sky-400 hover:bg-sky-500/20 hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all border border-sky-500/20 flex items-center justify-center">
+                                <i class="fa-solid fa-pen-to-square text-lg"></i>
+                            </button>
+
+                            {% if emp.empl_activo %}
+                                <button onclick="cambiarEstadoEmpleado('{{ emp.empl_id }}', false)" 
+                                        title="Inactivar Empleado"
+                                        class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/20 transition-all border border-amber-500/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-user-slash"></i>
+                                </button>
+                            {% else %}
+                                <button onclick="cambiarEstadoEmpleado('{{ emp.empl_id }}', true)" 
+                                        title="Activar Empleado"
+                                        class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500/70 hover:text-emerald-400 hover:bg-emerald-500/20 transition-all border border-emerald-500/20 flex items-center justify-center">
+                                    <i class="fa-solid fa-user-check"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-</td>
-    </tr>
-    {% endfor %}
-</tbody>
-            </table>
-        </div>
-    </div>
+</div>
 </div>
 
 <div id="modalEmpleado" data-id="" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
@@ -210,69 +216,88 @@
             <p class="text-slate-500 text-xs mt-1">Configura el perfil del colaborador</p>
         </div>
         
-        <div class="space-y-5">
-            <div class="space-y-1.5">
-                <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Nombre Completo</label>
-                <input type="text" id="empl_nombre" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:ring-2 focus:ring-sky-500/50">
-            </div>
-
-<div class="space-y-1.5">
-    <div class="flex items-center justify-between ml-2 mr-1">
-        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Servicios que presta</label>
-        <button type="button" 
-                onclick="toggleTodosServicios()" 
-                id="btnToggleTodos"
-                class="text-[9px] font-bold text-sky-500 hover:text-sky-400 uppercase tracking-tighter bg-sky-500/10 px-2 py-1 rounded-md border border-sky-500/20 transition-all">
-            Seleccionar Todos
-        </button>
+<div class="space-y-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Nombre Completo</label>
+            <input type="text" id="empl_nombre" placeholder="Ej: Juan Pérez" 
+                   class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
+        </div>
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Cargo / Especialidad</label>
+            <input type="text" id="empl_cargo" placeholder="Ej: Barbero Senior" 
+                   class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:ring-2 focus:ring-sky-500/50 transition-all">
+        </div>
     </div>
 
-<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-    {% for s in servicios %}
-    <label class="relative cursor-pointer group h-full">
-        <input type="checkbox" 
-               name="servicios_empleado" 
-               value="{{ s.ser_id }}" 
-               class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer checkbox-servicio">
-        
-        <div class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wider text-slate-400 
-                    transition-all duration-200 
-                    peer-checked:bg-sky-500/20 peer-checked:text-sky-400 peer-checked:border-sky-500/50
-                    group-hover:border-white/20 flex items-center justify-center text-center h-full min-h-[45px]">
-            {{ s.ser_nombre }}
-        </div>
-
-        <div class="absolute -top-1 -right-1 opacity-0 peer-checked:opacity-100 transition-opacity z-20">
-            <div class="bg-sky-500 text-white rounded-full p-0.5 shadow-lg shadow-sky-500/50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-2 w-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                </svg>
-            </div>
-        </div>
-    </label>
-    {% endfor %}
-</div>
-</div>
-
-            <div class="space-y-1.5">
-                <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Cédula de Identidad</label>
-                <input type="number" id="empl_cedula" oninput="validarLongitud(this, 15)" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">WhatsApp</label>
-                    <input type="number" id="empl_telefono" oninput="validarLongitud(this, 10)" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none">
-                </div>
-                <div class="space-y-1.5">
-                    <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Comisión (%)</label>
-                    <div class="relative">
-                        <input type="number" id="empl_porcentaje" value="40" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none pr-10">
-                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-black text-xs">%</span>
-                    </div>
+    <div class="space-y-1.5">
+        <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Foto de Perfil</label>
+        <div class="flex items-center gap-4 bg-white/5 border border-white/10 rounded-[2rem] p-3 hover:bg-white/[0.07] transition-all">
+            <div id="preview_contenedor" class="w-16 h-16 rounded-2xl bg-slate-800 border border-white/10 overflow-hidden flex-shrink-0 shadow-2xl">
+                <img id="img_preview" src="" class="w-full h-full object-cover hidden">
+                <div id="img_icon" class="w-full h-full flex items-center justify-center text-slate-500">
+                    <i class="fa-solid fa-camera text-xl"></i>
                 </div>
             </div>
+            <div class="flex-1">
+                <input type="file" id="empl_foto" accept="image/png, image/jpeg, image/jpg, image/webp" onchange="previsualizarImagen(this)"
+                       class="block w-full text-[10px] text-slate-400
+                              file:mr-3 file:py-2 file:px-4
+                              file:rounded-xl file:border-0
+                              file:text-[10px] file:font-black file:uppercase
+                              file:bg-sky-500/10 file:text-sky-500
+                              hover:file:bg-sky-500/20 file:cursor-pointer cursor-pointer">
+                <p class="text-[9px] text-slate-600 mt-1.5 ml-1 italic">JPG, PNG • Recomendado: Cuadrado</p>
+            </div>
         </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Cédula</label>
+            <input type="number" id="empl_cedula" oninput="validarLongitud(this, 15)" 
+                   class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:ring-2 focus:ring-sky-500/50">
+        </div>
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">WhatsApp</label>
+            <input type="number" id="empl_telefono" oninput="validarLongitud(this, 10)" 
+                   class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:ring-2 focus:ring-sky-500/50">
+        </div>
+    </div>
+
+    <div class="space-y-3 pt-2">
+        <div class="flex items-center justify-between ml-2 mr-1">
+            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Servicios y Comisión</label>
+            <button type="button" onclick="toggleTodosServicios()" id="btnToggleTodos"
+                    class="text-[9px] font-bold text-sky-500 hover:text-sky-400 uppercase tracking-tighter bg-sky-500/10 px-2 py-1 rounded-md border border-sky-500/20 transition-all">
+                Seleccionar Todos
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+            {% for s in servicios %}
+            <label class="relative cursor-pointer group">
+                <input type="checkbox" name="servicios_empleado" value="{{ s.ser_id }}" 
+                       class="peer absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer checkbox-servicio">
+                <div class="px-3 py-2.5 rounded-xl border border-white/10 bg-white/5 text-[9px] font-bold uppercase tracking-wider text-slate-400 
+                            transition-all duration-200 peer-checked:bg-sky-500/20 peer-checked:text-sky-400 peer-checked:border-sky-500/50
+                            group-hover:border-white/20 flex items-center justify-center text-center h-full min-h-[40px]">
+                    {{ s.ser_nombre }}
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="space-y-1.5 mt-4 bg-sky-500/5 p-4 rounded-2xl border border-sky-500/10">
+            <label class="text-[10px] font-black text-sky-500/70 uppercase ml-1 tracking-widest">Porcentaje de Comisión</label>
+            <div class="relative">
+                <input type="number" id="empl_porcentaje" value="40" 
+                       class="w-full bg-slate-900 border border-sky-500/20 rounded-xl px-5 py-3 text-white outline-none focus:border-sky-500/50 transition-all font-mono text-lg">
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sky-500 font-black text-lg">%</span>
+            </div>
+        </div>
+    </div>
+</div>
 
         <div class="flex gap-4 mt-10">
             <button onclick="cerrarModal()" class="flex-1 px-6 py-4 rounded-2xl bg-white/5 text-slate-400 font-bold hover:bg-white/10 transition-all uppercase text-[10px]">Cancelar</button>
