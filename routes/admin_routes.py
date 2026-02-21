@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
 from io import BytesIO
-from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp
+from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -39,6 +39,7 @@ admin_bp = Blueprint('admin', __name__)
 #-----12. CÓDIGOS QR
 # ----13  configuracion panel de control
 #-----14  Gestion de plantillas de correo
+#-----15  funciones promoccionales y de fidelización
 #
 
 
@@ -2459,5 +2460,63 @@ def guardar_plantilla():
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+#-----15  funciones promoccionales y de fidelización
+
+
+@admin_bp.route('/fidelizacion-promociones')
+def fidelizacion_promociones():
+    # Usamos la clase AvisoPromocional para consultar
+    aviso = AvisoPromocional.query.first()
     
+    # Si la tabla está vacía, creamos el registro inicial
+    if not aviso:
+        aviso = AvisoPromocional(
+            titulo="¡Nueva Promoción!",
+            mensaje="Bienvenidos a nuestra plataforma.",
+            activo=False,
+            texto_boton="¡Entendido!"
+        )
+        db.session.add(aviso)
+        db.session.commit()
+        
+    return render_template('admin/fidelizacion.html', aviso=aviso)
+
+@admin_bp.route('/guardar-aviso', methods=['POST'])
+def guardar_aviso():
+    try:
+        aviso = AvisoPromocional.query.first()
+        
+        # Capturamos datos del formulario
+        aviso.titulo = request.form.get('titulo')
+        aviso.mensaje = request.form.get('mensaje')
+        aviso.texto_boton = request.form.get('texto_boton', '¡Entendido!')
+        aviso.enlace_boton = request.form.get('enlace_boton')
+        
+        # Checkboxes
+        aviso.activo = True if request.form.get('activo') else False
+        aviso.solo_una_vez = True if request.form.get('solo_una_vez') else False
+        
+        # Manejo de la imagen en carpeta recursos
+        file = request.files.get('imagen')
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            # Guardamos en static/recursos
+            upload_path = os.path.join(current_app.root_path, 'static', 'recursos')
+            
+            if not os.path.exists(upload_path):
+                os.makedirs(upload_path)
+            
+            file.save(os.path.join(upload_path, filename))
+            aviso.imagen_url = filename 
+
+        db.session.commit()
+        flash('¡Campaña de fidelización actualizada!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al procesar: {str(e)}', 'error')
     
+    return redirect(url_for('admin.fidelizacion_promociones'))

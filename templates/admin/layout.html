@@ -168,6 +168,30 @@
     </div>
     {% endif %}
 
+
+{% if current_user.tiene_permiso('ver_promocion') %}
+<a href="{{ url_for('admin.fidelizacion_promociones') }}" 
+    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+    {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
+        bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 
+    {% else %} 
+        text-slate-400 hover:bg-white/5 hover:text-white border border-transparent 
+    {% endif %}">
+    
+    <div class="flex items-center justify-center">
+        <i class="fa-solid fa-ticket-simple text-lg 
+            {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
+                text-sky-500 
+            {% else %} 
+                group-hover:text-sky-400 
+            {% endif %} transition-colors"></i>
+    </div>
+    
+    <span class="font-bold tracking-wide">Promociones</span>
+</a>
+{% endif %}
+
+
     {% if current_user.tiene_permiso('ver_configuracion') %}
     <a href="{{ url_for('admin.panel_configuracion') }}" 
         class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
@@ -176,6 +200,8 @@
         <span class="font-bold tracking-wide">Configuración</span>
     </a>
     {% endif %}
+
+
 
                     <p class="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-4 mt-10 mb-4 opacity-80">Sesión</p>
 

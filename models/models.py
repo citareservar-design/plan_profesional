@@ -206,3 +206,29 @@ class PlantillaWhatsApp(db.Model):
             "tipo": self.plan_tipo,
             "activo": self.plan_activo
         }
+        
+
+
+class AvisoPromocional(db.Model):
+    __tablename__ = 'AVISOS_PROMOCIONALES'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Configuración del SweetAlert
+    titulo = db.Column(db.String(100), nullable=False, default="¡Nueva Promoción!")
+    mensaje = db.Column(db.Text, nullable=False)
+    
+    # Recursos visuales
+    imagen_url = db.Column(db.String(255), nullable=True)  # Ruta en la carpeta de recursos
+    
+    # Control de visualización
+    activo = db.Column(db.Boolean, default=True)
+    solo_una_vez = db.Column(db.Boolean, default=True) # Para que no le salga cada vez que refresca
+    
+    # Botón de acción opcional
+    texto_boton = db.Column(db.String(50), default="¡Entendido!")
+    enlace_boton = db.Column(db.String(255), nullable=True) # Por si quieres mandarlos a WhatsApp o a una cita
+    
+    fecha_actualizacion = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
+    def __repr__(self):
+        return f'<AvisoPromocional {self.titulo}>'

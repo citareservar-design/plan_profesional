@@ -1,0 +1,82 @@
+{% extends "admin/layout.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-4">
+    <div class="mb-8">
+        <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <i class="fa-solid fa-ticket-simple text-sky-500"></i>
+            Fidelización y <span class="text-sky-500">Promociones</span>
+        </h1>
+        <p class="text-slate-400 text-sm mt-2">Configura el anuncio que verán tus clientes al entrar a la plataforma.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <form id="formAviso" action="{{ url_for('admin.guardar_aviso') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <div class="bg-slate-800/50 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-xl">
+                
+                <div class="flex items-center justify-between mb-6 p-3 bg-white/5 rounded-2xl">
+                    <span class="text-white font-bold text-sm">Estado del Anuncio</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="activo" class="sr-only peer" {% if aviso and aviso.activo %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Título del SweetAlert</label>
+                        <input type="text" name="titulo" value="{{ aviso.titulo if aviso else '' }}" placeholder="¡Promo de Locura!" 
+                               class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Mensaje / Descripción</label>
+                        <textarea name="mensaje" rows="3" placeholder="Cuéntale a tus clientes de qué trata la oferta..." 
+                                  class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all">{{ aviso.mensaje if aviso else '' }}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Imagen Promocional (Opcional)</label>
+                        <div class="relative group">
+                            <input type="file" name="imagen" id="inputImagen" accept="image/*" class="hidden" onchange="previewImage(event)">
+                            <button type="button" onclick="document.getElementById('inputImagen').click()" 
+                                    class="w-full py-4 border-2 border-dashed border-white/10 rounded-2xl text-slate-400 group-hover:border-emerald-500/50 group-hover:text-emerald-400 transition-all flex flex-col items-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                                <span class="text-xs font-bold">Subir nueva imagen</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full mt-8 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-widest text-xs">
+                    Guardar Configuración
+                </button>
+            </div>
+        </form>
+
+        <div class="space-y-6">
+            <h2 class="text-xs font-black text-slate-500 uppercase">Vista Previa</h2>
+            <div class="bg-white rounded-3xl p-8 shadow-2xl text-center space-y-4">
+                <img id="imgPreview" src="{{ url_for('static', filename='recursos/' + aviso.imagen_url) if aviso and aviso.imagen_url else 'https://via.placeholder.com/400x200?text=Sube+una+imagen' }}" 
+                     class="w-full h-48 object-cover rounded-2xl shadow-md border border-slate-100">
+                <h3 id="tituloPreview" class="text-2xl font-black text-slate-800">{{ aviso.titulo if aviso else 'Título de Prueba' }}</h3>
+                <p id="mensajePreview" class="text-slate-600 text-sm leading-relaxed">{{ aviso.mensaje if aviso else 'Aquí se verá el cuerpo de tu mensaje promocional.' }}</p>
+                <button class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl">{{ aviso.texto_boton if aviso else '¡Entendido!' }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function previewImage(event) {
+        const reader = new FileReader();
+        reader.onload = function(){
+            const output = document.getElementById('imgPreview');
+            output.src = reader.result;
+        };
+        reader.readAsDataURL(event.target.files[0]);
+    }
+    // Sincronizar inputs con la vista previa en tiempo real
+    document.querySelector('input[name="titulo"]').onkeyup = e => document.getElementById('tituloPreview').innerText = e.target.value;
+    document.querySelector('textarea[name="mensaje"]').onkeyup = e => document.getElementById('mensajePreview').innerText = e.target.value;
+</script>
+{% endblock %}
