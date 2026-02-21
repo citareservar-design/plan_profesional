@@ -336,22 +336,34 @@ window.seleccionarEmpleado = function(id, elemento) {
     console.log("🎯 Seleccionando empleado ID:", id);
     
     const inputOculto = document.getElementById('empleado_id_input');
-    if (inputOculto) {
-        inputOculto.value = id;
-    }
+    if (inputOculto) inputOculto.value = id;
 
-    // Estética de selección
+    // 1. Limpiar todos los elementos
     document.querySelectorAll('.item-empleado').forEach(el => {
-        el.classList.remove('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
-        el.classList.add('border-slate-100');
+        el.classList.remove(
+            'seleccionado', 'border-sky-500', 'bg-sky-50', 
+            'ring-4', 'ring-sky-500/30', 'scale-105', 'shadow-md'
+        );
+        el.classList.add('border-slate-200', 'bg-white');
+        el.style.opacity = "0.7";
     });
 
+    // 2. Aplicar estilos al seleccionado
     if (elemento) {
-        elemento.classList.remove('border-slate-100');
-        elemento.classList.add('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
+        elemento.style.opacity = "1";
+        elemento.classList.remove('border-slate-200', 'bg-white');
+        
+        // Añadimos 'seleccionado' para activar el CSS del check y las de Tailwind para el diseño
+        elemento.classList.add(
+            'seleccionado', 
+            'border-sky-500', 
+            'bg-sky-50', 
+            'ring-4', 
+            'ring-sky-500/30', 
+            'scale-105', 
+            'shadow-md'
+        );
     }
 
-    // Llamamos a la función que refresca todo
-    actualizarTodo();
+    if (typeof actualizarTodo === 'function') actualizarTodo();
 };
-

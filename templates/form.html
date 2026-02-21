@@ -14,31 +14,27 @@
   
   <style>
 
-/* Aseguramos que el cuerpo no tenga scrolls raros durante la carga */
+/* 1. ESTRUCTURA Y CARGA */
 body {
     margin: 0;
     overflow-x: hidden;
 }
 
-/* Ajuste del contenedor principal */
 #main-content {
     display: none;
     opacity: 0;
-    /* Este padding debe ser igual o mayor al alto de tu cabecera */
     padding-top: 20px; 
     will-change: opacity, transform;
 }
 
-/* Si tu cabecera es fija (sticky/fixed), añade esto: */
-.navbar-custom { /* Usa la clase de tu header */
+.navbar-custom {
     position: relative;
     z-index: 1000;
     background: white;
-    margin-bottom: 20px; /* Espacio para que respire el título 'Reserva tu Espacio' */
+    margin-bottom: 20px;
 }
 
-
-/* Estilo para que el checkbox obligatorio resalte si intentan saltárselo */
+/* 2. VALIDACIONES */
 input:invalid:not(:placeholder-shown) {
     border-color: #f87171;
 }
@@ -47,6 +43,57 @@ input[type="checkbox"]:required:invalid + span {
     color: #64748b;
 }
 
+/* 3. COMPONENTE EMPLEADO (ESTADO BASE) */
+.item-empleado {
+    position: relative; /* Necesario para posicionar el check */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+/* 4. EMPLEADO SELECCIONADO (ESTADO ACTIVO) */
+.item-empleado.seleccionado {
+    background-color: #f0f9ff !important; /* sky-50 */
+    border-color: #0ea5e9 !important;     /* sky-500 */
+    border-width: 2px !important;
+    transform: scale(1.05);               /* Efecto de agrandado */
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+    z-index: 10;
+}
+
+.item-empleado.seleccionado span {
+    color: #0369a1 !important;            /* sky-700 */
+}
+
+/* 5. EL CHECK (INDICADOR VISUAL) */
+.check-selector {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #0ea5e9;
+    color: white;
+    width: 18px; /* Un poco más grande para que se vea bien */
+    height: 18px;
+    border-radius: 50%;
+    font-size: 10px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    animation: bounceIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Mostrar el check solo cuando tiene la clase seleccionado */
+.item-empleado.seleccionado .check-selector {
+    display: flex;
+}
+
+/* 6. ANIMACIONES */
+@keyframes bounceIn {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+}
 
   </style>
 </head>
@@ -189,41 +236,45 @@ input[type="checkbox"]:required:invalid + span {
 <div id="contenedor_empleado" class="animate-fade-in w-full mt-8">
     <div class="flex items-center justify-between mb-4">
         <label class="text-slate-500 text-[11px] font-black uppercase tracking-[0.15em] ml-1">
-            ¿Cual profesional quieres escojer?
+            ¿Cuál profesional quieres escoger?
         </label>
         <span class="text-[10px] bg-sky-50 text-sky-600 px-2 py-1 rounded-lg font-bold uppercase tracking-tighter">Opcional</span>
     </div>
 
     <input type="hidden" name="empleado_id" id="empleado_id_input" value="0">
 
-    <div id="grid_empleados" class="flex flex-wrap gap-2 md:gap-3">
-        
-        <div onclick="seleccionarEmpleado(0, this)" 
-             class="item-empleado group flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full cursor-pointer hover:border-sky-500 hover:bg-sky-50 transition-all shadow-sm active:scale-95 border-sky-500 bg-sky-50/50 ring-2 ring-sky-500/10" 
-             data-id="0">
-            <div class="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-white shrink-0 shadow-md">
-                <i class="fa-solid fa-users text-[10px]"></i>
-            </div>
-            <span class="font-bold text-slate-700 text-xs whitespace-nowrap">Cualquiera</span>
+<div id="grid_empleados" class="flex flex-wrap gap-2 md:gap-3 p-1">
+    
+    <div onclick="seleccionarEmpleado(0, this)" 
+         class="item-empleado group flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full cursor-pointer transition-all shadow-sm active:scale-95 seleccionado" 
+         data-id="0">
+        <div class="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-white shrink-0">
+            <i class="fa-solid fa-users text-[10px]"></i>
         </div>
-
-        {% for e in empleados %}
-        <div onclick="seleccionarEmpleado('{{ e.empl_id }}', this)" 
-             class="item-empleado opcion-empleado flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-full cursor-pointer hover:border-sky-500 hover:bg-sky-50 transition-all shadow-sm active:scale-95"
-             data-id="{{ e.empl_id }}">
-            
-            <div class="w-6 h-6 rounded-full bg-sky-100 overflow-hidden flex items-center justify-center shrink-0 border border-sky-200">
-                {% if e.empl_foto %}
-                    <img src="{{ e.empl_foto }}" alt="{{ e.empl_nombre }}" class="w-full h-full object-cover">
-                {% else %}
-                    <span class="text-sky-600 font-black text-[9px] uppercase">{{ e.empl_nombre[:2] }}</span>
-                {% endif %}
-            </div>
-
-            <span class="font-bold text-slate-700 text-xs whitespace-nowrap">{{ e.empl_nombre }}</span>
-        </div>
-        {% endfor %}
+        <span class="font-bold text-slate-700 text-xs whitespace-nowrap">Cualquiera</span>
     </div>
+
+{% for e in empleados %}
+<div onclick="seleccionarEmpleado('{{ e.empl_id }}', this)" 
+     class="item-empleado opcion-empleado flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-full cursor-pointer transition-all shadow-sm active:scale-95"
+     data-id="{{ e.empl_id }}">
+    
+    <div class="relative"> <div class="check-selector">
+            <i class="fa-solid fa-check"></i>
+        </div>
+
+        <div class="w-7 h-7 rounded-full bg-sky-100 overflow-hidden flex items-center justify-center shrink-0 border border-sky-200 shadow-sm">
+            <img src="/admin/foto_empleado/{{ e.empl_cedula }}/{{ e.empl_foto if e.empl_foto else e.empl_cedula ~ '.jpg' }}" 
+                 class="w-full h-full object-cover"
+                 onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\'text-sky-600 font-black text-[9px] uppercase\'>{{ e.empl_nombre[:2] }}</span>';">
+        </div>
+    </div>
+
+    <span class="font-bold text-slate-700 text-xs whitespace-nowrap">{{ e.empl_nombre }}</span>
+</div>
+{% endfor %}
+
+</div>
 </div>
 {% else %}
     <input type="hidden" name="empleado_id" id="empleado_id_input" value="0">

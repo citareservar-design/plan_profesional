@@ -672,7 +672,7 @@ fetch('/admin/api/configuracion/visibilidad-empleados', {
 
 function previsualizarImagen(input) {
     const file = input.files[0];
-    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    const tiposPermitidos = ['image/jpg'];
 
     if (file) {
         // VALIDACIÓN DE FORMATO
@@ -680,7 +680,7 @@ function previsualizarImagen(input) {
             Swal.fire({
                 icon: 'error',
                 title: 'Archivo no válido',
-                text: 'Solo se permiten imágenes (JPG, PNG, WEBP).',
+                text: 'Solo se permiten imágenes JPG.',
                 confirmButtonColor: '#0ea5e9'
             });
             input.value = ''; // Limpia el input
