@@ -1,5 +1,6 @@
 console.log("✅ Gestión de plantillas de WhatsApp cargada");
 
+
 /**
  * Cierra el modal de plantillas
  */
