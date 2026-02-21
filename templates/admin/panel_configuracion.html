@@ -69,6 +69,17 @@
         </a>
         {% endif %}
 
+
+        {% if current_user.tiene_permiso('ver_plantillas') %}
+        <a href="{{ url_for('admin.gestion_plantillas') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-emerald-500/50 transition-all hover:shadow-2xl hover:shadow-emerald-500/10">
+            <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-envelope-open-text text-2xl text-emerald-500"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Plantillas</h3>
+            <p class="text-slate-400 text-sm mt-2">Configura mensajes de WhatsApp y correos automáticos.</p>
+        </a>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

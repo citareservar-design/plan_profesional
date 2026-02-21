@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-
+from datetime import date, datetime, timedelta
 
 db = SQLAlchemy()
 
@@ -174,3 +174,21 @@ class DiasBloqueados(db.Model):
     motivo = db.Column(db.String(100))
     
     
+class PlantillaWhatsApp(db.Model):
+    __tablename__ = 'PLANTILLAS_WHATSAPP'
+    
+    plan_id = db.Column(db.Integer, primary_key=True)
+    plan_nombre = db.Column(db.String(100), nullable=False) # Ej: "Cumpleaños"
+    plan_mensaje = db.Column(db.Text, nullable=False)     # El contenido con {cliente}
+    plan_tipo = db.Column(db.String(50), default='personalizada') # 'cumpleaños', 'ausente', 'confirmacion'
+    plan_activo = db.Column(db.Boolean, default=True)
+    plan_fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.plan_id,
+            "nombre": self.plan_nombre,
+            "mensaje": self.plan_mensaje,
+            "tipo": self.plan_tipo,
+            "activo": self.plan_activo
+        }

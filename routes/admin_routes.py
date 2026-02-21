@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
 from io import BytesIO
-from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso
+from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -35,9 +35,10 @@ admin_bp = Blueprint('admin', __name__)
 # --- 8. CONFIGURACIÓN DE EMPRESA 
 # --- 9. PERMISOS Y GESTIÓN DE USUARIOS
 # ----10. GESTION DE COMISIONES 
-# ---11. HISTORIAL DE RESERVAS Y REPORTES
-#---12. CÓDIGOS QR
-# ---13  configuracion panel de control
+# ----11. HISTORIAL DE RESERVAS Y REPORTES
+#-----12. CÓDIGOS QR
+# ----13  configuracion panel de control
+#-----14  Gestion de plantillas de correo
 #
 
 
@@ -2248,3 +2249,74 @@ def panel_configuracion():
     if not current_user.tiene_permiso('ver_configuracion'):
         abort(403)
     return render_template('admin/panel_configuracion.html')
+
+
+
+
+#-----14  Gestion de plantillas de correo
+
+@admin_bp.route('/obtener_plantilla/<int:id>')
+@login_required
+def obtener_plantilla(id):
+    try:
+        # Buscamos la plantilla por ID
+        plantilla = PlantillaWhatsApp.query.get_or_404(id)
+        
+        # Retornamos los datos en formato JSON
+        # Asegúrate de que los nombres coincidan con los que usa tu JS
+        return jsonify({
+            "id": plantilla.plan_id,
+            "nombre": plantilla.plan_nombre,
+            "mensaje": plantilla.plan_mensaje,
+            "tipo": plantilla.plan_tipo,
+            "activo": plantilla.plan_activo
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+@admin_bp.route('/gestion-plantillas')
+@login_required
+def gestion_plantillas():
+    # Consultamos todas las plantillas guardadas en la base de datos
+    plantillas = PlantillaWhatsApp.query.order_by(PlantillaWhatsApp.plan_fecha_creacion.desc()).all()
+    # Las pasamos al HTML
+    return render_template('admin/gestion_plantillas.html', plantillas=plantillas)
+
+
+@admin_bp.route('/guardar_plantilla', methods=['POST'])
+@login_required
+def guardar_plantilla():
+    data = request.get_json()
+    plan_id = data.get('id')
+    
+    try:
+        if plan_id and plan_id != "":
+            # EDITAR: Buscamos la existente
+            plantilla = PlantillaWhatsApp.query.get(plan_id)
+            if not plantilla:
+                return jsonify({"status": "error", "message": "Plantilla no encontrada"}), 404
+            
+            plantilla.plan_nombre = data['nombre']
+            plantilla.plan_mensaje = data['mensaje']
+            plantilla.plan_tipo = data['tipo']
+            mensaje_exito = "Plantilla actualizada correctamente"
+        else:
+            # CREAR: Nueva instancia
+            nueva = PlantillaWhatsApp(
+                plan_nombre=data['nombre'],
+                plan_mensaje=data['mensaje'],
+                plan_tipo=data['tipo']
+            )
+            db.session.add(nueva)
+            mensaje_exito = "Plantilla creada con éxito"
+            
+        db.session.commit()
+        return jsonify({"status": "success", "message": mensaje_exito})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+    
