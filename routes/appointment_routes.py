@@ -235,143 +235,141 @@ def api_horas_disponibles():
     try:
         fecha_str = request.args.get('fecha')
         servicio_id_o_nombre = request.args.get('servicio_id')
+        # CAPTURAMOS EL EMPLEADO SELECCIONADO
+        empleado_seleccionado_id = request.args.get('empleado_id') 
 
         if not fecha_str or not servicio_id_o_nombre:
             return jsonify({"bloqueado": False, "horas": [], "mensaje": "Fecha o servicio no seleccionado"})
 
-        # --- 1. CONFIGURACIÓN DE TIEMPO ---
         zona_horaria = pytz.timezone('America/Bogota')
         ahora_colombia = datetime.now(zona_horaria)
         hoy_colombia = ahora_colombia.date()
         minutos_ahora = (ahora_colombia.hour * 60) + ahora_colombia.minute
-
         fecha_dt = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         
-        
-        # --- NUEVA VALIDACIÓN: DÍAS BLOQUEADOS ---
+        # --- VALIDACIÓN: DÍAS BLOQUEADOS ---
         from models.models import DiasBloqueados
         dia_bloqueado = DiasBloqueados.query.filter_by(fecha=fecha_dt).first()
-        
         if dia_bloqueado:
-            # Si el día existe en la tabla, bloqueamos todo
-            return jsonify({
-                "bloqueado": True, 
-                "mensaje": f"Este día no habrá servicio: {dia_bloqueado.motivo or 'Día no laboral'}", 
-                "horas": []
-            })
+            return jsonify({"bloqueado": True, "mensaje": f"Bloqueado: {dia_bloqueado.motivo or 'Día no laboral'}", "horas": []})
         
-        # --- 2. VALIDAR HORARIO LABORAL ---
+        # --- VALIDAR HORARIO LABORAL ---
         config = ConfigHorario.query.filter_by(dia_semana=fecha_dt.weekday()).first()
         if not config or not config.activo:
             return jsonify({"bloqueado": True, "mensaje": "Local cerrado", "horas": []})
 
-        # --- 3. IDENTIFICAR SERVICIO Y EMPLEADOS APTOS ---
-        # Buscamos el servicio por nombre o ID
+        # --- IDENTIFICAR SERVICIO ---
         servicio = Servicio.query.filter(Servicio.ser_nombre.ilike(servicio_id_o_nombre.strip())).first()
         if not servicio:
-            # Imprime esto en tu consola para ver qué está llegando realmente
-            print(f"ERROR: No se encontró el servicio '{servicio_id_o_nombre}'")
-            return jsonify({"bloqueado": False, "horas": [], "mensaje": f"Servicio '{servicio_id_o_nombre}' no encontrado"})
+            return jsonify({"bloqueado": False, "horas": [], "mensaje": "Servicio no encontrado"})
         
         duracion = int(servicio.ser_tiempo)
         
-        # OBTENER EMPLEADOS QUE HACEN ESTE SERVICIO (Usando tu tabla EMPLEADO_SERVICIOS)
-        # Importamos los modelos dentro para evitar recursividad si es necesario
+        # --- FILTRAR EMPLEADOS ---
         from models.models import Empleado, EmpleadoServicios
-        empleados_aptos = Empleado.query.join(EmpleadoServicios).filter(
+        query_emp = Empleado.query.join(EmpleadoServicios).filter(
             EmpleadoServicios.ser_id == servicio.ser_id,
             Empleado.empl_activo == 1
-        ).all()
-        
-        # DEBUG CRÍTICO: Mira esto en tu terminal negra de VSCode
-        print(f"--- DEBUG SISTEMA INTELIGENTE ---")
-        print(f"Servicio: {servicio.ser_nombre} (ID: {servicio.ser_id}, Tiempo: {servicio.ser_tiempo}min)")
-        print(f"Empleados Aptos encontrados: {len(empleados_aptos)}")
-        for e in empleados_aptos:
-            print(f" - Empleado: {e.empl_nombre} (ID: {e.empl_id})")
+        )
+
+        # SI EL USUARIO ELIGIÓ UNO EN EL GRID, FILTRAMOS SOLO ESE
+        if empleado_seleccionado_id and empleado_seleccionado_id != "0":
+            empleados_aptos = query_emp.filter(Empleado.empl_id == empleado_seleccionado_id).all()
+        else:
+            empleados_aptos = query_emp.all()
         
         if not empleados_aptos:
-            return jsonify({"bloqueado": False, "horas": [], "mensaje": "No hay personal disponible para este servicio"})
+            return jsonify({"bloqueado": False, "horas": [], "mensaje": "No hay personal disponible"})
 
-        # --- 4. RESERVAS DEL DÍA ---
+        # --- RESERVAS DEL DÍA (Solo las que ocupan tiempo) ---
         reservas = Reserva.query.filter(
             Reserva.res_fecha == fecha_dt,
-            Reserva.res_estado != 'Cancelada' # <-- Esto hace que para el sistema la cita NO exista
-            ).all()
+            Reserva.res_estado.notin_(['Cancelada', 'Cancelado'])
+        ).all()
         
-        # --- 5. RANGO DEL DÍA ---
         inicio_dt = datetime.combine(fecha_dt, config.hora_inicio)
         fin_dt = datetime.combine(fecha_dt, config.hora_fin)
 
-        # --- 6. GENERAR HORAS DISPONIBLES ---
         horas = []
         actual = inicio_dt
         intervalo_paso = 30 
 
         while actual + timedelta(minutes=duracion) <= fin_dt:
-            # A. VALIDACIÓN DE ALMUERZO
+            # --- 1. CÁLCULO DE RANGO POTENCIAL ---
+            fin_actual = actual + timedelta(minutes=duracion)
+            esta_bloqueado_por_almuerzo = False
+
+            # --- A. VALIDACIÓN DE ALMUERZO ---
             if config.almuerzo_inicio and config.almuerzo_fin:
                 almuerzo_ini = datetime.combine(fecha_dt, config.almuerzo_inicio)
                 almuerzo_fin = datetime.combine(fecha_dt, config.almuerzo_fin)
-                if actual >= almuerzo_ini and actual < almuerzo_fin:
-                    actual = almuerzo_fin
-                    continue
-                if actual < almuerzo_ini and (actual + timedelta(minutes=duracion)) > almuerzo_ini:
-                    actual = almuerzo_fin
-                    continue
+                
+                # Si el servicio se cruza con el rango del almuerzo
+                if fin_actual > almuerzo_ini and actual < almuerzo_fin:
+                    esta_bloqueado_por_almuerzo = True
 
-            # B. FILTRO TIEMPO REAL
+            if esta_bloqueado_por_almuerzo:
+                # Si choca, saltamos al final del almuerzo para seguir buscando
+                if actual < almuerzo_fin:
+                    actual = almuerzo_fin
+                else:
+                    actual += timedelta(minutes=intervalo_paso)
+                continue
+
+            # --- B. FILTRO TIEMPO REAL (Para hoy) ---
             if fecha_dt == hoy_colombia:
                 minutos_itera = (actual.hour * 60) + actual.minute
-                if minutos_itera <= (minutos_ahora + 5): # Margen de 20 min
+                if minutos_itera <= (minutos_ahora + 10):
                     actual += timedelta(minutes=intervalo_paso)
                     continue
 
-            # C. VALIDAR DISPONIBILIDAD POR EMPLEADO (Lógica Multi-Especialista)
-            fin_actual = actual + timedelta(minutes=duracion)
-            empleados_libres_en_este_bloque = 0
-            
-            # Pre-cargamos la duración de los servicios de las reservas para no consultar la DB mil veces
+            # --- C. VALIDAR DISPONIBILIDAD DE EMPLEADOS ---
+            empleados_libres = 0
             for emp in empleados_aptos:
                 esta_ocupado = False
-                
-                # Revisamos si ESTE empleado tiene algún choque de horario
                 for r in reservas:
-                    if r.empl_id == emp.empl_id and r.res_estado != 'Cancelado':
-                        inicio_res = datetime.combine(fecha_dt, r.res_hora)
+                    if r.empl_id == emp.empl_id:
+                        # Asegurar que r.res_hora es un objeto time
+                        res_hora_obj = r.res_hora
+                        if isinstance(res_hora_obj, timedelta):
+                            # Algunos conectores de DB devuelven timedelta para campos TIME
+                            total_segundos = int(res_hora_obj.total_seconds())
+                            res_hora_obj = time(total_segundos // 3600, (total_segundos % 3600) // 60)
                         
-                        # Buscamos cuánto dura el servicio de esta reserva existente
-                        # Si no se encuentra, asumimos 60 min por defecto
+                        inicio_res = datetime.combine(fecha_dt, res_hora_obj)
+                        
+                        # Obtener duración del servicio de la reserva existente
                         serv_res = Servicio.query.filter_by(ser_nombre=r.res_tipo_servicio).first()
                         dur_res = int(serv_res.ser_tiempo) if serv_res else 60
                         fin_res = inicio_res + timedelta(minutes=dur_res)
                         
-                        # Lógica de choque: (A inicia antes de que B termine) Y (B inicia antes de que A termine)
+                        # Choque de rangos: si el nuevo servicio empieza antes de que termine el otro
+                        # Y termina después de que empiece el otro.
                         if actual < fin_res and fin_actual > inicio_res:
                             esta_ocupado = True
-                            break # Este empleado está ocupado, saltamos al siguiente
+                            break 
                 
                 if not esta_ocupado:
-                    empleados_libres_en_este_bloque += 1
+                    empleados_libres += 1
             
-            # --- LA CLAVE ---
-            # Si al menos uno de los 3 especialistas está libre, la hora aparece en el móvil
-            if empleados_libres_en_este_bloque > 0:
+            if empleados_libres > 0:
                 horas.append({
                     "valor": actual.strftime("%H:%M:%S"),
                     "formato": actual.strftime("%I:%M %p").lower(),
-                    "cupos_libres": empleados_libres_en_este_bloque 
+                    "cupos_libres": empleados_libres 
                 })
 
+            # Avance normal al siguiente slot
             actual += timedelta(minutes=intervalo_paso)
 
         return jsonify({
             "bloqueado": False,
             "horas": horas,
-            "mensaje": "Selecciona una hora" if horas else "❌ No hay especialistas libres"
+            "mensaje": "Selecciona una hora" if horas else "No hay turnos disponibles para este servicio/especialista"
         })
 
     except Exception as e:
         import traceback
-        print(traceback.format_exc())
+        print(f"❌ Error en API Horas: {e}")
+        traceback.print_exc()
         return jsonify({"bloqueado": False, "horas": [], "error": str(e)}), 500

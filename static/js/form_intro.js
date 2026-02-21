@@ -61,81 +61,53 @@ function bloquearDiasAnteriores() {
     }
 }
 
-// ESTA FUNCIÓN AHORA CONECTA CON EL GRID DE BOTONES
+// ESTA FUNCIÓN AHORA CONECTA CON EL GRID DE BOTONES Y EMPLEADOS
 function actualizarTodo() {
     const fecha = fechaInput.value;
     const servicioId = servicioSelect.value;
+    // Capturamos el empleado del input oculto
+    const empleadoId = document.getElementById('empleado_id_input')?.value || "0";
 
-    // --- 1. LÓGICA DE CASILLAS DE DETALLE (PRECIO Y TIEMPO) ---
+    // --- 1. LÓGICA DE CASILLAS DE DETALLE (Esto lo dejamos igual) ---
     const selectedOption = servicioSelect.options[servicioSelect.selectedIndex];
     const detallesDiv = document.getElementById('detalles_servicio');
 
     if (selectedOption && detallesDiv) {
         const precioRaw = selectedOption.getAttribute('data-precio');
-        const tiempoRaw = selectedOption.getAttribute('data-tiempo'); // Minutos (ej: 60, 90, 45)
-        
+        const tiempoRaw = selectedOption.getAttribute('data-tiempo');
         const showPrecio = selectedOption.getAttribute('data-show-precio') === '1' || selectedOption.getAttribute('data-show-precio') === 'True';
         const showTiempo = selectedOption.getAttribute('data-show-tiempo') === '1' || selectedOption.getAttribute('data-show-tiempo') === 'True';
 
-        // --- FORMATEADOR DE PRECIO (COP) ---
-        let precioFormateado = "";
-        if (precioRaw) {
-            precioFormateado = new Intl.NumberFormat('es-CO', {
-                style: 'currency',
-                currency: 'COP',
-                minimumFractionDigits: 0
-            }).format(precioRaw);
-        }
-
-        // --- CONVERTIDOR DE MINUTOS A HORAS ---
+        let precioFormateado = precioRaw ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(precioRaw) : "";
         let tiempoTexto = "";
         if (tiempoRaw) {
             const mins = parseInt(tiempoRaw);
-            if (mins === 60) {
-                tiempoTexto = "1 Hora";
-            } else if (mins > 60) {
+            if (mins === 60) tiempoTexto = "1 Hora";
+            else if (mins > 60) {
                 const horas = Math.floor(mins / 60);
                 const resto = mins % 60;
                 tiempoTexto = resto > 0 ? `${horas}h ${resto}min` : `${horas} Horas`;
-            } else {
-                tiempoTexto = `${mins} Minutos`;
-            }
+            } else tiempoTexto = `${mins} Minutos`;
         }
 
         let htmlDetalles = '';
-
         if ((showTiempo && tiempoRaw) || (showPrecio && precioRaw)) {
             detallesDiv.classList.remove('hidden');
-            
             if (showTiempo && tiempoRaw) {
-                htmlDetalles += `
-                    <div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl transition-all">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-regular fa-clock text-sky-500 text-xs"></i>
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duración estimada</span>
-                        </div>
-                        <span class="text-xs font-bold text-slate-700 uppercase">${tiempoTexto}</span>
-                    </div>`;
+                htmlDetalles += `<div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl">
+                    <div class="flex items-center gap-2"><i class="fa-regular fa-clock text-sky-500 text-xs"></i><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duración</span></div>
+                    <span class="text-xs font-bold text-slate-700 uppercase">${tiempoTexto}</span></div>`;
             }
-
             if (showPrecio && precioRaw) {
-                htmlDetalles += `
-                    <div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl transition-all">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-tag text-emerald-500 text-xs"></i>
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión</span>
-                        </div>
-                        <span class="text-xs font-bold text-emerald-600 uppercase">${precioFormateado}</span>
-                    </div>`;
+                htmlDetalles += `<div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-tag text-emerald-500 text-xs"></i><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión</span></div>
+                    <span class="text-xs font-bold text-emerald-600 uppercase">${precioFormateado}</span></div>`;
             }
-        } else {
-            detallesDiv.classList.add('hidden');
-        }
-
+        } else detallesDiv.classList.add('hidden');
         detallesDiv.innerHTML = htmlDetalles;
     }
 
-    // --- 2. LÓGICA DE HORARIOS (TU FETCH ORIGINAL) ---
+    // --- 2. LÓGICA DE HORARIOS (ACTUALIZADA CON EMPLEADO_ID) ---
     if (fecha && servicioId && servicioId !== "") {
         gridHoras.innerHTML = `
             <div class="col-span-full py-8 text-center animate-pulse">
@@ -143,22 +115,19 @@ function actualizarTodo() {
                 <p class="text-sky-500 font-bold text-sm uppercase tracking-tighter">Buscando turnos...</p>
             </div>`;
 
-        fetch(`/api/horas-disponibles?fecha=${fecha}&servicio_id=${servicioId}`)
+        // AQUÍ ESTÁ EL CAMBIO CLAVE: Incluimos empleado_id en el fetch
+        const url = `/api/horas-disponibles?fecha=${fecha}&servicio_id=${encodeURIComponent(servicioId)}&empleado_id=${empleadoId}`;
+        console.log("📡 Pidiendo horas a:", url);
+
+        fetch(url)
             .then(res => res.json())
             .then(data => {
                 if (data.bloqueado) {
-                    Swal.fire({
-                        title: 'Día no disponible',
-                        text: data.mensaje,
-                        icon: 'warning',
-                        confirmButtonColor: '#0ea5e9'
-                    });
+                    Swal.fire({ title: 'Día no disponible', text: data.mensaje, icon: 'warning', confirmButtonColor: '#0ea5e9' });
                     fechaInput.value = ''; 
-                    gridHoras.innerHTML = `
-                        <div class="col-span-full py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                            <i class="fa-regular fa-calendar-check text-slate-300 text-2xl mb-2 block"></i>
-                            <p class="text-slate-400 text-xs font-bold uppercase">Selecciona otra fecha</p>
-                        </div>`;
+                    gridHoras.innerHTML = `<div class="col-span-full py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                        <i class="fa-regular fa-calendar-check text-slate-300 text-2xl mb-2 block"></i>
+                        <p class="text-slate-400 text-xs font-bold uppercase">Selecciona otra fecha</p></div>`;
                     return;
                 }
                 renderizarHoras(data.horas);
@@ -170,6 +139,10 @@ function actualizarTodo() {
     }
 }
 
+// CREAMOS UN ALIAS PARA QUE NO FALLE SI LLAMAMOS A ACTUALIZARHORASDISPONIBLES
+window.actualizarHorasDisponibles = actualizarTodo;
+
+
 function renderizarHoras(horas) {
     gridHoras.innerHTML = ''; 
     inputOcultoHora.value = ''; // Resetear selección previa
@@ -178,7 +151,7 @@ function renderizarHoras(horas) {
         gridHoras.innerHTML = `
             <div class="col-span-full text-center p-6 bg-rose-50 rounded-2xl border border-rose-100">
                 <i class="fa-solid fa-clock-slash text-rose-300 mb-2 text-xl"></i>
-                <p class="text-rose-500 text-xs font-bold">No hay turnos para este servicio</p>
+                <p class="text-rose-500 text-xs font-bold">No hay turnos para este servicio | agenda ocupada</p>
             </div>`;
         return;
     }
@@ -316,4 +289,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+
+window.seleccionarEmpleado = function(id, elemento) {
+    console.log("🎯 Seleccionando empleado ID:", id);
+    
+    const inputOculto = document.getElementById('empleado_id_input');
+    if (inputOculto) {
+        inputOculto.value = id;
+    }
+
+    // Estética de selección
+    document.querySelectorAll('.item-empleado').forEach(el => {
+        el.classList.remove('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
+        el.classList.add('border-slate-100');
+    });
+
+    if (elemento) {
+        elemento.classList.remove('border-slate-100');
+        elemento.classList.add('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
+    }
+
+    // Llamamos a la función que refresca todo
+    actualizarTodo();
+};
 

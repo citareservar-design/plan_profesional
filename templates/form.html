@@ -295,6 +295,40 @@ input[type="checkbox"]:required:invalid + span {
 
   
 <script src="{{ url_for('static', filename='js/form_intro.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const divData = document.getElementById('data-mapa');
+    const selectServicio = document.getElementById('select_servicio');
+
+    if (divData && selectServicio) {
+        const mapaHabilidades = JSON.parse(divData.getAttribute('data-mapa'));
+
+        selectServicio.addEventListener('change', function() {
+            const servicioNombre = this.value;
+            const idsPermitidos = mapaHabilidades[servicioNombre] || [];
+
+            // Resetear selección visual usando la función del archivo externo
+            const primerDisponible = document.querySelector('.item-empleado[data-id="0"]');
+            if(primerDisponible && typeof window.seleccionarEmpleado === 'function') {
+                window.seleccionarEmpleado(0, primerDisponible);
+            }
+
+            // Filtrar Tarjetas
+            document.querySelectorAll('.opcion-empleado').forEach(tarjeta => {
+                const idEmp = parseInt(tarjeta.getAttribute('data-id'));
+                tarjeta.style.display = idsPermitidos.includes(idEmp) ? 'flex' : 'none';
+            });
+            
+            // Si ya hay fecha, actualizar horas
+            if (typeof actualizarHorasDisponibles === 'function') {
+                actualizarHorasDisponibles();
+            }
+        });
+    }
+});
+</script>
+
   <div id="loader-confirmacion" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm hidden items-center justify-center p-6">
     <div class="w-full max-w-xs bg-white rounded-[2.5rem] p-8 text-center shadow-2xl">
         <div class="relative w-20 h-20 mx-auto mb-6">
@@ -351,50 +385,6 @@ input[type="checkbox"]:required:invalid + span {
 <div id="data-mapa" data-mapa='{{ mapa_habilidades | safe }}' style="display: none;"></div>
 
 
-<script>
-// Función para marcar visualmente la selección
-function seleccionarEmpleado(id, elemento) {
-    // 1. Actualizar el input oculto que se envía al servidor
-    document.getElementById('empleado_id_input').value = id;
 
-    // 2. Limpiar estilos de todos los demás
-    document.querySelectorAll('.item-empleado').forEach(el => {
-        el.classList.remove('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
-        el.classList.add('border-slate-100');
-    });
-
-    // 3. Aplicar estilo al seleccionado
-    elemento.classList.remove('border-slate-100');
-    elemento.classList.add('border-sky-500', 'bg-sky-50/50', 'ring-2', 'ring-sky-500/20');
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const divData = document.getElementById('data-mapa');
-    const selectServicio = document.getElementById('select_servicio');
-
-    if (divData && selectServicio) {
-        const mapaHabilidades = JSON.parse(divData.getAttribute('data-mapa'));
-
-        selectServicio.addEventListener('change', function() {
-            const servicioNombre = this.value;
-            const idsPermitidos = mapaHabilidades[servicioNombre] || [];
-
-            // Resetear selección al cambiar servicio
-            seleccionarEmpleado(0, document.querySelector('.item-empleado[data-id="0"]'));
-
-            // Filtrar Tarjetas
-            document.querySelectorAll('.opcion-empleado').forEach(tarjeta => {
-                const idEmp = parseInt(tarjeta.getAttribute('data-id'));
-                
-                if (idsPermitidos.includes(idEmp)) {
-                    tarjeta.style.display = 'flex'; // Mostrar
-                } else {
-                    tarjeta.style.display = 'none'; // Ocultar
-                }
-            });
-        });
-    }
-});
-</script>
 </body>
 </html>

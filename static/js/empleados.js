@@ -668,3 +668,4 @@ fetch('/admin/api/configuracion/visibilidad-empleados', {
         });
     });
 }
+

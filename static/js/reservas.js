@@ -396,3 +396,4 @@ window.reagendarHora = function(reservaId, nuevaHora, nuevaFecha) {
         Swal.fire('Error', 'No se pudo actualizar la reserva.', 'error');
     });
 };
+
