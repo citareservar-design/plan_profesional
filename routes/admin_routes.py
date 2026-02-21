@@ -839,6 +839,53 @@ def cambiar_visibilidad_staff():
     
 # --- 4. GESTIÓN DE CLIENTES ---
 
+
+@admin_bp.route('/aplicar_descuento_general', methods=['POST'])
+def aplicar_descuento_general():
+    try:
+        # Importamos dentro de la función para evitar importaciones circulares
+        from models.models import Cliente, db
+        
+        datos = request.get_json()
+        
+        # Extraemos y validamos los datos que vienen del JS
+        nuevo_porcentaje = datos.get('porcentaje')
+        nueva_cantidad = datos.get('cantidad')
+        
+        if nuevo_porcentaje is None or nueva_cantidad is None:
+            return jsonify({
+                "status": "error", 
+                "message": "Faltan valores de porcentaje o cantidad."
+            }), 400
+
+        # --- LA CIRUGÍA EN LA DB ---
+        # Filtramos solo clientes activos para no reactivar promociones a gente bloqueada
+        # synchronize_session=False hace que la actualización sea ultra rápida
+        Cliente.query.filter(Cliente.cli_activo == 1).update({
+            Cliente.cli_descuento: float(nuevo_porcentaje),
+            Cliente.cli_descuento_cantidad: int(nueva_cantidad)
+        }, synchronize_session=False)
+        
+        db.session.commit()
+        
+        print(f"✅ [ADMIN] Campaña lanzada con éxito: {nuevo_porcentaje} desc / {nueva_cantidad} citas")
+        
+        return jsonify({
+            "status": "success", 
+            "message": "¡Campaña activada correctamente en todos los clientes!"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"❌ Error en admin_bp.aplicar_descuento_general: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            "status": "error", 
+            "message": "Error interno del servidor al procesar la campaña."
+        }), 500
+
+
 @admin_bp.route('/obtener_plantillas')
 @login_required
 def obtener_plantillas():

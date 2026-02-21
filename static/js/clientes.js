@@ -647,3 +647,60 @@ function cerrarSelector() {
         modal.classList.remove('flex');
     }
 }
+
+
+
+async function aplicarDescuentoMasivo() {
+    let porcentaje = document.getElementById('desc_porcentaje').value;
+    const cantidad = document.getElementById('desc_cantidad').value;
+
+    if (!porcentaje || !cantidad) {
+        return Swal.fire('Error', 'Ingresa porcentaje y cantidad', 'warning');
+    }
+
+    // --- CIRUGÍA DE PORCENTAJE ---
+    let valorFinalDesc = parseFloat(porcentaje);
+    // Si puso 20, lo convertimos a 0.20. Si puso 0.20, lo dejamos igual.
+    if (valorFinalDesc > 1) {
+        valorFinalDesc = valorFinalDesc / 100;
+    }
+
+    const confirmacion = await Swal.fire({
+        title: '¿Lanzar Campaña?',
+        text: `Aplicarás ${Math.round(valorFinalDesc * 100)}% de descuento por ${cantidad} citas.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '¡Lanzar ahora!',
+        confirmButtonColor: '#10b981'
+    });
+
+    if (confirmacion.isConfirmed) {
+        try {
+            // CAMBIO CLAVE AQUÍ: Asegúrate de que la ruta sea /admin/... 
+            // porque estás usando admin_bp
+            const response = await fetch('/admin/aplicar_descuento_general', { 
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    porcentaje: valorFinalDesc, 
+                    cantidad: parseInt(cantidad) 
+                })
+            });
+            
+            // Si la respuesta no es OK (ej: 404), esto atrapará el error antes del JSON
+            if (!response.ok) {
+                const textError = await response.text();
+                console.error("Respuesta del servidor:", textError);
+                throw new Error(`Servidor respondió con código ${response.status}`);
+            }
+
+            const res = await response.json();
+            if (res.status === 'success') {
+                Swal.fire('¡Listo!', res.message, 'success').then(() => location.reload());
+            }
+        } catch (e) {
+            console.error("Error detallado:", e);
+            Swal.fire('Error de Ruta', 'El servidor no encontró la dirección /admin/aplicar_descuento_general', 'error');
+        }
+    }
+}
