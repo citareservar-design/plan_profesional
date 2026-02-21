@@ -68,7 +68,7 @@ function actualizarTodo() {
     // Capturamos el empleado del input oculto
     const empleadoId = document.getElementById('empleado_id_input')?.value || "0";
 
-    // --- 1. LÓGICA DE CASILLAS DE DETALLE (Esto lo dejamos igual) ---
+    // --- 1. LÓGICA DE CASILLAS DE DETALLE (DISEÑO PREMIUM RESPONSIVO) ---
     const selectedOption = servicioSelect.options[servicioSelect.selectedIndex];
     const detallesDiv = document.getElementById('detalles_servicio');
 
@@ -78,7 +78,14 @@ function actualizarTodo() {
         const showPrecio = selectedOption.getAttribute('data-show-precio') === '1' || selectedOption.getAttribute('data-show-precio') === 'True';
         const showTiempo = selectedOption.getAttribute('data-show-tiempo') === '1' || selectedOption.getAttribute('data-show-tiempo') === 'True';
 
-        let precioFormateado = precioRaw ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(precioRaw) : "";
+        // Formateo de Moneda
+        let precioFormateado = precioRaw ? new Intl.NumberFormat('es-CO', { 
+            style: 'currency', 
+            currency: 'COP', 
+            maximumFractionDigits: 0 
+        }).format(precioRaw) : "";
+
+        // Formateo de Tiempo
         let tiempoTexto = "";
         if (tiempoRaw) {
             const mins = parseInt(tiempoRaw);
@@ -87,35 +94,57 @@ function actualizarTodo() {
                 const horas = Math.floor(mins / 60);
                 const resto = mins % 60;
                 tiempoTexto = resto > 0 ? `${horas}h ${resto}min` : `${horas} Horas`;
-            } else tiempoTexto = `${mins} Minutos`;
+            } else tiempoTexto = `${mins} min`;
         }
 
-        let htmlDetalles = '';
         if ((showTiempo && tiempoRaw) || (showPrecio && precioRaw)) {
             detallesDiv.classList.remove('hidden');
+            // Forzamos el grid de 2 columnas en PC y 1 o 2 en móvil según prefieras
+            detallesDiv.className = "mt-4 grid grid-cols-2 gap-3 animate-fade-in"; 
+            
+            let htmlDetalles = '';
+
+            // Card de Duración
             if (showTiempo && tiempoRaw) {
-                htmlDetalles += `<div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl">
-                    <div class="flex items-center gap-2"><i class="fa-regular fa-clock text-sky-500 text-xs"></i><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duración</span></div>
-                    <span class="text-xs font-bold text-slate-700 uppercase">${tiempoTexto}</span></div>`;
+                htmlDetalles += `
+                <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm transition-all hover:bg-white">
+                    <div class="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                        <i class="fa-regular fa-clock text-sm"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Tiempo</p>
+                        <p class="text-xs font-bold text-slate-700 truncate">${tiempoTexto}</p>
+                    </div>
+                </div>`;
             }
+
+            // Card de Inversión
             if (showPrecio && precioRaw) {
-                htmlDetalles += `<div class="flex items-center justify-between px-5 py-3 bg-slate-100/50 border-2 border-slate-100 rounded-xl">
-                    <div class="flex items-center gap-2"><i class="fa-solid fa-tag text-emerald-500 text-xs"></i><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión</span></div>
-                    <span class="text-xs font-bold text-emerald-600 uppercase">${precioFormateado}</span></div>`;
+                htmlDetalles += `
+                <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm transition-all hover:bg-white">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                        <i class="fa-solid fa-hand-holding-dollar text-sm"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Costo</p>
+                        <p class="text-xs font-bold text-emerald-600 truncate">${precioFormateado}</p>
+                    </div>
+                </div>`;
             }
-        } else detallesDiv.classList.add('hidden');
-        detallesDiv.innerHTML = htmlDetalles;
+            detallesDiv.innerHTML = htmlDetalles;
+        } else {
+            detallesDiv.classList.add('hidden');
+        }
     }
 
-    // --- 2. LÓGICA DE HORARIOS (ACTUALIZADA CON EMPLEADO_ID) ---
+    // --- 2. LÓGICA DE HORARIOS (CONEXIÓN CON API) ---
     if (fecha && servicioId && servicioId !== "") {
         gridHoras.innerHTML = `
-            <div class="col-span-full py-8 text-center animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin text-sky-500 text-xl mb-2 block"></i>
-                <p class="text-sky-500 font-bold text-sm uppercase tracking-tighter">Buscando turnos...</p>
+            <div class="col-span-full py-10 text-center animate-pulse">
+                <i class="fa-solid fa-circle-notch fa-spin text-sky-500 text-2xl mb-3 block"></i>
+                <p class="text-sky-600 font-bold text-xs uppercase tracking-widest">Consultando agenda...</p>
             </div>`;
 
-        // AQUÍ ESTÁ EL CAMBIO CLAVE: Incluimos empleado_id en el fetch
         const url = `/api/horas-disponibles?fecha=${fecha}&servicio_id=${encodeURIComponent(servicioId)}&empleado_id=${empleadoId}`;
         console.log("📡 Pidiendo horas a:", url);
 
@@ -123,18 +152,31 @@ function actualizarTodo() {
             .then(res => res.json())
             .then(data => {
                 if (data.bloqueado) {
-                    Swal.fire({ title: 'Día no disponible', text: data.mensaje, icon: 'warning', confirmButtonColor: '#0ea5e9' });
+                    Swal.fire({ 
+                        title: 'Día no disponible', 
+                        text: data.mensaje, 
+                        icon: 'warning', 
+                        confirmButtonColor: '#0ea5e9',
+                        customClass: { popup: 'rounded-3xl' }
+                    });
                     fechaInput.value = ''; 
-                    gridHoras.innerHTML = `<div class="col-span-full py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                        <i class="fa-regular fa-calendar-check text-slate-300 text-2xl mb-2 block"></i>
-                        <p class="text-slate-400 text-xs font-bold uppercase">Selecciona otra fecha</p></div>`;
+                    gridHoras.innerHTML = `
+                        <div class="col-span-full py-10 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                            <i class="fa-regular fa-calendar-xmark text-slate-300 text-3xl mb-3 block"></i>
+                            <p class="text-slate-400 text-[10px] font-black uppercase tracking-widest">Elige otra fecha de atención</p>
+                        </div>`;
                     return;
                 }
                 renderizarHoras(data.horas);
             })
             .catch(err => {
                 console.error("Error:", err);
-                gridHoras.innerHTML = '<p class="col-span-full text-center text-rose-500 text-[10px] font-bold uppercase tracking-widest">Error de conexión</p>';
+                gridHoras.innerHTML = `
+                    <div class="col-span-full py-6 text-center">
+                        <p class="text-rose-500 text-[10px] font-black uppercase tracking-widest bg-rose-50 py-2 rounded-full border border-rose-100">
+                            <i class="fa-solid fa-triangle-exclamation mr-2"></i> Error de conexión
+                        </p>
+                    </div>`;
             });
     }
 }
