@@ -5,9 +5,8 @@ function abrirModalEditar(cliente) {
     const modal = document.getElementById('modalEditar');
     if (!modal) return; 
 
-    // CALCULAMOS EL VALOR PARA MOSTRAR (0.2 -> 20)
-    // Usamos Math.round para evitar decimales extraños como 19.9999
-    const descuentoVisible = cliente.descuento ? Math.round(cliente.descuento * 100) : 0;
+    // --- CAMBIO AQUÍ: Ya no multiplicamos, usamos el valor directo ---
+    const descuentoVisible = cliente.descuento || 0; 
 
     const fieldMap = {
         'edit_cli_id': cliente.id,
@@ -16,7 +15,7 @@ function abrirModalEditar(cliente) {
         'edit_email': cliente.email || '',
         'edit_telefono': cliente.telefono || '',
         'edit_fecha_nacimiento': cliente.fecha_nacimiento || '',
-        'edit_descuento': descuentoVisible, // <--- CAMBIO AQUÍ
+        'edit_descuento': descuentoVisible, 
         'edit_descuento_cantidad': cliente.descuento_cantidad || 0,
         'edit_notas_personales': cliente.notas_personales || ''
     };
@@ -52,11 +51,10 @@ function guardarCambiosCliente() {
         return;
     }
 
-    // --- LÓGICA DE CONVERSIÓN DE DESCUENTO ---
-    // Obtenemos el valor del input (ej: 20)
+    // --- LÓGICA CORREGIDA: ENVIAR EL NÚMERO ENTERO ---
+    // Obtenemos el valor del input (ej: 20) directamente sin dividir
     const valorDescuentoInput = document.getElementById('edit_descuento')?.value || 0;
-    // Lo convertimos a decimal para la base de datos (20 / 100 = 0.2)
-    const descuentoParaBD = parseFloat(valorDescuentoInput) / 100;
+    const descuentoParaBD = parseFloat(valorDescuentoInput); 
 
     // 2. Recolectar datos del formulario
     const data = {
@@ -66,13 +64,13 @@ function guardarCambiosCliente() {
         telefono: document.getElementById('edit_telefono').value,
         fecha_nacimiento: document.getElementById('edit_fecha_nacimiento').value,
         notas_personales: document.getElementById('edit_notas_personales')?.value || '',
-        descuento: descuentoParaBD, // Enviamos el decimal (0.2)
+        descuento: descuentoParaBD, // Enviamos el entero (Ej: 20)
         descuento_cantidad: parseInt(document.getElementById('edit_descuento_cantidad')?.value || 0)
     };
 
     // 3. Definir URL
     const url = `/admin/api/cliente/editar/${cliId}`;
-    console.log("Datos enviados al servidor:", data);
+    console.log("📤 Enviando a la BD:", data);
 
     // 4. Ejecutar la petición
     fetch(url, {
@@ -122,7 +120,6 @@ function guardarCambiosCliente() {
         });
     });
 }
-
 
 
 function crearCliente() {

@@ -296,7 +296,8 @@
 <div class="mt-2 flex items-center gap-2">
   <span class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
     <i class="fa-solid fa-tag mr-1"></i>
-    {{ (cliente.cli_descuento * 100)|int }}% OFF
+    {# Quitamos el * 100 porque ahora el valor ya es 20 #}
+    {{ cliente.cli_descuento|int }}% OFF
   </span>
   <span class="text-[10px] text-slate-500">
     Válido por <b>{{ cliente.cli_descuento_cantidad }}</b> citas
@@ -434,8 +435,10 @@
             type="number"
             id="edit_descuento"
             name="descuento"
+            min="0"
+            max="100"
             class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white outline-none focus:border-sky-500 transition-all"
-            placeholder="Ej: 10"
+            placeholder="Ej: 20" 
           />
         </div>
 
