@@ -152,6 +152,8 @@ class Reserva(db.Model):
     cli_id = db.Column(db.Integer, db.ForeignKey('CLIENTES.cli_id'), nullable=False)
     emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False) # <--- EMPRESA
     
+    cliente = db.relationship('Cliente', backref='reservas_asociadas')
+    
     # NUEVA COLUMNA PARA EL PROFESIONAL (Añade esta línea)
     empl_id = db.Column(db.Integer, db.ForeignKey('EMPLEADOS.empl_id'), nullable=True)
     
