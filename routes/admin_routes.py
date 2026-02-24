@@ -1461,14 +1461,11 @@ def actualizar_servicios_masivo():
 @admin_bp.route('/reservas')
 @login_required
 def reservas():
-    # 1. Configuración de fechas
     ahora = datetime.now()
     hoy = ahora.date()
     ayer = hoy - timedelta(days=1)
     manana = hoy + timedelta(days=1)
     
-    # 2. Datos generales (Empresa y Empleados activos)
-    # Usamos el emp_id del usuario logueado para que sea dinámico
     datos_empresa = Empresa.query.get(current_user.emp_id)
     
     lista_empleados = Empleado.query.filter_by(
@@ -1476,23 +1473,24 @@ def reservas():
         empl_activo=1
     ).all()
     
-    # 3. Obtener todas las reservas de la empresa
     todas_las_reservas = Reserva.query.filter_by(emp_id=current_user.emp_id)\
                         .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc()).all()
     
     reservas_data = []
     
-    # 4. Procesar cada reserva para encontrar empleados aptos
     for r in todas_las_reservas:
-        # Buscamos el servicio por nombre y empresa
+        # --- LÓGICA DEL PRECIO ---
         servicio_obj = Servicio.query.filter_by(
             ser_nombre=r.res_tipo_servicio, 
             emp_id=current_user.emp_id
         ).first()
         
+        # Le pegamos el precio al objeto 'r' para usarlo en el HTML
+        r.precio_estimado = servicio_obj.ser_precio if servicio_obj else 0
+        # -------------------------
+
         empleados_aptos = []
         if servicio_obj:
-            # SQL para traer empleados que prestan este servicio específico
             from sqlalchemy import text
             sql = text("""
                 SELECT e.* FROM EMPLEADOS e
@@ -1501,20 +1499,17 @@ def reservas():
             """)
             empleados_aptos = db.session.query(Empleado).from_statement(sql).params(s_id=servicio_obj.ser_id).all()
         else:
-            # Si no hay match, usamos la lista general para no bloquear
             empleados_aptos = lista_empleados
 
-        # Guardamos la tupla (Reserva, Cliente, Lista de Aptos)
+        # IMPORTANTE: Asegúrate de que r.cliente funcione (vía relación o búsqueda manual)
+        # Si no tienes la relación en el modelo, usa: cliente_obj = Cliente.query.get(r.cli_id)
         reservas_data.append((r, r.cliente, empleados_aptos))
 
-    # 5. Retorno único de variables al template
     return render_template('admin/reservas.html', 
                            reservas_data=reservas_data, 
                            lista_empleados=lista_empleados,
-                           hoy=hoy,
-                           ayer=ayer,
-                           manana=manana,
-                           empresa=datos_empresa) # Esta variable contiene ahora nombre y dirección
+                           hoy=hoy, ayer=ayer, manana=manana,
+                           empresa=datos_empresa)
 
 @admin_bp.route('/reserva_estado/<int:id>', methods=['POST'])
 @login_required

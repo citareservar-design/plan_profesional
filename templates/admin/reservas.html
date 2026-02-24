@@ -378,6 +378,7 @@
     </form>
 </div>
 
+
 <div @click.stop>
     <form action="{{ url_for('admin.reserva_estado', id=r.res_id) }}" method="POST">
         <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1 mb-1 block">
@@ -402,6 +403,25 @@
             {% endif %}
         </select>
     </form>
+</div>
+
+
+{# SECCIÓN DE TOTAL A PAGAR #}
+<div class="mt-4 pt-3 border-t border-white/10">
+    <div class="flex justify-between items-center">
+        <div class="flex flex-col">
+            <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1">Total a Pagar</span>
+            <span class="text-white font-mono text-lg font-bold">
+                {# Usamos el nuevo atributo que creamos en el back #}
+                ${{ "{:,.0f}".format(r.precio_estimado) if r.precio_estimado else '0' }}
+            </span>
+        </div>
+        
+        {# Opcional: Un icono de moneda para que se vea pro #}
+        <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+            <i class="fa-solid fa-hand-holding-dollar text-emerald-400 text-sm"></i>
+        </div>
+    </div>
 </div>
                 </div>
             </div>
