@@ -2468,10 +2468,9 @@ def guardar_plantilla():
 
 @admin_bp.route('/fidelizacion-promociones')
 def fidelizacion_promociones():
-    # Usamos la clase AvisoPromocional para consultar
     aviso = AvisoPromocional.query.first()
+    empresa = Empresa.query.first() # Para obtener la ruta base en el HTML si es necesario
     
-    # Si la tabla está vacía, creamos el registro inicial
     if not aviso:
         aviso = AvisoPromocional(
             titulo="¡Nueva Promoción!",
@@ -2482,38 +2481,66 @@ def fidelizacion_promociones():
         db.session.add(aviso)
         db.session.commit()
         
-    return render_template('admin/fidelizacion.html', aviso=aviso)
+    return render_template('admin/fidelizacion.html', aviso=aviso, empresa=empresa)
+
+
+
+
+@admin_bp.route('/ver-recurso-promo/<path:filename>')
+def servir_promo(filename):
+    empresa = Empresa.query.first()
+    # Construimos la ruta absoluta: Recursos + promociones
+    base_path = os.path.join(current_app.root_path, empresa.emp_ruta_recursos.strip('/'), 'promociones')
+    # Esto servirá el archivo incluso fuera de static
+    return send_from_directory(base_path, filename)
+
+
 
 @admin_bp.route('/guardar-aviso', methods=['POST'])
 def guardar_aviso():
     try:
         aviso = AvisoPromocional.query.first()
+        # Obtenemos los datos de la empresa (asumiendo que hay una sola o usas la del usuario)
+        empresa = Empresa.query.first() 
         
-        # Capturamos datos del formulario
+        if not empresa:
+            flash('No se encontró la configuración de la empresa.', 'error')
+            return redirect(url_for('admin.fidelizacion_promociones'))
+
+        # 1. Actualizamos datos de texto
         aviso.titulo = request.form.get('titulo')
         aviso.mensaje = request.form.get('mensaje')
         aviso.texto_boton = request.form.get('texto_boton', '¡Entendido!')
         aviso.enlace_boton = request.form.get('enlace_boton')
-        
-        # Checkboxes
         aviso.activo = True if request.form.get('activo') else False
         aviso.solo_una_vez = True if request.form.get('solo_una_vez') else False
         
-        # Manejo de la imagen en carpeta recursos
+        # 2. Manejo de la imagen
         file = request.files.get('imagen')
         if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            # Guardamos en static/recursos
-            upload_path = os.path.join(current_app.root_path, 'static', 'recursos')
+            # Validar que sea JPG
+            if not file.filename.lower().endswith('.jpg'):
+                flash('Solo se permiten imágenes en formato .jpg', 'error')
+                return redirect(url_for('admin.fidelizacion_promociones'))
+
+            # Definir la ruta: ruta_recursos/promociones/
+            # Nota: empresa.emp_ruta_recursos debería ser algo como 'static/recursos'
+            ruta_base = empresa.emp_ruta_recursos.replace('\\', '/').strip('/')
+            carpeta_promo = os.path.abspath(os.path.join(current_app.root_path, ruta_base, 'promociones'))
             
-            if not os.path.exists(upload_path):
-                os.makedirs(upload_path)
-            
-            file.save(os.path.join(upload_path, filename))
-            aviso.imagen_url = filename 
+            # Crear la carpeta 'promociones' si no existe
+            if not os.path.exists(carpeta_promo):
+                os.makedirs(carpeta_promo, exist_ok=True)
+
+            nombre_archivo = f"{empresa.emp_nit}.jpg"
+            ruta_final = os.path.join(carpeta_promo, nombre_archivo)
+
+            file.save(ruta_final)
+            # Guardamos solo el nombre para que sea más fácil de manejar
+            aviso.imagen_url = nombre_archivo
 
         db.session.commit()
-        flash('¡Campaña de fidelización actualizada!', 'success')
+        flash('¡Campaña de fidelización actualizada con éxito!', 'success')
         
     except Exception as e:
         db.session.rollback()

@@ -56,8 +56,9 @@
         <div class="space-y-6">
             <h2 class="text-xs font-black text-slate-500 uppercase">Vista Previa</h2>
             <div class="bg-white rounded-3xl p-8 shadow-2xl text-center space-y-4">
-                <img id="imgPreview" src="{{ url_for('static', filename='recursos/' + aviso.imagen_url) if aviso and aviso.imagen_url else 'https://via.placeholder.com/400x200?text=Sube+una+imagen' }}" 
-                     class="w-full h-48 object-cover rounded-2xl shadow-md border border-slate-100">
+                <img id="imgPreview" 
+                src="{{ url_for('admin.servir_promo', filename=aviso.imagen_url.split('/')[-1]) if aviso and aviso.imagen_url else 'https://via.placeholder.com/400x200?text=Sube+una+imagen' }}" 
+                class="w-full h-48 object-cover rounded-2xl shadow-md border border-slate-100">
                 <h3 id="tituloPreview" class="text-2xl font-black text-slate-800">{{ aviso.titulo if aviso else 'Título de Prueba' }}</h3>
                 <p id="mensajePreview" class="text-slate-600 text-sm leading-relaxed">{{ aviso.mensaje if aviso else 'Aquí se verá el cuerpo de tu mensaje promocional.' }}</p>
                 <button class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl">{{ aviso.texto_boton if aviso else '¡Entendido!' }}</button>
