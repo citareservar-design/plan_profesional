@@ -12,8 +12,6 @@ from werkzeug.security import generate_password_hash
 import smtplib
 from email.message import EmailMessage
 from sqlalchemy import func, text
-import shutil
-import json
 from werkzeug.utils import secure_filename
 import os
 
@@ -2486,13 +2484,18 @@ def fidelizacion_promociones():
 
 
 
-@admin_bp.route('/ver-recurso-promo/<path:filename>')
+@admin_bp.route('/ver-recurso-promo/<filename>')
 def servir_promo(filename):
     empresa = Empresa.query.first()
-    # Construimos la ruta absoluta: Recursos + promociones
-    base_path = os.path.join(current_app.root_path, empresa.emp_ruta_recursos.strip('/'), 'promociones')
-    # Esto servirá el archivo incluso fuera de static
-    return send_from_directory(base_path, filename)
+    # C:\Apps\cocoanails
+    ruta_base = empresa.emp_ruta_recursos.strip()
+    
+    # Unimos: C:\Apps\cocoanails + promociones
+    directorio_final = os.path.join(ruta_base, 'promociones')
+    directorio_final = os.path.normpath(directorio_final)
+
+    # filename aquí será '2222222222.jpg'
+    return send_from_directory(directorio_final, filename)
 
 
 
@@ -2547,3 +2550,23 @@ def guardar_aviso():
         flash(f'Error al procesar: {str(e)}', 'error')
     
     return redirect(url_for('admin.fidelizacion_promociones'))
+
+
+@admin_bp.route('/api/aviso-activo')
+def aviso_activo():
+    aviso = AvisoPromocional.query.first()
+    if aviso and aviso.activo:
+        # Extraemos solo el nombre del archivo (ej: de 'promociones/2222222222.jpg' a '2222222222.jpg')
+        nombre_limpio = aviso.imagen_url.split('/')[-1] if aviso.imagen_url else None
+        
+        return {
+            "id": aviso.id,
+            "titulo": aviso.titulo,
+            "mensaje": aviso.mensaje,
+            "imagen_url": nombre_limpio, # <--- ENVIAMOS SOLO EL NOMBRE
+            "activo": aviso.activo,
+            "solo_una_vez": aviso.solo_una_vez,
+            "texto_boton": aviso.texto_boton,
+            "enlace_boton": aviso.enlace_boton
+        }
+    return {"activo": False}
