@@ -171,42 +171,10 @@
     </p>
 </div>
 
+<script src="{{ url_for('static', filename='js/comisiones.js') }}"></script>
+
 <script>
-    // 1. Definición global de la función (Soluciona el "not defined")
-    window.confirmarCerrarCaja = function() {
-        const formulario = document.getElementById('formCerrarCaja');
-        
-        if (typeof Swal === 'undefined') {
-            console.warn("SweetAlert no cargado, enviando directo...");
-            formulario.submit();
-            return;
-        }
-
-        Swal.fire({
-            title: '¿CERRAR CAJA HOY?',
-            text: "Se archivarán todos los servicios y el reporte volverá a cero. ¿Deseas continuar?",
-            icon: 'warning',
-            showCancelButton: true,
-            background: '#0f172a',
-            color: '#ffffff',
-            confirmButtonColor: '#10b981',
-            cancelButtonColor: '#334155',
-            confirmButtonText: 'SÍ, LIQUIDAR JORNADA',
-            cancelButtonText: 'VOLVER',
-            borderRadius: '2.5rem',
-            customClass: {
-                popup: 'rounded-[2.5rem] border border-white/10 shadow-2xl',
-                confirmButton: 'rounded-full px-8 py-4 font-black text-sm',
-                cancelButton: 'rounded-full px-8 py-4 font-black text-sm'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                formulario.submit();
-            }
-        });
-    };
-
-    // 2. Manejo de Mensajes Flash (Éxito/Error)
+    // El manejo de mensajes Flash (Jinja2) se queda AQUÍ en el HTML
     document.addEventListener('DOMContentLoaded', function() {
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -218,10 +186,7 @@
                         background: '#0f172a',
                         color: '#ffffff',
                         confirmButtonColor: '#0ea5e9',
-                        borderRadius: '2rem',
-                        customClass: {
-                            popup: 'rounded-[2rem] border border-white/10 shadow-2xl'
-                        }
+                        borderRadius: '2rem'
                     });
                 {% endfor %}
             {% endif %}
