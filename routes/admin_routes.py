@@ -2227,7 +2227,7 @@ def descargar_reporte_cierre():
         subtotal_emp = 0
         for res in reservas:
             ser = Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
-            if ser: subtotal_emp += float(ser.ser_precio)
+            if ser: subtotal_emp += (float(ser.ser_precio) - float(res.res_descuento_valor or 0))
 
         porcentaje = float(emp.empl_porcentaje or 40)
         pago_emp = subtotal_emp * (porcentaje / 100)
@@ -2326,21 +2326,13 @@ def enviar_correo_comision(empresa, empleado, pdf_binario, nombre_archivo):
 @admin_bp.route('/reporte-comisiones')
 @login_required
 def reporte_comisiones():
-    # 1. Obtenemos empleados activos
-    lista_empleados = Empleado.query.filter_by(
-        emp_id=current_user.emp_id, 
-        empl_activo=1
-    ).all()
-    
+    lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
     reporte = []
     total_negocio_neto = 0
     fecha_actual = datetime.now()
 
     for emp in lista_empleados:
         porcentaje_comision = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
-        
-        # 2. IMPORTANTE: Filtramos por 'Realizada'
-        # Estos son los servicios que ya terminaron pero no se han liquidado en caja.
         reservas_por_pagar = Reserva.query.filter(
             Reserva.empl_id == emp.empl_id,
             Reserva.res_estado.ilike('Realizada') 
@@ -2351,23 +2343,29 @@ def reporte_comisiones():
         servicios_resumen_wpp = "" 
         
         for res in reservas_por_pagar:
-            # Buscamos el precio del servicio
             servicio = Servicio.query.filter(
                 Servicio.ser_nombre.ilike(res.res_tipo_servicio),
                 Servicio.emp_id == current_user.emp_id
             ).first()
             
             if servicio:
-                precio = float(servicio.ser_precio)
-                total_generado_empleado += precio
-                servicios_resumen_wpp += f"• {res.res_tipo_servicio} (${precio:,.0f})\n"
+                # --- NUEVA LÓGICA DE DESCUENTO POR PORCENTAJE ---
+                precio_base = float(servicio.ser_precio)
+                porcentaje_desc = float(res.res_descuento_valor or 0)
+                
+                # Calculamos cuánto dinero representa ese porcentaje
+                valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
+                # El precio final es el base menos el dinero calculado
+                precio_final = precio_base - valor_descuento_dinero
+                
+                total_generado_empleado += precio_final
+                servicios_resumen_wpp += f"• {res.res_tipo_servicio} (${precio_final:,.0f})\n"
                 lista_detallada_servicios.append({
                     'fecha': res.res_fecha.strftime('%d/%m'),
                     'nombre': res.res_tipo_servicio,
-                    'precio': precio
+                    'precio': precio_final
                 })
 
-        # 3. Cálculos de comisión
         pago_profesional = total_generado_empleado * (porcentaje_comision / 100)
         ganancia_local = total_generado_empleado - pago_profesional
         total_negocio_neto += ganancia_local
@@ -2385,15 +2383,10 @@ def reporte_comisiones():
             'servicios_wpp': servicios_resumen_wpp
         })
 
-    return render_template('admin/comisiones.html', 
-                           reporte=reporte, 
-                           hoy=fecha_actual, 
-                           total_negocio=total_negocio_neto)
-    
+    return render_template('admin/comisiones.html', reporte=reporte, hoy=fecha_actual, total_negocio=total_negocio_neto)
     
     
 
-# --- 1. FUNCIÓN AUXILIAR (Aquí integré tu lógica de diseño) ---
 def generar_pdf_binario(emp, reservas, current_user):
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
@@ -2408,9 +2401,16 @@ def generar_pdf_binario(emp, reservas, current_user):
             emp_id=current_user.emp_id
         ).first()
         if ser:
-            precio = float(ser.ser_precio)
-            total_bruto += precio
-            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio:,.0f}")
+            # --- NUEVA LÓGICA DE DESCUENTO POR PORCENTAJE ---
+            precio_base = float(ser.ser_precio)
+            porcentaje_desc = float(res.res_descuento_valor or 0)
+            
+            # Calculamos el valor del descuento y lo restamos
+            valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
+            precio_final = precio_base - valor_descuento_dinero
+            
+            total_bruto += precio_final
+            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio_final:,.0f}")
 
     porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
     pago_empleado = total_bruto * (porcentaje / 100)
@@ -2463,12 +2463,14 @@ def generar_pdf_binario(emp, reservas, current_user):
     p.setFont("Helvetica-Oblique", 8)
     p.setFillColorRGB(0.5, 0.5, 0.5)
     p.drawCentredString(width/2, 45, "AgendApp - Reporte de procesos de pago a empleados")
-    # --- FIN DE TU DISEÑO ---
 
     p.showPage()
     p.save()
     buffer.seek(0)
     return buffer
+
+
+
 
 # --- 2. RUTA DE CIERRE CORREGIDA ---
 @admin_bp.route('/cerrar-caja-comisiones', methods=['POST'])
@@ -2556,29 +2558,37 @@ def cerrar_caja_comisiones():
 def descargar_recibo(emp_id):
     emp = Empleado.query.get_or_404(emp_id)
     
-    # 1. CORRECCIÓN: Incluir 'Realizada' y 'Completada' para el pago
+    # 1. Obtenemos las reservas en estado 'Realizada'
     reservas = Reserva.query.filter(
             Reserva.empl_id == emp_id, 
-            Reserva.res_estado == 'Realizada' # <--- CAMBIO AQUÍ
+            Reserva.res_estado == 'Realizada'
         ).all()
     
     total_bruto = 0
     servicios_pdf = []
     
     for res in reservas:
-        # Buscamos el servicio exacto de la empresa actual
+        # Buscamos el servicio para traer el precio base
         ser = Servicio.query.filter_by(
             ser_nombre=res.res_tipo_servicio, 
             emp_id=current_user.emp_id
         ).first()
         
         if ser:
-            precio = float(ser.ser_precio)
-            total_bruto += precio
-            # Guardamos el detalle para el PDF
-            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio:,.0f}")
+            # --- LÓGICA DE DESCUENTO POR PORCENTAJE ---
+            precio_base = float(ser.ser_precio)
+            porcentaje_desc = float(res.res_descuento_valor or 0)
+            
+            # Calculamos el dinero del descuento y lo restamos del base
+            valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
+            precio_final = precio_base - valor_descuento_dinero
+            
+            total_bruto += precio_final
+            
+            # Guardamos el detalle con el precio ya descontado para el PDF
+            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio_final:,.0f}")
 
-    # Cálculo de comisión
+    # Cálculo de comisión sobre el total con descuentos aplicados
     porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
     pago_empleado = total_bruto * (porcentaje / 100)
 
@@ -2587,7 +2597,7 @@ def descargar_recibo(emp_id):
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # --- ENCABEZADO PREMIUM ---
+    # --- ENCABEZADO ---
     p.setFont("Helvetica-Bold", 16)
     p.drawString(100, 750, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
     
@@ -2599,30 +2609,27 @@ def descargar_recibo(emp_id):
     p.setStrokeColorRGB(0.8, 0.8, 0.8)
     p.line(100, 715, 512, 715)
 
-    # --- CUERPO: LISTADO DE TODOS LOS SERVICIOS ---
+    # --- CUERPO ---
     y = 690
     p.setFillColorRGB(0, 0, 0)
     p.setFont("Helvetica-Bold", 12)
     p.drawString(100, y, "DETALLE DE SERVICIOS REALIZADOS:")
     
     y -= 25
-    p.setFont("Courier", 10) # Fuente monoespaciada para que los precios alineen mejor
+    p.setFont("Courier", 10)
     
     if not servicios_pdf:
         p.drawString(120, y, "No se encontraron servicios finalizados.")
     else:
         for s in servicios_pdf:
-            # Control de fin de página
             if y < 80:
                 p.showPage()
                 y = 750
                 p.setFont("Courier", 10)
-            
             p.drawString(120, y, s)
             y -= 15
 
-    # --- TOTALES FINALES ---
-    # Si la lista es larga, aseguramos que los totales no queden volando
+    # --- TOTALES ---
     if y < 150:
         p.showPage()
         y = 750
@@ -2636,7 +2643,7 @@ def descargar_recibo(emp_id):
     
     y -= 20
     p.setFont("Helvetica-Bold", 14)
-    p.setFillColorRGB(0, 0.4, 0.2) # Un verde más profesional
+    p.setFillColorRGB(0, 0.4, 0.2) 
     p.drawString(100, y, f"TOTAL A PAGAR ({int(porcentaje)}%): ${pago_empleado:,.0f}")
 
     # --- PIE DE PÁGINA ---
