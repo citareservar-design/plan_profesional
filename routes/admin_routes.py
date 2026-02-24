@@ -15,7 +15,9 @@ from sqlalchemy import func, text
 from werkzeug.utils import secure_filename
 import os
 from xhtml2pdf import pisa
+from PyPDF2 import PdfWriter, PdfReader
 import io
+
 
 
 
@@ -2335,32 +2337,146 @@ def reporte_comisiones():
                            total_negocio=total_negocio_neto)
     
     
+    
+
+# --- 1. FUNCIÓN AUXILIAR (Aquí integré tu lógica de diseño) ---
+def generar_pdf_binario(emp, reservas, current_user):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    total_bruto = 0
+    servicios_pdf = []
+    
+    for res in reservas:
+        ser = Servicio.query.filter_by(
+            ser_nombre=res.res_tipo_servicio, 
+            emp_id=current_user.emp_id
+        ).first()
+        if ser:
+            precio = float(ser.ser_precio)
+            total_bruto += precio
+            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio:,.0f}")
+
+    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
+    pago_empleado = total_bruto * (porcentaje / 100)
+
+    # --- INICIO DE TU DISEÑO ---
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, 750, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
+    p.setFont("Helvetica", 10)
+    p.setFillColorRGB(0.3, 0.3, 0.3)
+    p.drawString(100, 735, f"Empleado: {emp.empl_nombre}")
+    p.drawString(100, 722, f"Fecha de reporte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    p.setStrokeColorRGB(0.8, 0.8, 0.8)
+    p.line(100, 715, 512, 715)
+
+    y = 690
+    p.setFillColorRGB(0, 0, 0)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(100, y, "DETALLE DE SERVICIOS REALIZADOS:")
+    
+    y -= 25
+    p.setFont("Courier", 10)
+    
+    if not servicios_pdf:
+        p.drawString(120, y, "No se encontraron servicios finalizados.")
+    else:
+        for s in servicios_pdf:
+            if y < 80:
+                p.showPage()
+                y = 750
+                p.setFont("Courier", 10)
+            p.drawString(120, y, s)
+            y -= 15
+
+    if y < 150:
+        p.showPage()
+        y = 750
+
+    y -= 30
+    p.setStrokeColorRGB(0.7, 0.7, 0.7)
+    p.line(100, y+15, 512, y+15)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(100, y, f"SUBTOTAL BRUTO: ${total_bruto:,.0f}")
+    y -= 20
+    p.setFont("Helvetica-Bold", 14)
+    p.setFillColorRGB(0, 0.4, 0.2)
+    p.drawString(100, y, f"TOTAL A PAGAR ({int(porcentaje)}%): ${pago_empleado:,.0f}")
+
+    p.setStrokeColorRGB(0.8, 0.8, 0.8)
+    p.line(100, 60, 512, 60)
+    p.setFont("Helvetica-Oblique", 8)
+    p.setFillColorRGB(0.5, 0.5, 0.5)
+    p.drawCentredString(width/2, 45, "AgendApp - Reporte de procesos de pago a empleados")
+    # --- FIN DE TU DISEÑO ---
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+# --- 2. RUTA DE CIERRE CORREGIDA ---
 @admin_bp.route('/cerrar-caja-comisiones', methods=['POST'])
 @login_required
 def cerrar_caja_comisiones():
-    # Buscamos solo las reservas en estado 'Realizada'
-    reservas_a_liquidar = Reserva.query.join(Empleado).filter(
-        Empleado.emp_id == current_user.emp_id,
-        Reserva.res_estado.ilike('Realizada')
-    ).all()
-
-    if not reservas_a_liquidar:
-        flash('No hay servicios realizados pendientes por liquidar.', 'info')
-        return redirect(url_for('admin.reporte_comisiones'))
+    empresa = Empresa.query.get(current_user.emp_id)
+    empleados = Empleado.query.filter_by(emp_id=empresa.emp_id, empl_activo=1).all()
+    
+    # Aseguramos que la ruta sea string para evitar el error Decimal + str
+    ruta_recursos = str(empresa.emp_ruta_recursos) if empresa.emp_ruta_recursos else 'recursos'
+    fecha_str = datetime.now().strftime('%Y-%m-%d')
+    ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_str)
 
     try:
-        count = 0
-        for res in reservas_a_liquidar:
-            # Al liquidar, el estado pasa a ser el final absoluto
-            res.res_estado = 'Completada'
-            count += 1
+        servicios_liquidados = 0
         
-        db.session.commit()
-        flash(f'Caja cerrada con éxito. Se liquidaron {count} servicios.', 'success')
+        for emp in empleados:
+            reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
+            
+            if not reservas:
+                continue
+            
+            # A. Generar PDF
+            buffer_pdf = generar_pdf_binario(emp, reservas, current_user)
+            
+            # B. Cifrar con Cédula
+            pdf_cifrado = BytesIO()
+            reader = PdfReader(buffer_pdf)
+            writer = PdfWriter()
+            for page in reader.pages:
+                writer.add_page(page)
+            
+            # La cédula debe ser string para la clave
+            cedula_str = str(emp.empl_cedula)
+            writer.encrypt(cedula_str)
+            writer.write(pdf_cifrado)
+            
+            # C. Guardar físicamente
+            ruta_final_empleado = os.path.join(ruta_base_comisiones, cedula_str)
+            os.makedirs(ruta_final_empleado, exist_ok=True)
+            
+            nombre_archivo = f"Recibo_{emp.empl_nombre.replace(' ', '_')}.pdf"
+            ruta_completa = os.path.join(ruta_final_empleado, nombre_archivo)
+            
+            with open(ruta_completa, "wb") as f:
+                f.write(pdf_cifrado.getvalue())
+
+            # D. Marcar como Completada
+            for res in reservas:
+                res.res_estado = 'Completada'
+                servicios_liquidados += 1
+
+        if servicios_liquidados > 0:
+            db.session.commit()
+            flash(f'Caja cerrada. {servicios_liquidados} servicios liquidados y guardados en recursos.', 'success')
+        else:
+            flash('No había servicios para liquidar.', 'info')
+
     except Exception as e:
         db.session.rollback()
-        flash('Error al procesar el cierre de caja.', 'danger')
-        print(f"Error en cierre: {e}")
+        print(f"Error crítico en cierre: {type(e).__name__} - {e}")
+        flash(f'Error al procesar el cierre: {str(e)}', 'danger')
 
     return redirect(url_for('admin.reporte_comisiones'))
 
