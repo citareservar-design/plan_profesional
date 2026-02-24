@@ -2,16 +2,13 @@ console.log('CARGO EL ARCHIVO JS DE CLIENTES')
 
 // --- LÓGICA MODALES ---
 function abrirModalEditar(cliente) {
-    // 1. Buscamos el modal único (usando el ID que confirmaste: modalEditar)
     const modal = document.getElementById('modalEditar');
-    
-    if (!modal) {
-        console.error("Error: No se encontró el modal con ID 'modalEditar'");
-        return; 
-    }
+    if (!modal) return; 
 
-    // 2. Llenamos los campos básicos
-    // (Asegúrate de que estos IDs existan dentro de tu modalEditar)
+    // CALCULAMOS EL VALOR PARA MOSTRAR (0.2 -> 20)
+    // Usamos Math.round para evitar decimales extraños como 19.9999
+    const descuentoVisible = cliente.descuento ? Math.round(cliente.descuento * 100) : 0;
+
     const fieldMap = {
         'edit_cli_id': cliente.id,
         'edit_nombre': cliente.nombre,
@@ -19,20 +16,16 @@ function abrirModalEditar(cliente) {
         'edit_email': cliente.email || '',
         'edit_telefono': cliente.telefono || '',
         'edit_fecha_nacimiento': cliente.fecha_nacimiento || '',
-        'edit_descuento': cliente.descuento || 0,
+        'edit_descuento': descuentoVisible, // <--- CAMBIO AQUÍ
         'edit_descuento_cantidad': cliente.descuento_cantidad || 0,
         'edit_notas_personales': cliente.notas_personales || ''
     };
 
-    // Llenamos cada campo solo si existe en el HTML para evitar errores de "null"
     for (const [id, value] of Object.entries(fieldMap)) {
         const input = document.getElementById(id);
-        if (input) {
-            input.value = value;
-        }
+        if (input) input.value = value;
     }
 
-    // 3. Mostramos el modal correctamente
     modal.classList.remove('hidden');
     modal.classList.add('flex'); 
 }
@@ -59,6 +52,12 @@ function guardarCambiosCliente() {
         return;
     }
 
+    // --- LÓGICA DE CONVERSIÓN DE DESCUENTO ---
+    // Obtenemos el valor del input (ej: 20)
+    const valorDescuentoInput = document.getElementById('edit_descuento')?.value || 0;
+    // Lo convertimos a decimal para la base de datos (20 / 100 = 0.2)
+    const descuentoParaBD = parseFloat(valorDescuentoInput) / 100;
+
     // 2. Recolectar datos del formulario
     const data = {
         nombre: document.getElementById('edit_nombre').value,
@@ -66,19 +65,14 @@ function guardarCambiosCliente() {
         email: document.getElementById('edit_email').value,
         telefono: document.getElementById('edit_telefono').value,
         fecha_nacimiento: document.getElementById('edit_fecha_nacimiento').value,
-        // Captura las notas o envía vacío si no hay nada
         notas_personales: document.getElementById('edit_notas_personales')?.value || '',
-        descuento: document.getElementById('edit_descuento')?.value || 0,
-        descuento_cantidad: document.getElementById('edit_descuento_cantidad')?.value || 0
+        descuento: descuentoParaBD, // Enviamos el decimal (0.2)
+        descuento_cantidad: parseInt(document.getElementById('edit_descuento_cantidad')?.value || 0)
     };
 
-
-     
-
-    // 3. Definir URL (Asegúrate de que el prefijo coincida con tu Blueprint de Flask)
+    // 3. Definir URL
     const url = `/admin/api/cliente/editar/${cliId}`;
-    console.log("Intentando conectar a:", url);
-    console.log("Datos enviados:", data);
+    console.log("Datos enviados al servidor:", data);
 
     // 4. Ejecutar la petición
     fetch(url, {
@@ -89,10 +83,7 @@ function guardarCambiosCliente() {
         body: JSON.stringify(data)
     })
     .then(response => {
-        console.log("Status Code recibido:", response.status); // <--- REVISA ESTO EN F12
-        
         if (!response.ok) {
-            // Si no es un 200 OK, lanzamos error con el código
             throw new Error(`Error en el servidor (Código: ${response.status})`);
         }
         return response.json();
@@ -101,14 +92,14 @@ function guardarCambiosCliente() {
         if (result.status === 'success') {
             Swal.fire({
                 title: '¡Actualizado!',
-                text: 'Los datos de confianza se han guardado con éxito.',
+                text: 'Los datos del cliente se han guardado con éxito.',
                 icon: 'success',
                 background: '#1e293b',
                 color: '#fff',
                 timer: 1500,
                 showConfirmButton: false
             }).then(() => {
-                location.reload(); // Recarga para ver cambios
+                location.reload(); 
             });
         } else {
             Swal.fire({
@@ -121,17 +112,16 @@ function guardarCambiosCliente() {
         }
     })
     .catch(error => {
-        console.error('Error detallado detectado:', error);
+        console.error('Error detectado:', error);
         Swal.fire({
             title: 'Error de Conexión',
-            text: `Detalle: ${error.message}. Por favor, verifica la consola (F12).`,
+            text: `No se pudo conectar con el servidor. ${error.message}`,
             icon: 'error',
             background: '#1e293b',
             color: '#fff'
         });
     });
 }
-
 
 
 
