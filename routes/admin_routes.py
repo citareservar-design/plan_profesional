@@ -1551,6 +1551,7 @@ def reservas():
     reservas_data = []
     
     for r in todas_las_reservas:
+        r.estado_normalizado = r.res_estado.lower().strip() if r.res_estado else ""
         # --- 3. LÓGICA DE PRECIO Y DESCUENTO REAL (COLUMNA PROPIA) ---
         servicio_obj = Servicio.query.filter_by(
             ser_nombre=r.res_tipo_servicio, 
@@ -1618,30 +1619,43 @@ def reservas():
 @login_required
 def reserva_estado(id):
     nueva_reserva = Reserva.query.get_or_404(id)
-    nuevo_estado = request.form.get('estado')
     
-    # --- LÓGICA DE VALIDACIÓN DE CONFLICTOS ---
-    # Solo validamos si intentamos pasar a un estado "activo" (Pendiente, Confirmada, etc.)
+    # 1. SEGURIDAD: Si la reserva ya está 'Realizada' o 'Completada', no permitir cambios
+    # Limpiamos el estado actual para comparar correctamente
+    estado_actual = nueva_reserva.res_estado.lower().strip() if nueva_reserva.res_estado else ""
+    
+    if estado_actual in ['realizada', 'completada']:
+        flash("Esta cita ya ha sido finalizada y no puede modificarse.", "error")
+        return redirect(url_for('admin.reservas'))
+
+    # 2. Capturamos el nuevo estado del formulario
+    nuevo_estado = request.form.get('estado')
+    if not nuevo_estado:
+        return redirect(url_for('admin.reservas'))
+
+    nuevo_estado_clean = nuevo_estado.lower().strip()
+
+    # 3. LÓGICA DE VALIDACIÓN DE CONFLICTOS
+    # Solo validamos si intentamos pasar a un estado "activo"
     estados_activos = ['pendiente', 'confirmada', 'realizada']
     
-    if nuevo_estado.lower() in estados_activos:
+    if nuevo_estado_clean in estados_activos:
         # Buscamos si ya existe OTRA reserva activa en ese mismo horario con ese empleado
         conflicto = Reserva.query.filter(
-            Reserva.res_id != id,                       # Que no sea la misma reserva
-            Reserva.res_fecha == nueva_reserva.res_fecha, # Mismo día
-            Reserva.res_hora == nueva_reserva.res_hora,   # Misma hora
-            Reserva.empl_id == nueva_reserva.empl_id,     # Mismo empleado
-            Reserva.res_estado.in_(['Pendiente', 'Confirmada', 'Realizada']), # Que esté activa
-            Reserva.emp_id == current_user.emp_id        # De tu misma empresa
+            Reserva.res_id != id,
+            Reserva.res_fecha == nueva_reserva.res_fecha,
+            Reserva.res_hora == nueva_reserva.res_hora,
+            Reserva.empl_id == nueva_reserva.empl_id,
+            Reserva.res_estado.in_(['Pendiente', 'Confirmada', 'Realizada']),
+            Reserva.emp_id == current_user.emp_id
         ).first()
 
         if conflicto:
-            # Si hay conflicto, devolvemos un error y no cambiamos nada
             flash(f"¡Error! El profesional ya tiene una cita de {conflicto.res_tipo_servicio} con {conflicto.cliente.cli_nombre} en ese horario.", "error")
             return redirect(url_for('admin.reservas'))
     
-    # Si no hay conflicto o el estado es 'Cancelada', procedemos:
-    nueva_reserva.res_estado = nuevo_estado
+    # 4. Si pasó los filtros, procedemos a actualizar
+    nueva_reserva.res_estado = nuevo_estado # Guardamos el valor original (ej: 'Realizada')
     db.session.commit()
     
     flash("Estado actualizado correctamente", "success")

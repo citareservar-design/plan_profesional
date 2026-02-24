@@ -245,98 +245,112 @@
         </p>
     </div>
 
-<div class="mt-3 p-3 bg-white/5 rounded-2xl border border-white/10" 
-     @click.stop 
-     x-data="{ 
-        abierto: false, 
-        horas: [], 
-        cargando: false,
-        {# Inicializa con la fecha de la reserva, pero si ya pasó, usa hoy #}
-        nuevaFecha: '{{ r.res_fecha if r.res_fecha >= hoy else hoy }}',
+<div class="mt-3 p-3 rounded-2xl border transition-all duration-300
+    {% if r.estado_normalizado in ['realizada', 'completada'] %} 
+        bg-slate-950/20 border-slate-800/50 opacity-60
+    {% else %} 
+        bg-white/5 border-white/10 
+    {% endif %}" 
+    @click.stop 
+    x-data="{ 
+       abierto: false, 
+       horas: [], 
+       cargando: false,
+       nuevaFecha: '{{ r.res_fecha if r.res_fecha >= hoy else hoy }}',
+       
+       async cargarHoras() {
+           {# Si el estado es final, esta función ni siquiera debería ejecutarse #}
+           {% if r.estado_normalizado in ['realizada', 'completada'] %} return; {% endif %}
+
+           const hoyStr = '{{ hoy.strftime('%Y-%m-%d') }}';
+           if (this.nuevaFecha < hoyStr) {
+               this.horas = [];
+               return;
+           }
+
+           this.cargando = true;
+           this.abierto = true;
+           try {
+               const resp = await fetch(`/api/horas-disponibles?fecha=${this.nuevaFecha}&servicio_id={{ r.res_tipo_servicio }}`);
+               const data = await resp.json();
+               this.horas = data.horas;
+           } catch (e) { 
+               console.error('Error al cargar horas:', e); 
+           }
+           this.cargando = false;
+       }
+    }">
+    
+    <div class="flex items-center justify-between 
+        {% if r.estado_normalizado in ['realizada', 'completada'] %} 
+            pointer-events-none 
+        {% endif %}">
         
-        async cargarHoras() {
-            const hoyStr = '{{ hoy.strftime('%Y-%m-%d') }}';
-            
-            {# Validación de seguridad: si es fecha pasada, no carga nada #}
-            if (this.nuevaFecha < hoyStr) {
-                this.horas = [];
-                return;
-            }
+        <div class="flex flex-col">
+            <span class="text-[9px] font-black uppercase tracking-widest 
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} text-slate-600 {% else %} text-slate-400 {% endif %}">
+                {% if r.estado_normalizado in ['realizada', 'completada'] %}
+                    Cita Finalizada
+                {% else %}
+                    Reagendar Cita
+                {% endif %}
+            </span>
+            <span class="text-[8px] text-slate-500">
+                {% if r.estado_normalizado in ['realizada', 'completada'] %}
+                    No se permiten cambios de horario
+                {% else %}
+                    Cambiar fecha o servidor
+                {% endif %}
+            </span>
+        </div>
 
-            this.cargando = true;
-            this.abierto = true;
-            try {
-                {# Enviamos la nuevaFecha seleccionada y el tipo de servicio #}
-                const resp = await fetch(`/api/horas-disponibles?fecha=${this.nuevaFecha}&servicio_id={{ r.res_tipo_servicio }}`);
-                const data = await resp.json();
-                this.horas = data.horas;
-            } catch (e) { 
-                console.error('Error al cargar horas:', e); 
-            }
-            this.cargando = false;
-        }
-     }">
-    
-<div class="flex items-center justify-between 
-    {% if r.res_estado|lower == 'completada' %} 
-        opacity-30 pointer-events-none grayscale 
-    {% endif %}">
-    
-    <span class="text-[9px] font-bold uppercase tracking-tighter 
-        {% if r.res_estado|lower == 'completada' %} text-slate-500 {% else %} text-slate-400 {% endif %}">
-        {% if r.res_estado|lower == 'completada' %}
-            <i class="fa-solid fa-lock text-[8px] mr-1"></i> Cita Finalizada
+        {% if r.estado_normalizado not in ['realizada', 'completada'] %}
+            <button @click.stop="cargarHoras()" class="text-sky-400 hover:text-sky-300 transition-colors p-2 bg-sky-500/10 rounded-xl">
+                <i class="fa-solid fa-calendar-day text-sm"></i>
+            </button>
         {% else %}
-            Reagendar Cita
+            <div class="text-slate-700 p-2">
+                <i class="fa-solid fa-lock text-sm"></i>
+            </div>
         {% endif %}
-    </span>
+    </div>
 
-    <button @click.stop="cargarHoras()" class="text-sky-400 hover:text-sky-300 transition-colors p-1">
-        <i class="fa-solid fa-calendar-day text-sm"></i>
-    </button>
-</div>
-
-    <div x-show="abierto" x-cloak class="mt-2 space-y-3 no-drag" @click.outside="abierto = false">
+    {% if r.estado_normalizado not in ['realizada', 'completada'] %}
+    <div x-show="abierto" x-cloak class="mt-4 pt-3 border-t border-white/5 space-y-3" @click.outside="abierto = false" x-transition>
         <div>
-            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Seleccionar Día</label>
+            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Nueva Fecha</label>
             <input type="date" 
                    x-model="nuevaFecha" 
                    @change="cargarHoras()"
-                   {# Atributo MIN: Bloquea fechas anteriores a hoy en el navegador #}
                    min="{{ hoy.strftime('%Y-%m-%d') }}"
-                   class="w-full bg-slate-900 border border-white/10 rounded-lg text-[10px] text-white p-2 focus:ring-1 focus:ring-sky-500 outline-none color-scheme-dark">
+                   class="w-full bg-slate-900 border border-white/10 rounded-xl text-[10px] text-white p-2.5 outline-none color-scheme-dark">
         </div>
 
         <div class="space-y-2">
-            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Horas Disponibles</label>
+            <label class="text-[8px] text-slate-500 uppercase font-black ml-1">Disponibilidad</label>
             
             <template x-if="cargando">
-                <div class="flex justify-center py-2">
-                    <div class="animate-spin h-4 w-4 border-2 border-sky-500 border-t-transparent rounded-full"></div>
+                <div class="flex justify-center py-4">
+                    <div class="animate-spin h-5 w-5 border-2 border-sky-500 border-t-transparent rounded-full"></div>
                 </div>
             </template>
             
-            <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+            <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                 <template x-for="h in horas" :key="h.valor">
                     <button type="button"
                             x-on:click.stop.prevent="window.reagendarHora('{{ r.res_id }}', h.valor, nuevaFecha)" 
-                            class="text-[10px] bg-slate-900 border border-white/10 text-slate-300 py-1.5 rounded-lg hover:bg-sky-500 hover:text-white transition-all font-mono"
-                            x-text="h.formato">
+                            class="text-[10px] bg-slate-900 border border-white/10 text-slate-200 py-2 rounded-xl hover:bg-sky-600 hover:border-sky-400 transition-all font-mono">
+                        <span x-text="h.formato"></span>
                     </button>
                 </template>
             </div>
-            
-            <template x-if="horas.length === 0 && !cargando">
-                <div class="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
-                    <p class="text-[9px] text-rose-400 text-center font-medium">No hay turnos disponibles para esta fecha</p>
-                </div>
-            </template>
         </div>
 
-        <button @click.stop="abierto = false" class="w-full text-[9px] text-slate-500 hover:text-white uppercase font-black pt-2 border-t border-white/5 transition-colors">
-            Cerrar
+        <button @click.stop="abierto = false" class="w-full text-[9px] text-slate-500 hover:text-rose-400 uppercase font-black pt-2 transition-colors">
+            Cancelar reagendado
         </button>
     </div>
+    {% endif %}
 </div>
 </div>
                         
@@ -356,52 +370,83 @@
                     </div>
 
 
-<div class="mb-3" @click.stop>
+<div class="mb-3 relative group" @click.stop>
     <form action="{{ url_for('admin.asignar_empleado', id=r.res_id) }}" method="POST">
-        <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1 mb-1 block">
+        <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 mb-1.5 block">
             Profesional Calificado
         </label>
-        <select name="empleado_id" onchange="this.form.submit()" 
-                {% if r.res_estado|lower == 'completada' %} disabled {% endif %}
-                class="w-full bg-slate-900 border border-white/10 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none appearance-none transition-all
-                {% if r.res_estado|lower == 'completada' %} opacity-50 cursor-not-allowed border-transparent bg-slate-950 {% endif %}">
-            <option value="">Sin asignar</option>
-            {% for emp in aptos %}
-                <option value="{{ emp.empl_id }}" {% if r.empl_id == emp.empl_id %}selected{% endif %}>
-                    {{ emp.empl_nombre }}
-                </option>
-            {% endfor %}
-        </select>
-        {% if r.res_estado|lower == 'completada' %}
+        
+        <div class="relative">
+            <select name="empleado_id" onchange="this.form.submit()" 
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
+                class="w-full bg-slate-900/50 border border-white/10 text-slate-200 text-xs rounded-xl px-4 py-2.5 outline-none appearance-none transition-all duration-300
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} 
+                    border-slate-800/50 text-slate-500 bg-slate-950/50 cursor-not-allowed
+                {% else %} 
+                    focus:border-indigo-500/50 hover:border-white/20 hover:bg-slate-800 cursor-pointer 
+                {% endif %}">
+                
+                <option value="">— Sin asignar —</option>
+                {% for emp in aptos %}
+                    <option value="{{ emp.empl_id }}" {% if r.empl_id == emp.empl_id %}selected{% endif %}>
+                        👤 {{ emp.empl_nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            {# Flecha personalizada (Solo visible si está activo) #}
+            {% if r.estado_normalizado not in ['realizada', 'completada'] %}
+            <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if r.estado_normalizado == 'completada' %}
             <input type="hidden" name="empleado_id" value="{{ r.empl_id }}">
         {% endif %}
     </form>
 </div>
 
 
-<div @click.stop>
+<div @click.stop class="relative group">
     <form action="{{ url_for('admin.reserva_estado', id=r.res_id) }}" method="POST">
-        <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1 mb-1 block">
+        <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 mb-1.5 block">
             Estado de la Cita
         </label>
-        <select name="estado" onchange="this.form.submit()" 
-                {% if r.res_estado|lower == 'completada' %} disabled {% endif %}
-                class="w-full border outline-none font-bold text-xs rounded-xl px-3 py-2 appearance-none transition-all
-                {% if r.res_estado|lower == 'pendiente' %} bg-sky-500 text-white
-                {% elif r.res_estado|lower == 'confirmada' %} bg-amber-500 text-white
-                {% elif r.res_estado|lower == 'realizada' %} bg-emerald-500 text-white
-                {% elif r.res_estado|lower == 'completada' %} bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed
-                {% else %} bg-slate-900 text-white {% endif %}">
-            
-            <option value="Pendiente" {% if r.res_estado|lower == 'pendiente' %}selected{% endif %}>🔔 Pendiente</option>
-            <option value="Confirmada" {% if r.res_estado|lower == 'confirmada' %}selected{% endif %}>🤝 Confirmada</option>
-            <option value="Realizada" {% if r.res_estado|lower == 'realizada' %}selected{% endif %}>✨ Realizada</option>
-            <option value="Cancelada" {% if r.res_estado|lower == 'cancelada' %}selected{% endif %}>❌ Cancelada</option>
-            
-            {% if r.res_estado|lower == 'completada' %}
-                <option value="Completada" selected>✅ Pagada</option>
+        
+        <div class="relative">
+            <select name="estado" onchange="this.form.submit()" 
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
+                class="w-full bg-slate-900/50 border border-white/10 text-slate-200 text-xs rounded-xl px-4 py-2.5 outline-none appearance-none transition-all duration-300
+                {% if r.estado_normalizado == 'pendiente' %} border-sky-500/30 text-sky-400
+                {% elif r.estado_normalizado == 'confirmada' %} border-amber-500/30 text-amber-400
+                {% elif r.estado_normalizado == 'realizada' %} border-emerald-500/30 text-emerald-400
+                {% elif r.estado_normalizado == 'completada' %} border-slate-700/50 text-slate-500 bg-slate-950/50
+                {% endif %}
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} cursor-not-allowed {% else %} cursor-pointer hover:border-white/20 hover:bg-slate-800 {% endif %}">
+                
+                <option value="Pendiente" {% if r.estado_normalizado == 'pendiente' %}selected{% endif %}>🔔 Pendiente</option>
+                <option value="Confirmada" {% if r.estado_normalizado == 'confirmada' %}selected{% endif %}>🤝 Confirmada</option>
+                <option value="Realizada" {% if r.estado_normalizado == 'realizada' %}selected{% endif %}>✨ Realizada</option>
+                <option value="Cancelada" {% if r.estado_normalizado == 'cancelada' %}selected{% endif %}>❌ Cancelada</option>
+                
+                {% if r.estado_normalizado == 'completada' %}
+                    <option value="Completada" selected>✅ Pagada</option>
+                {% endif %}
+            </select>
+
+            {# Flecha personalizada (Solo se muestra si NO está bloqueado) #}
+            {% if r.estado_normalizado not in ['realizada', 'completada'] %}
+            <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
             {% endif %}
-        </select>
+        </div>
     </form>
 </div>
 
