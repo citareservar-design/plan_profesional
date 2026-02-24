@@ -1462,6 +1462,16 @@ def actualizar_servicios_masivo():
 
 # --- 6. GESTIÓN DE RESERVAS 
 
+
+@admin_bp.app_context_processor
+def inject_pendientes():
+    from models.models import Reserva
+    # Contamos las reservas con estado 'pendiente'
+    count = Reserva.query.filter_by(res_estado='pendiente').count()
+    return dict(pendientes_count=count)
+
+
+
 @admin_bp.route('/reservas')
 @login_required
 def reservas():

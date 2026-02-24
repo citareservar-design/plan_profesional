@@ -112,14 +112,24 @@
 
 
 
-                    {% if current_user.tiene_permiso('ver_reservas') %}
-                    <a href="{{ url_for('admin.reservas') }}"
-                        class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
-                        {% if 'reservas' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
-                        <i class="fa-solid fa-calendar-check text-lg {% if 'reservas' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
-                        <span class="font-bold tracking-wide">Reservas</span>
-                    </a>
-                    {% endif %}
+{% if current_user.tiene_permiso('ver_reservas') %}
+<a href="{{ url_for('admin.reservas') }}"
+    class="relative flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+    {% if 'reservas' in request.endpoint %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
+    
+    <i class="fa-solid fa-calendar-check text-lg {% if 'reservas' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+    
+    <span class="font-bold tracking-wide">Reservas</span>
+
+    {# --- PING MINIMALISTA (8px) --- #}
+    {% if pendientes_count > 0 %}
+    <span class="absolute top-4 right-5 flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+    </span>
+    {% endif %}
+</a>
+{% endif %}
 
 
                     {% if current_user.tiene_permiso('ver_comisiones') %}
@@ -130,6 +140,29 @@
                         <span class="font-bold tracking-wide">Comisiones</span>
                     </a>
                     {% endif %}
+
+
+{% if current_user.tiene_permiso('ver_promocion') %}
+<a href="{{ url_for('admin.fidelizacion_promociones') }}" 
+    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+    {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
+        bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 
+    {% else %} 
+        text-slate-400 hover:bg-white/5 hover:text-white border border-transparent 
+    {% endif %}">
+    
+    <div class="flex items-center justify-center">
+        <i class="fa-solid fa-ticket-simple text-lg 
+            {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
+                text-sky-500 
+            {% else %} 
+                group-hover:text-sky-400 
+            {% endif %} transition-colors"></i>
+    </div>
+    
+    <span class="font-bold tracking-wide">Promociones</span>
+</a>
+{% endif %}
 
 
 
@@ -169,27 +202,7 @@
     {% endif %}
 
 
-{% if current_user.tiene_permiso('ver_promocion') %}
-<a href="{{ url_for('admin.fidelizacion_promociones') }}" 
-    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
-    {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
-        bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 
-    {% else %} 
-        text-slate-400 hover:bg-white/5 hover:text-white border border-transparent 
-    {% endif %}">
-    
-    <div class="flex items-center justify-center">
-        <i class="fa-solid fa-ticket-simple text-lg 
-            {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
-                text-sky-500 
-            {% else %} 
-                group-hover:text-sky-400 
-            {% endif %} transition-colors"></i>
-    </div>
-    
-    <span class="font-bold tracking-wide">Promociones</span>
-</a>
-{% endif %}
+
 
 
     {% if current_user.tiene_permiso('ver_configuracion') %}
