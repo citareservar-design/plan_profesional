@@ -14,6 +14,8 @@ from email.message import EmailMessage
 from sqlalchemy import func, text
 from werkzeug.utils import secure_filename
 import os
+from xhtml2pdf import pisa
+import io
 
 
 
@@ -1470,6 +1472,64 @@ def inject_pendientes():
     count = Reserva.query.filter_by(res_estado='pendiente').count()
     return dict(pendientes_count=count)
 
+
+
+@admin_bp.route('/reserva/recibo/<int:res_id>')
+@login_required
+def generar_recibo_cliente(res_id):
+    import io
+    from flask import render_template, make_response
+    from xhtml2pdf import pisa
+    from models.models import Reserva, Cliente, Empresa, Servicio
+
+    reserva = Reserva.query.get_or_404(res_id)
+    cliente = Cliente.query.get(reserva.cli_id)
+    empresa = Empresa.query.get(current_user.emp_id)
+    
+    # --- LÓGICA DE EMERGENCIA PARA SER_ID NULL ---
+    servicio = None
+    
+    # 1. Intentamos por ID (si existe)
+    if reserva.ser_id:
+        servicio = Servicio.query.get(reserva.ser_id)
+    
+    # 2. Si no hay ID, buscamos por el NOMBRE escrito en res_tipo_servicio
+    if not servicio and reserva.res_tipo_servicio:
+        servicio = Servicio.query.filter_by(
+            ser_nombre=reserva.res_tipo_servicio, 
+            emp_id=reserva.emp_id
+        ).first()
+
+    # 3. Asignamos precios
+    precio_base = float(servicio.ser_precio) if servicio else 0.0
+    descuento_porc = float(reserva.res_descuento_valor or 0)
+    
+    # 4. Calculamos montos
+    monto_ahorro = precio_base * (descuento_porc / 100)
+    precio_final = precio_base - monto_ahorro
+
+    # DEBUG para que veas en la terminal qué encontró
+    print(f"--- REPORTE RECIBO {res_id} ---")
+    print(f"Buscando: {reserva.res_tipo_servicio}")
+    print(f"Encontrado: {servicio.ser_nombre if servicio else 'NADA'}")
+    print(f"Precio: {precio_base} | Descuento: {descuento_porc}% | Total: {precio_final}")
+
+    html = render_template('admin/pdf_recibo.html', 
+                           r=reserva, 
+                           c=cliente, 
+                           empresa=empresa,
+                           p_original=precio_base,
+                           p_final=precio_final,
+                           p_desc=descuento_porc)
+
+    output = io.BytesIO()
+    pisa.CreatePDF(io.BytesIO(html.encode("UTF-8")), dest=output, encoding='UTF-8')
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=Recibo_{reserva.res_id}.pdf'
+    
+    return response
 
 
 @admin_bp.route('/reservas')

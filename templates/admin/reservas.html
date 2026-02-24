@@ -436,9 +436,16 @@
             </div>
         </div>
         
-        <div class="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
-            <i class="fa-solid fa-receipt text-emerald-500"></i>
-        </div>
+<div class="flex flex-col gap-2">
+    {# Botón de Recibo PDF #}
+{# Busca el botón de descarga en tu HTML y cámbialo así #}
+<a href="{{ url_for('admin.generar_recibo_cliente', res_id=r.res_id) }}" 
+   target="_blank"
+   @click.stop
+   class="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+    <i class="fa-solid fa-file-pdf text-emerald-500"></i>
+</a>
+</div>
     </div>
 </div>
                 </div>

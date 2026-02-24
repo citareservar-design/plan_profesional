@@ -157,6 +157,10 @@ class Reserva(db.Model):
     # Relaciones
     cliente = db.relationship('Cliente', backref='reservas_asociadas')
     empl = db.relationship('Empleado', backref='reservas')
+    ser_id = db.Column(db.Integer, db.ForeignKey('SERVICIOS.ser_id'), nullable=True)
+    
+    # AGREGA ESTA LÍNEA PARA LA RELACIÓN:
+    servicio = db.relationship('Servicio', backref='reservas')
     
 class Servicio(db.Model):
     __tablename__ = 'SERVICIOS'
