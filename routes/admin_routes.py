@@ -2423,10 +2423,14 @@ def cerrar_caja_comisiones():
     empresa = Empresa.query.get(current_user.emp_id)
     empleados = Empleado.query.filter_by(emp_id=empresa.emp_id, empl_activo=1).all()
     
-    # Aseguramos que la ruta sea string para evitar el error Decimal + str
+    # 1. Definimos los formatos de fecha y hora
+    ahora = datetime.now()
+    fecha_carpeta = ahora.strftime('%Y-%m-%d')
+    # Formato para el nombre del archivo: 20260224_0905 (AñoMesDía_HoraMinuto)
+    dia_hora_archivo = ahora.strftime('%Y%m%d_%H%M%S') 
+    
     ruta_recursos = str(empresa.emp_ruta_recursos) if empresa.emp_ruta_recursos else 'recursos'
-    fecha_str = datetime.now().strftime('%Y-%m-%d')
-    ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_str)
+    ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_carpeta)
 
     try:
         servicios_liquidados = 0
@@ -2440,14 +2444,13 @@ def cerrar_caja_comisiones():
             # A. Generar PDF
             buffer_pdf = generar_pdf_binario(emp, reservas, current_user)
             
-            # B. Cifrar con Cédula
+            # B. Cifrar
             pdf_cifrado = BytesIO()
             reader = PdfReader(buffer_pdf)
             writer = PdfWriter()
             for page in reader.pages:
                 writer.add_page(page)
             
-            # La cédula debe ser string para la clave
             cedula_str = str(emp.empl_cedula)
             writer.encrypt(cedula_str)
             writer.write(pdf_cifrado)
@@ -2456,7 +2459,8 @@ def cerrar_caja_comisiones():
             ruta_final_empleado = os.path.join(ruta_base_comisiones, cedula_str)
             os.makedirs(ruta_final_empleado, exist_ok=True)
             
-            nombre_archivo = f"Recibo_{emp.empl_nombre.replace(' ', '_')}.pdf"
+            # NOMBRE DEL ARCHIVO CON DÍA Y HORA
+            nombre_archivo = f"Recibo_{emp.empl_nombre.replace(' ', '_')}_{dia_hora_archivo}.pdf"
             ruta_completa = os.path.join(ruta_final_empleado, nombre_archivo)
             
             with open(ruta_completa, "wb") as f:
@@ -2469,16 +2473,18 @@ def cerrar_caja_comisiones():
 
         if servicios_liquidados > 0:
             db.session.commit()
-            flash(f'Caja cerrada. {servicios_liquidados} servicios liquidados y guardados en recursos.', 'success')
+            flash(f'Caja cerrada. {servicios_liquidados} servicios guardados con fecha {dia_hora_archivo}.', 'success')
         else:
             flash('No había servicios para liquidar.', 'info')
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error crítico en cierre: {type(e).__name__} - {e}")
+        print(f"Error crítico en cierre: {e}")
         flash(f'Error al procesar el cierre: {str(e)}', 'danger')
 
     return redirect(url_for('admin.reporte_comisiones'))
+
+
 
 
 @admin_bp.route('/descargar-recibo/<int:emp_id>')
