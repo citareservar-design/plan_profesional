@@ -842,47 +842,29 @@ def cambiar_visibilidad_staff():
 @admin_bp.route('/aplicar_descuento_general', methods=['POST'])
 def aplicar_descuento_general():
     try:
-        # Importamos dentro de la función para evitar importaciones circulares
         from models.models import Cliente, db
-        
         datos = request.get_json()
         
-        # Extraemos y validamos los datos que vienen del JS
-        nuevo_porcentaje = datos.get('porcentaje')
-        nueva_cantidad = datos.get('cantidad')
-        
-        if nuevo_porcentaje is None or nueva_cantidad is None:
-            return jsonify({
-                "status": "error", 
-                "message": "Faltan valores de porcentaje o cantidad."
-            }), 400
+        nuevo_porcentaje = float(datos.get('porcentaje', 0))
+        nueva_cantidad = int(datos.get('cantidad', 0))
 
-        # --- LA CIRUGÍA EN LA DB ---
-        # Filtramos solo clientes activos para no reactivar promociones a gente bloqueada
-        # synchronize_session=False hace que la actualización sea ultra rápida
+        # --- NORMALIZACIÓN ---
+        # Si el admin pone 0.20, lo convertimos en 20
+        if 0 < nuevo_porcentaje < 1:
+            nuevo_porcentaje = nuevo_porcentaje * 100
+
+        # Actualización masiva
         Cliente.query.filter(Cliente.cli_activo == 1).update({
-            Cliente.cli_descuento: float(nuevo_porcentaje),
-            Cliente.cli_descuento_cantidad: int(nueva_cantidad)
+            Cliente.cli_descuento: nuevo_porcentaje,
+            Cliente.cli_descuento_cantidad: nueva_cantidad
         }, synchronize_session=False)
         
         db.session.commit()
-        
-        print(f"✅ [ADMIN] Campaña lanzada con éxito: {nuevo_porcentaje} desc / {nueva_cantidad} citas")
-        
-        return jsonify({
-            "status": "success", 
-            "message": "¡Campaña activada correctamente en todos los clientes!"
-        }), 200
+        return jsonify({"status": "success", "message": f"Campaña activada al {int(nuevo_porcentaje)}%"}), 200
 
     except Exception as e:
         db.session.rollback()
-        import traceback
-        print(f"❌ Error en admin_bp.aplicar_descuento_general: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({
-            "status": "error", 
-            "message": "Error interno del servidor al procesar la campaña."
-        }), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @admin_bp.route('/obtener_plantillas')
@@ -1082,9 +1064,22 @@ def inject_cumpleanos():
 def nuevo_cliente():
     data = request.get_json()
     try:
+        from models.models import Cliente, db
+        from datetime import datetime
+
+        # 1. Procesamiento de la fecha
         fecha_nac = data.get('fecha_nacimiento')
         fecha_obj = datetime.strptime(fecha_nac, '%Y-%m-%d').date() if fecha_nac else None
 
+        # 2. Captura y Normalización del Descuento
+        # Si el usuario manda 0.20, lo convertimos a 20.00
+        desc_bruto = float(data.get('descuento', 0))
+        if 0 < desc_bruto < 1:
+            desc_final = desc_bruto * 100
+        else:
+            desc_final = desc_bruto
+
+        # 3. Creación del objeto Cliente
         nuevo = Cliente(
             cli_nombre=data.get('nombre'),
             cli_email=data.get('email'),
@@ -1092,19 +1087,28 @@ def nuevo_cliente():
             cli_telefono=data.get('telefono'),
             cli_fecha_nacimiento=fecha_obj,
             cli_notas_personales=data.get('notas_personales'), 
-            # --- NUEVOS CAMPOS ---
-            cli_descuento=float(data.get('descuento', 0)),
+            
+            # Guardamos el valor normalizado (Ej: 20.00)
+            cli_descuento=desc_final,
             cli_descuento_cantidad=int(data.get('descuento_cantidad', 0)),
-            # ---------------------
+            
             emp_id=current_user.emp_id,
             cli_activo=True
         )
+
+        # 4. Guardado en Base de Datos
         db.session.add(nuevo)
         db.session.commit()
-        return jsonify({"status": "success"})
+
+        print(f"✅ Cliente creado: {nuevo.cli_nombre} con {desc_final}% de descuento.")
+        return jsonify({"status": "success", "message": "Cliente creado correctamente"})
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({"status": "error", "message": str(e)})
+        import traceback
+        print(f"❌ Error al crear cliente: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"status": "error", "message": f"No se pudo crear el cliente: {str(e)}"})
     
     
 
@@ -1466,30 +1470,51 @@ def reservas():
     ayer = hoy - timedelta(days=1)
     manana = hoy + timedelta(days=1)
     
+    # 1. Datos básicos
     datos_empresa = Empresa.query.get(current_user.emp_id)
+    lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
     
-    lista_empleados = Empleado.query.filter_by(
-        emp_id=current_user.emp_id, 
-        empl_activo=1
-    ).all()
-    
+    # 2. Carga de reservas
     todas_las_reservas = Reserva.query.filter_by(emp_id=current_user.emp_id)\
                         .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc()).all()
     
     reservas_data = []
     
     for r in todas_las_reservas:
-        # --- LÓGICA DEL PRECIO ---
+        # --- 3. LÓGICA DE PRECIO Y DESCUENTO REAL (COLUMNA PROPIA) ---
         servicio_obj = Servicio.query.filter_by(
             ser_nombre=r.res_tipo_servicio, 
             emp_id=current_user.emp_id
         ).first()
         
-        # Le pegamos el precio al objeto 'r' para usarlo en el HTML
-        r.precio_estimado = servicio_obj.ser_precio if servicio_obj else 0
-        # -------------------------
+        # Convertimos Decimal a float para evitar errores de cálculo
+        if servicio_obj and servicio_obj.ser_precio:
+            precio_base = float(servicio_obj.ser_precio)
+        else:
+            precio_base = 0.0
+            
+        r.precio_estimado = precio_base 
+        
+        # PRIORIDAD: Usamos la nueva columna res_descuento_valor que "congelamos" al reservar
+        # Si es None o 0, el float lo manejará correctamente.
+        porcentaje_desc = float(r.res_descuento_valor or 0.0)
+        
+        # Si por alguna razón la reserva no tiene descuento guardado (reservas viejas),
+        # revisamos si el cliente tiene uno activo ahora mismo.
+        if porcentaje_desc == 0 and r.cliente and r.cliente.cli_descuento:
+            porcentaje_desc = float(r.res_descuento_valor or 0.0) # Ahora vendrá un 20.0
 
-        empleados_aptos = []
+        # Cálculo de precio final
+        if porcentaje_desc > 0:
+            r.precio_final = precio_base * (1 - (porcentaje_desc / 100))
+            r.tiene_descuento = True
+            r.monto_descuento = int(porcentaje_desc)
+        else:
+            r.precio_final = precio_base
+            r.tiene_descuento = False
+
+        # --- 4. ASIGNACIÓN DE EMPLEADOS APTOS ---
+        empleados_aptos = [] 
         if servicio_obj:
             from sqlalchemy import text
             sql = text("""
@@ -1497,12 +1522,17 @@ def reservas():
                 JOIN EMPLEADO_SERVICIOS es ON e.empl_id = es.empl_id
                 WHERE es.ser_id = :s_id AND e.empl_activo = 1
             """)
-            empleados_aptos = db.session.query(Empleado).from_statement(sql).params(s_id=servicio_obj.ser_id).all()
-        else:
+            try:
+                # Usamos la conexión de base de datos para ejecutar el SQL crudo
+                empleados_aptos = db.session.query(Empleado).from_statement(sql).params(s_id=servicio_obj.ser_id).all()
+            except Exception as e:
+                print(f"Error SQL empleados: {e}")
+                empleados_aptos = lista_empleados
+        
+        if not empleados_aptos:
             empleados_aptos = lista_empleados
 
-        # IMPORTANTE: Asegúrate de que r.cliente funcione (vía relación o búsqueda manual)
-        # Si no tienes la relación en el modelo, usa: cliente_obj = Cliente.query.get(r.cli_id)
+        # --- 5. EMPAQUETADO FINAL ---
         reservas_data.append((r, r.cliente, empleados_aptos))
 
     return render_template('admin/reservas.html', 
@@ -1510,6 +1540,9 @@ def reservas():
                            lista_empleados=lista_empleados,
                            hoy=hoy, ayer=ayer, manana=manana,
                            empresa=datos_empresa)
+    
+    
+    
 
 @admin_bp.route('/reserva_estado/<int:id>', methods=['POST'])
 @login_required

@@ -198,42 +198,45 @@ def reservar():
         resultado = crear_cita(datos, request.host_url)
 
         if resultado.get('status') == 'success':
-            # 1. Definimos un mensaje por defecto
             mensaje_descuento = ""
-
-            # 2. LÓGICA DE DESCUENTOS
             try:
                 print(f"DEBUG: Procesando descuentos para resultado exitoso...")
                 
-                # Verificamos si el objeto existe y tiene saldo
                 if cliente_check:
-                    print(f"DEBUG: Saldo actual de {cliente_check.cli_nombre}: {cliente_check.cli_descuento_cantidad}")
-                    
+                    # Verificamos si tiene saldo de citas con descuento
                     if cliente_check.cli_descuento_cantidad > 0:
-                        # RESTAMOS LA CITA
+                        # Buscamos la reserva que se acaba de crear
+                        reserva_reciente = Reserva.query.filter_by(cli_id=cliente_check.cli_id).order_by(Reserva.res_id.desc()).first()
+                        
+                        # Capturamos el porcentaje antes de resetearlo
+                        porcentaje = int(cliente_check.cli_descuento)
+                        
+                        if reserva_reciente:
+                            reserva_reciente.res_descuento_valor = porcentaje
+                        
+                        # Restamos saldo y limpiamos si llega a 0
                         cliente_check.cli_descuento_cantidad -= 1
+                        if cliente_check.cli_descuento_cantidad <= 0:
+                            cliente_check.cli_descuento = 0
                         
-                        # Preparamos el mensaje según el saldo restante
-                        if cliente_check.cli_descuento_cantidad > 0:
-                            mensaje_descuento = f"¡Descuento aplicado! Te quedan {cliente_check.cli_descuento_cantidad} citas con este beneficio."
-                        else:
-                            # SI LLEGÓ A CERO, LIMPIAMOS EL PORCENTAJE
-                            cliente_check.cli_descuento = 0.00
-                            mensaje_descuento = "¡Has aprovechado tu último descuento disponible!"
+                        db.session.commit()
                         
-                        # GUARDAMOS CAMBIOS EN LA BASE DE DATOS
-                        db.session.commit() 
-                        print(f"✅ DB Actualizada con éxito para {cliente_check.cli_nombre}")
+                        # Preparamos el mensaje para el Sweet Alert
+                        mensaje_descuento = f"¡Felicidades! Se ha aplicado un {porcentaje}% de descuento a tu cita."
+                        
+                        print(f"✅ DB Actualizada: {cliente_check.cli_nombre} ahora tiene saldo {cliente_check.cli_descuento_cantidad}")
                     else:
-                        print("ℹ️ El cliente existe pero tiene saldo 0 de descuentos.")
+                        print(f"ℹ️ El cliente {cliente_check.cli_nombre} existe pero tiene saldo 0 de descuentos.")
                 else:
-                    print("⚠️ No se pudo aplicar descuento: cliente_check es None (No se encontró el cliente).")
-                
+                    print("⚠️ No se pudo aplicar descuento: cliente_check es None.")
+
             except Exception as e:
                 db.session.rollback()
+                import traceback
                 print(f"❌ Error CRÍTICO al actualizar descuento: {e}")
+                print(traceback.format_exc())
 
-            # 3. ENVÍO DE CORREO
+            # 3. ENVÍO DE CORREO (Ahora sí se ejecutará)
             try:
                 from services.appointment_service import enviar_correo_confirmacion
                 from models.models import Empresa
@@ -245,24 +248,26 @@ def reservar():
                     hora=hora_valor,
                     empresa=empresa_obj
                 )
+                print("📧 Correo de confirmación enviado.")
             except Exception as e:
                 print(f"⚠️ Error correo: {e}")
 
-            # 4. RESPUESTA FINAL
+            # 4. RESPUESTA FINAL AL CLIENTE (JS / SweetAlert)
             print(f"📤 Enviando respuesta al JS. Info descuento: '{mensaje_descuento}'")
             return jsonify({
                 "status": "success", 
-                "message": "Reserva confirmada",
+                "message": "Reserva confirmada con éxito",
                 "info_descuento": mensaje_descuento
             }), 200
-        # Este return es por si 'resultado' NO fue success (alineado con el IF inicial)
-        return jsonify({"status": "error", "message": "Error al guardar"}), 400
+
+        # Si el resultado del servicio no fue exitoso
+        return jsonify({"status": "error", "message": "Error al guardar la cita"}), 400
 
     except Exception as e:
         import traceback
-        print(f"Error general: {e}")
+        print(f"❌ Error general en la ruta reservar: {e}")
         print(traceback.format_exc())
-        return jsonify({"status": "error", "message": "Error interno"}), 500
+        return jsonify({"status": "error", "message": "Error interno del servidor"}), 500
     
     
     

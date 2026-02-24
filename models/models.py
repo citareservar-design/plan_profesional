@@ -146,16 +146,17 @@ class Reserva(db.Model):
     res_tipo_servicio = db.Column(db.String(100))
     res_estado = db.Column(db.String(20), default='pendiente')
     
-    empl = db.relationship('Empleado', backref='reservas')
-    
     # Llaves foráneas
     cli_id = db.Column(db.Integer, db.ForeignKey('CLIENTES.cli_id'), nullable=False)
-    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False) # <--- EMPRESA
-    
-    cliente = db.relationship('Cliente', backref='reservas_asociadas')
-    
-    # NUEVA COLUMNA PARA EL PROFESIONAL (Añade esta línea)
+    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
     empl_id = db.Column(db.Integer, db.ForeignKey('EMPLEADOS.empl_id'), nullable=True)
+
+    # USAMOS SOLO ESTA (Borra las otras dos del modelo)
+    res_descuento_valor = db.Column(db.Numeric(10, 2), default=0.00)
+    
+    # Relaciones
+    cliente = db.relationship('Cliente', backref='reservas_asociadas')
+    empl = db.relationship('Empleado', backref='reservas')
     
 class Servicio(db.Model):
     __tablename__ = 'SERVICIOS'
