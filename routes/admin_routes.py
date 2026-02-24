@@ -2494,9 +2494,9 @@ def descargar_recibo(emp_id):
     
     # 1. CORRECCIÓN: Incluir 'Realizada' y 'Completada' para el pago
     reservas = Reserva.query.filter(
-        Reserva.empl_id == emp_id, 
-        Reserva.res_estado.in_(['Realizada', 'Completada', 'Confirmada']) # <--- Aquí el cambio
-    ).all()
+            Reserva.empl_id == emp_id, 
+            Reserva.res_estado == 'Realizada' # <--- CAMBIO AQUÍ
+        ).all()
     
     total_bruto = 0
     servicios_pdf = []
