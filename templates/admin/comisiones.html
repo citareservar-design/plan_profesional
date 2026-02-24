@@ -83,13 +83,23 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 pt-2">
-                    {% set mensaje_wpp = "*REPORTE DE COMISIONES*\n*Empleado:* " ~ item.nombre ~ "\n*TOTAL A PAGAR:* $" ~ "{:,.0f}".format(item.pago_empleado) %}
-                    
-                    <a href="https://wa.me/{{ item.telefono }}?text={{ mensaje_wpp | urlencode }}" target="_blank"
-                       class="flex flex-col items-center justify-center py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-3xl transition-all">
-                        <i class="fa-brands fa-whatsapp text-2xl text-emerald-500 mb-1"></i>
-                        <span class="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Enviar Reporte</span>
-                    </a>
+                        {# --- CAMBIO AQUÍ: Construcción del mensaje con desglose de servicios --- #}
+                        {% set mensaje_wpp = 
+                            "*REPORTE DE COMISIONES*\n" ~
+                            "*Empleado:* " ~ item.nombre ~ "\n" ~
+                            "----------------------------\n" ~
+                            item.servicios_wpp ~
+                            "----------------------------\n" ~
+                            "*TOTAL BRUTO:* $" ~ "{:,.0f}".format(item.bruto) ~ "\n" ~
+                            "*A PAGAR (" ~ item.porcentaje ~ "%):* $" ~ "{:,.0f}".format(item.pago_empleado) ~ "\n\n" ~
+                            "Reporte generado por AgendApp"
+                        %}
+
+                        <a href="https://wa.me/{{ item.telefono }}?text={{ mensaje_wpp | urlencode }}" target="_blank"
+                        class="flex flex-col items-center justify-center py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-3xl transition-all">
+                            <i class="fa-brands fa-whatsapp text-2xl text-emerald-500 mb-1"></i>
+                            <span class="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Enviar Reporte</span>
+                        </a>
 
                     <a href="{{ url_for('admin.descargar_recibo', emp_id=item.id) }}" target="_blank"
                        class="flex flex-col items-center justify-center py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl transition-all">
