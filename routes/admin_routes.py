@@ -2176,6 +2176,96 @@ def eliminar_usuario(id):
 # ----10. GESTION DE COMISIONES 
 
 
+@admin_bp.route('/descargar-reporte-cierre')
+@login_required
+def descargar_reporte_cierre():
+    # 1. Obtener empleados y sus servicios 'Realizados' (los que se van a liquidar)
+    lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
+    
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = 750
+
+    # Encabezado del Negocio
+    p.setFont("Helvetica-Bold", 18)
+    p.drawString(100, y, "REPORTE GENERAL DE CIERRE DE CAJA")
+    y -= 20
+    p.setFont("Helvetica", 10)
+    p.drawString(100, y, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    y -= 30
+
+    total_bruto_general = 0
+    total_pagos_empleados = 0
+
+    # Tabla de Contenido
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(100, y, "COLABORADOR")
+    p.drawString(250, y, "BRUTO")
+    p.drawString(350, y, "COMISIÓN")
+    p.drawString(450, y, "AL NEGOCIO")
+    y -= 10
+    p.line(100, y, 512, y)
+    y -= 20
+
+    for emp in lista_empleados:
+        # Solo tomamos lo que está 'Realizada' (pendiente de cierre)
+        reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
+        
+        if not reservas:
+            continue
+
+        subtotal_emp = 0
+        for res in reservas:
+            ser = Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
+            if ser: subtotal_emp += float(ser.ser_precio)
+
+        porcentaje = float(emp.empl_porcentaje or 40)
+        pago_emp = subtotal_emp * (porcentaje / 100)
+        ganancia_local = subtotal_emp - pago_emp
+
+        # Acumuladores generales
+        total_bruto_general += subtotal_emp
+        total_pagos_empleados += pago_emp
+
+        # Dibujar fila del empleado
+        p.setFont("Helvetica", 10)
+        p.drawString(100, y, emp.empl_nombre[:20])
+        p.drawString(250, y, f"${subtotal_emp:,.0f}")
+        p.drawString(350, y, f"${pago_emp:,.0f}")
+        p.drawString(450, y, f"${ganancia_local:,.0f}")
+        y -= 15
+
+        if y < 100: # Nueva página si se llena
+            p.showPage()
+            y = 750
+
+    # Resumen Final
+    y -= 40
+    p.setStrokeColorRGB(0.8, 0.8, 0.8)
+    p.roundRect(100, y-60, 412, 80, 10, fill=0)
+    
+    y -= 15
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(120, y, f"PRODUCCIÓN TOTAL BRUTA:   ${total_bruto_general:,.0f}")
+    y -= 15
+    p.setFillColorRGB(0.7, 0, 0) # Rojo para egresos
+    p.drawString(120, y, f"TOTAL PAGOS EMPLEADOS:    -${total_pagos_empleados:,.0f}")
+    y -= 20
+    p.setFillColorRGB(0, 0.4, 0.2) # Verde para ganancia neta
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(120, y, f"UTILIDAD NETA LOCAL:      ${(total_bruto_general - total_pagos_empleados):,.0f}")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'inline; filename=Reporte_Cierre_General.pdf'
+    return response
+
+
 
 @admin_bp.route('/reporte-comisiones')
 @login_required

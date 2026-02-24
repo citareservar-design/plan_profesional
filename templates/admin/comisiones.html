@@ -6,16 +6,27 @@
 
 <div class="p-4 max-w-6xl mx-auto mb-20 space-y-12">
     <header class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-10">
-        <div>
-            <h2 class="text-5xl font-black text-white tracking-tighter uppercase">
-                Reparto de <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500">Comisiones</span>
-            </h2>
-        </div>
+<div>
+    <h2 class="text-5xl font-black text-white tracking-tighter uppercase">
+        Pago a <span class="text-sky-500">Colaboradores</span>
+    </h2>
+</div>
     </header>
 
+
+
+
+
+<div x-data="{ verTodos: false, limite: 4 }" class="space-y-10">
+    
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         {% for item in reporte %}
-        <div x-data="{ open: false }" 
+        <div x-show="verTodos || {{ loop.index0 }} < limite"
+             x-transition:enter="transition ease-out duration-500"
+             x-transition:enter-start="opacity-0 translate-y-8"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-data="{ open: false }" 
+             x-cloak
              class="group relative bg-slate-900/40 backdrop-blur-2xl border border-white/10 rounded-[3rem] p-8 transition-all duration-500 hover:border-sky-500/40 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
             
             <div class="absolute -top-12 -right-12 w-40 h-40 bg-sky-500/10 blur-[80px] rounded-full group-hover:bg-sky-500/20 transition-all"></div>
@@ -28,10 +39,8 @@
                         <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">{{ item.cargo or 'Especialista' }}</p>
                     </div>
                 </div>
-                <div class="flex flex-col items-end">
-                    <div class="bg-gradient-to-br from-sky-400 to-indigo-600 px-4 py-2 rounded-2xl shadow-lg shadow-sky-500/20 transform group-hover:scale-105 transition-transform">
-                        <span class="text-slate-900 text-sm font-black">{{ item.porcentaje }}% PAGO</span>
-                    </div>
+                <div class="bg-gradient-to-br from-sky-400 to-indigo-600 px-4 py-2 rounded-2xl shadow-lg">
+                    <span class="text-slate-900 text-sm font-black">{{ item.porcentaje }}% PAGO</span>
                 </div>
             </div>
 
@@ -39,11 +48,11 @@
                 <div class="space-y-3">
                     <div class="flex justify-between items-end px-1">
                         <div class="flex flex-col">
-                            <span class="text-slate-500 text-[9px] font-black uppercase tracking-tighter">Local ({{ 100 - item.porcentaje }}%)</span>
+                            <span class="text-slate-500 text-[9px] font-black uppercase tracking-tighter">Local</span>
                             <span class="text-white font-bold text-sm">${{ "{:,.0f}".format(item.bruto - item.pago_empleado) }}</span>
                         </div>
                         <div class="flex flex-col text-right">
-                            <span class="text-sky-400 text-[9px] font-black uppercase tracking-tighter">Profesional ({{ item.porcentaje }}%)</span>
+                            <span class="text-sky-400 text-[9px] font-black uppercase tracking-tighter">Profesional</span>
                             <span class="text-sky-400 font-bold text-sm">${{ "{:,.0f}".format(item.pago_empleado) }}</span>
                         </div>
                     </div>
@@ -54,71 +63,52 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-4">
-                    <div class="flex justify-between items-center p-6 bg-white/5 rounded-[2rem] border border-white/5 group/box hover:bg-white/10 transition-colors">
+                    <div class="flex justify-between items-center p-6 bg-white/5 rounded-[2rem] border border-white/5">
                         <div>
                             <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Producción Bruta</p>
-                            <p class="text-white text-3xl font-black tracking-tighter">${{ "{:,.0f}".format(item.bruto if item.bruto else 0) }}</p>
+                            <p class="text-white text-3xl font-black tracking-tighter">${{ "{:,.0f}".format(item.bruto) }}</p>
                         </div>
-                        <div class="bg-slate-800 p-4 rounded-2xl text-slate-400 group-hover/box:text-white transition-colors">
-                            <i class="fa-solid fa-chart-line text-xl"></i>
-                        </div>
+                        <i class="fa-solid fa-chart-line text-xl text-slate-400"></i>
                     </div>
 
-                    <div class="flex justify-between items-center p-6 bg-sky-500/10 border border-sky-500/20 rounded-[2.2rem] relative overflow-hidden group/pago">
-                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/pago:translate-x-full transition-transform duration-1000"></div>
-                        <div class="relative z-10">
+                    <div class="flex justify-between items-center p-6 bg-sky-500/10 border border-sky-500/20 rounded-[2.2rem]">
+                        <div>
                             <p class="text-sky-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Neto a Liquidar</p>
-                            <p class="text-white font-black text-5xl tracking-tighter drop-shadow-lg">
-                                ${{ "{:,.0f}".format(item.pago_empleado if item.pago_empleado else 0) }}
-                            </p>
+                            <p class="text-white font-black text-5xl tracking-tighter">${{ "{:,.0f}".format(item.pago_empleado) }}</p>
                         </div>
-                        <div class="relative z-10 bg-sky-500 p-4 rounded-2xl shadow-xl shadow-sky-500/30">
+                        <div class="bg-sky-500 p-4 rounded-2xl">
                             <i class="fa-solid fa-wallet text-slate-900 text-xl"></i>
                         </div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 pt-2">
-                    {% set mensaje_wpp = 
-                        "*REPORTE DE COMISIONES*\n" ~
-                        "*Empleado:* " ~ item.nombre ~ "\n" ~
-                        "*Servicios realizados:*\n" ~ item.servicios_wpp ~ "\n" ~
-                        "*TOTAL A PAGAR:* $" ~ "{:,.0f}".format(item.pago_empleado) 
-                    %}
-
-                    <a href="https://wa.me/{{ item.telefono }}?text={{ mensaje_wpp | urlencode }}"
-                    target="_blank"
-                    class="flex flex-col items-center justify-center py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-3xl transition-all group/wa">
-                        <i class="fa-brands fa-whatsapp text-2xl text-emerald-500 mb-1 group-hover/wa:scale-110 transition-transform"></i>
+                    {% set mensaje_wpp = "*REPORTE DE COMISIONES*\n*Empleado:* " ~ item.nombre ~ "\n*TOTAL A PAGAR:* $" ~ "{:,.0f}".format(item.pago_empleado) %}
+                    
+                    <a href="https://wa.me/{{ item.telefono }}?text={{ mensaje_wpp | urlencode }}" target="_blank"
+                       class="flex flex-col items-center justify-center py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-3xl transition-all">
+                        <i class="fa-brands fa-whatsapp text-2xl text-emerald-500 mb-1"></i>
                         <span class="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Enviar Reporte</span>
                     </a>
 
-                    <a href="{{ url_for('admin.descargar_recibo', emp_id=item.id) }}"
-                        target="_blank"
-                       class="flex flex-col items-center justify-center py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl transition-all group/pdf">
-                        <i class="fa-solid fa-file-pdf text-2xl text-rose-500 mb-1 group-hover/pdf:scale-110 transition-transform"></i>
+                    <a href="{{ url_for('admin.descargar_recibo', emp_id=item.id) }}" target="_blank"
+                       class="flex flex-col items-center justify-center py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl transition-all">
+                        <i class="fa-solid fa-file-pdf text-2xl text-rose-500 mb-1"></i>
                         <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest">Descargar PDF</span>
                     </a>
                 </div>
 
                 <div class="pt-2">
-                    <button @click="open = !open" 
-                            class="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-white/5 rounded-2xl transition-all">
-                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Desglose de servicios ({{ item.cantidad_citas }})</span>
-                        <i class="fa-solid fa-chevron-down text-slate-600 transition-transform duration-500" :class="open ? 'rotate-180 text-sky-400' : ''"></i>
+                    <button @click="open = !open" class="w-full flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/5">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Desglose ({{ item.cantidad_citas }})</span>
+                        <i class="fa-solid fa-chevron-down text-slate-600 transition-transform" :class="open ? 'rotate-180 text-sky-400' : ''"></i>
                     </button>
 
                     <div x-show="open" x-collapse x-cloak class="mt-4 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                         {% for serv in item.servicios_detalle %}
-                        <div class="flex justify-between items-center p-4 bg-slate-900/80 border border-white/5 rounded-2xl hover:border-sky-500/30 transition-colors">
+                        <div class="flex justify-between items-center p-4 bg-slate-900/80 border border-white/5 rounded-2xl">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center border border-white/5">
-                                    <i class="fa-solid fa-cut text-[10px] text-slate-500"></i>
-                                </div>
-                                <div class="flex flex-col">
-                                    <span class="text-white text-xs font-bold">{{ serv.nombre }}</span>
-                                    <span class="text-slate-500 text-[9px] font-medium">{{ serv.fecha }}</span>
-                                </div>
+                                <span class="text-white text-xs font-bold">{{ serv.nombre }}</span>
                             </div>
                             <span class="text-emerald-400 text-sm font-black">${{ "{:,.0f}".format(serv.precio) }}</span>
                         </div>
@@ -130,10 +120,35 @@
         {% endfor %}
     </div>
 
+    {% if reporte|length > 4 %}
+    <div class="flex justify-center pt-4">
+        <button @click="verTodos = !verTodos" 
+                class="group flex items-center gap-4 px-8 py-4 bg-slate-800/40 border border-white/10 rounded-2xl transition-all">
+            <i class="fa-solid" :class="verTodos ? 'fa-minus text-rose-400' : 'fa-plus text-sky-400'"></i>
+            <span class="text-sm font-black text-white uppercase" x-text="verTodos ? 'Mostrar menos' : 'Ver todos los empleados'"></span>
+        </button>
+    </div>
+    {% endif %}
+</div>
 
 
 
-<div class="max-w-2xl mx-auto pt-10">
+
+
+<div class="max-w-2xl mx-auto pt-10 space-y-4">
+    <a href="{{ url_for('admin.descargar_reporte_cierre') }}" 
+       target="_blank"
+       class="group w-full py-4 bg-slate-900/50 hover:bg-slate-800 border border-white/5 hover:border-sky-500/30 rounded-[2rem] transition-all duration-300 flex items-center justify-center gap-4">
+        <div class="w-10 h-10 rounded-full bg-sky-500/10 flex items-center justify-center">
+            <i class="fa-solid fa-file-invoice-dollar text-sky-400"></i>
+        </div>
+        <div class="text-left">
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Contabilidad del Negocio</p>
+            <p class="text-xs font-black text-white uppercase">Descargar Reporte de Utilidades (PDF)</p>
+        </div>
+        <i class="fa-solid fa-chevron-right text-slate-700 group-hover:translate-x-1 transition-transform ml-4"></i>
+    </a>
+
     <form action="{{ url_for('admin.cerrar_caja_comisiones') }}" method="POST" id="formCerrarCaja">
         <button type="button" onclick="confirmarCerrarCaja()" 
                 class="group relative w-full bg-white hover:bg-sky-50 text-slate-900 font-black py-8 rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(255,255,255,0.1)] transition-all duration-500 flex items-center justify-center gap-6 overflow-hidden">
@@ -150,7 +165,8 @@
             </div>
         </button>
     </form>
-    <p class="text-center text-slate-600 text-[10px] mt-6 uppercase font-bold tracking-[0.2em] opacity-60">
+
+    <p class="text-center text-slate-600 text-[10px] mt-2 uppercase font-bold tracking-[0.2em] opacity-60">
         <i class="fa-solid fa-shield-halved mr-2"></i> Esta operación archivará los servicios y reseteará el balance
     </p>
 </div>
