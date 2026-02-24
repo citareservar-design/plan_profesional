@@ -17,6 +17,9 @@ import os
 from xhtml2pdf import pisa
 from PyPDF2 import PdfWriter, PdfReader
 import io
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
 
 
@@ -490,6 +493,7 @@ def nuevo_empleados():
     # 1. Recibimos los datos (Usamos request.form porque ahora enviamos archivos)
     nombre = request.form.get('nombre', '').strip()
     cedula = str(request.form.get('cedula', '')).strip()
+    correo = request.form.get('correo', '').strip()
     servicios_ids = request.form.getlist('servicios[]') 
     foto_archivo = request.files.get('foto') 
 
@@ -535,6 +539,7 @@ def nuevo_empleados():
         nuevo_emp = Empleado(
             empl_nombre=nombre,
             empl_cedula=cedula,
+            empl_correo=correo,
             empl_telefono=request.form.get('telefono'),
             empl_porcentaje=request.form.get('porcentaje', 40),
             empl_cargo=request.form.get('cargo', 'Especialista'),
@@ -585,6 +590,7 @@ def editar_empleado(id):
     # 2. Recibir datos
     nombre = request.form.get('nombre', '').strip()
     cedula_nueva = str(request.form.get('cedula', '')).strip()
+    correo = request.form.get('correo', '').strip()
     cedula_anterior = str(emp.empl_cedula)
     foto_nueva = request.files.get('foto')
 
@@ -628,6 +634,7 @@ def editar_empleado(id):
         # 3. Actualizar datos básicos
         emp.empl_nombre = nombre
         emp.empl_cedula = cedula_nueva
+        emp.empl_correo = correo
         emp.empl_telefono = request.form.get('telefono')
         emp.empl_porcentaje = request.form.get('porcentaje', 40)
         emp.empl_cargo = request.form.get('cargo', 'Especialista')
@@ -2269,6 +2276,53 @@ def descargar_reporte_cierre():
 
 
 
+def enviar_correo_comision(empresa, empleado, pdf_binario, nombre_archivo):
+    # Verificar si la empresa tiene configurado el correo
+    if not empresa.emp_cuenta_smtp or not empresa.emp_clave_cuenta_smtp:
+        print(f"Configuración SMTP incompleta para la empresa {empresa.emp_razon_social}")
+        return False
+
+    if not empleado.empl_correo:
+        print(f"El empleado {empleado.empl_nombre} no tiene correo registrado.")
+        return False
+
+    try:
+        # Configuración del mensaje
+        msg = MIMEMultipart()
+        msg['From'] = empresa.emp_cuenta_smtp
+        msg['To'] = empleado.empl_correo
+        msg['Subject'] = f"Recibo de Pago - {empresa.emp_razon_social}"
+
+        cuerpo = f"""
+        Hola {empleado.empl_nombre},
+        
+        Se ha realizado el cierre de caja. Adjunto encontrarás tu comprobante de servicios realizados y comisiones.
+        
+        Recuerda que la clave para abrir tu PDF es tu número de cédula.
+        
+        Atentamente,
+        {empresa.emp_razon_social}
+        """
+        msg.attach(MIMEText(cuerpo, 'plain'))
+
+        # Adjuntar el PDF (usamos el valor cifrado que ya tienes)
+        part = MIMEApplication(pdf_binario, Name=nombre_archivo)
+        part['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+        msg.attach(part)
+
+        # Conexión SMTP
+        servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
+        servidor.starttls()  # Iniciamos seguridad
+        servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
+        servidor.send_message(msg)
+        servidor.quit()
+        return True
+    except Exception as e:
+        print(f"Error enviando correo a {empleado.empl_correo}: {e}")
+        return False
+
+
+
 @admin_bp.route('/reporte-comisiones')
 @login_required
 def reporte_comisiones():
@@ -2420,34 +2474,37 @@ def generar_pdf_binario(emp, reservas, current_user):
 @admin_bp.route('/cerrar-caja-comisiones', methods=['POST'])
 @login_required
 def cerrar_caja_comisiones():
+    # Obtenemos datos de la empresa y empleados activos
     empresa = Empresa.query.get(current_user.emp_id)
     empleados = Empleado.query.filter_by(emp_id=empresa.emp_id, empl_activo=1).all()
     
-    # 1. Definimos los formatos de fecha y hora
     ahora = datetime.now()
     fecha_carpeta = ahora.strftime('%Y-%m-%d')
-    # Formato para el nombre del archivo: 20260224_0905 (AñoMesDía_HoraMinuto)
     dia_hora_archivo = ahora.strftime('%Y%m%d_%H%M%S') 
     
+    # Configuración de rutas de archivos
     ruta_recursos = str(empresa.emp_ruta_recursos) if empresa.emp_ruta_recursos else 'recursos'
     ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_carpeta)
 
     try:
         servicios_liquidados = 0
+        correos_enviados = 0
         
         for emp in empleados:
+            # Solo procesamos empleados con servicios 'Realizada'
             reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
             
             if not reservas:
                 continue
             
-            # A. Generar PDF
+            # A. Generar PDF base
             buffer_pdf = generar_pdf_binario(emp, reservas, current_user)
             
-            # B. Cifrar
+            # B. Cifrar el PDF con la cédula del empleado
             pdf_cifrado = BytesIO()
             reader = PdfReader(buffer_pdf)
             writer = PdfWriter()
+            
             for page in reader.pages:
                 writer.add_page(page)
             
@@ -2455,32 +2512,39 @@ def cerrar_caja_comisiones():
             writer.encrypt(cedula_str)
             writer.write(pdf_cifrado)
             
-            # C. Guardar físicamente
+            contenido_final_pdf = pdf_cifrado.getvalue()
+            
+            # C. Guardar físicamente en el servidor
             ruta_final_empleado = os.path.join(ruta_base_comisiones, cedula_str)
             os.makedirs(ruta_final_empleado, exist_ok=True)
             
-            # NOMBRE DEL ARCHIVO CON DÍA Y HORA
             nombre_archivo = f"Recibo_{emp.empl_nombre.replace(' ', '_')}_{dia_hora_archivo}.pdf"
             ruta_completa = os.path.join(ruta_final_empleado, nombre_archivo)
             
             with open(ruta_completa, "wb") as f:
-                f.write(pdf_cifrado.getvalue())
+                f.write(contenido_final_pdf)
 
-            # D. Marcar como Completada
+            # D. ENVÍO DE CORREO ELECTRÓNICO
+            if emp.empl_correo:
+                exito_mail = enviar_correo_comision(empresa, emp, contenido_final_pdf, nombre_archivo)
+                if exito_mail:
+                    correos_enviados += 1
+
+            # E. Marcar servicios como 'Completada' para que salgan del reporte actual
             for res in reservas:
                 res.res_estado = 'Completada'
                 servicios_liquidados += 1
 
         if servicios_liquidados > 0:
             db.session.commit()
-            flash(f'Caja cerrada. {servicios_liquidados} servicios guardados con fecha {dia_hora_archivo}.', 'success')
+            flash(f'✅ Caja cerrada con éxito. {servicios_liquidados} servicios liquidados. Se enviaron {correos_enviados} correos.', 'success')
         else:
-            flash('No había servicios para liquidar.', 'info')
+            flash('ℹ️ No se encontraron servicios pendientes por liquidar.', 'info')
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error crítico en cierre: {e}")
-        flash(f'Error al procesar el cierre: {str(e)}', 'danger')
+        print(f"🔥 Error crítico en proceso de cierre: {e}")
+        flash(f'Hubo un problema al procesar la liquidación: {str(e)}', 'danger')
 
     return redirect(url_for('admin.reporte_comisiones'))
 

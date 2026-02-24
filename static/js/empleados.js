@@ -30,28 +30,30 @@ function abrirModalNuevo() {
     modal.classList.add('flex');
 }
 
-function prepararEdicion(id, nombre, cedula, telefono, porcentaje, cargo, serviciosIds) {
+// CIRUGÍA: Añadimos 'correo' como último parámetro
+function prepararEdicion(id, nombre, cedula, telefono, porcentaje, cargo, serviciosIds, correo) {
     const modal = document.getElementById('modalEmpleado');
     if (!modal) return;
 
     modal.setAttribute('data-id', id);
     document.getElementById('modalTitulo').innerHTML = 'Editar <span class="text-sky-500">Empleado</span>';
     
+    // Ahora 'correo' sí existe porque viene en los parámetros
+    if(document.getElementById('empl_correo')) {
+        document.getElementById('empl_correo').value = correo || '';
+    }
+    
     if(document.getElementById('empl_nombre')) document.getElementById('empl_nombre').value = nombre;
-    // Limpiamos posibles comillas simples de la cédula que vienen de Jinja2
     if(document.getElementById('empl_cedula')) document.getElementById('empl_cedula').value = String(cedula).replace(/'/g, "");
     if(document.getElementById('empl_telefono')) document.getElementById('empl_telefono').value = telefono;
     if(document.getElementById('empl_porcentaje')) document.getElementById('empl_porcentaje').value = porcentaje;
     if(document.getElementById('empl_cargo')) document.getElementById('empl_cargo').value = cargo;
 
     const checkboxes = document.querySelectorAll('input[name="servicios_empleado"]');
-    
-    // Convertimos serviciosIds a un Array si viene como string/JSON
     let listaIds = Array.isArray(serviciosIds) ? serviciosIds : [];
 
     checkboxes.forEach(cb => {
         cb.checked = false;
-        // Comparamos convirtiendo ambos a String para evitar fallos de tipo
         if (listaIds.some(sId => String(sId) === String(cb.value))) {
             cb.checked = true;
         }
@@ -65,35 +67,35 @@ function guardarEmpleado() {
     const modal = document.getElementById('modalEmpleado');
     if (!modal) return;
 
-    // 1. Limpieza de ID
     let id = modal.getAttribute('data-id'); 
     if (id === "null" || id === "undefined" || id === "" || !id) {
         id = null;
     }
 
-    // 2. Construcción de la URL
     const url = id ? `/admin/api/empleado/editar/${id}` : '/admin/api/empleado/nuevo';
-
-    // --- CAMBIO CLAVE: Usamos FormData en lugar de un objeto plano ---
     const formData = new FormData();
 
     // 3. Agregamos los campos de texto
     formData.append('nombre', document.getElementById('empl_nombre')?.value.trim() || '');
     formData.append('cedula', document.getElementById('empl_cedula')?.value.trim() || '');
     formData.append('telefono', document.getElementById('empl_telefono')?.value || '');
+    
+    // --- CIRUGÍA AQUÍ: Agregamos el correo al FormData ---
+    formData.append('correo', document.getElementById('empl_correo')?.value.trim() || '');
+    
     formData.append('porcentaje', document.getElementById('empl_porcentaje')?.value || '40');
     formData.append('cargo', document.getElementById('empl_cargo')?.value || 'Especialista');
 
-    // 4. Agregamos la Foto (Asegúrate que tu input file tenga el id="empl_foto")
+    // 4. Agregamos la Foto
     const fotoInput = document.getElementById('empl_foto');
     if (fotoInput && fotoInput.files[0]) {
         formData.append('foto', fotoInput.files[0]);
     }
 
-    // 5. Agregamos los Servicios (como array para Python)
+    // 5. Agregamos los Servicios
     const checkboxes = document.querySelectorAll('input[name="servicios_empleado"]:checked');
     checkboxes.forEach(cb => {
-        formData.append('servicios[]', cb.value); // Nota el uso de [] para que Flask lo reciba como lista
+        formData.append('servicios[]', cb.value); 
     });
 
     // 6. Validación previa básica
@@ -111,22 +113,15 @@ function guardarEmpleado() {
         return;
     }
 
-    // 7. Petición al servidor
-    // NOTA: Quitamos el 'Content-Type': 'application/json' de los headers.
-    // El navegador detectará que es FormData y pondrá el "multipart/form-data" automáticamente.
+    // 7. Petición al servidor (Fetch se encarga del multipart/form-data)
     fetch(url, {
         method: 'POST',
-        headers: { 
-            'Accept': 'application/json'
-            // No pongas Content-Type aquí
-        },
+        headers: { 'Accept': 'application/json' },
         body: formData 
     })
     .then(res => {
         return res.json().then(data => {
-            if (!res.ok) {
-                throw new Error(data.message || `Error ${res.status}`);
-            }
+            if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
             return data;
         });
     })
@@ -150,7 +145,6 @@ function guardarEmpleado() {
         }
     })
     .catch(error => {
-        console.error('Error detallado:', error);
         Swal.fire({ 
             title: 'Atención', 
             text: error.message, 
