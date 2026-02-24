@@ -2324,50 +2324,169 @@ def descargar_reporte_cierre():
 
 
 
-def enviar_correo_comision(empresa, empleado, pdf_binario, nombre_archivo):
-    # Verificar si la empresa tiene configurado el correo
-    if not empresa.emp_cuenta_smtp or not empresa.emp_clave_cuenta_smtp:
-        print(f"Configuración SMTP incompleta para la empresa {empresa.emp_razon_social}")
-        return False
+# --- FUNCIÓN 1: GENERAR EL PDF BINARIO PARA EL DUEÑO ---
+def generar_reporte_general_binario(lista_empleados, current_user):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = 750
 
-    if not empleado.empl_correo:
-        print(f"El empleado {empleado.empl_nombre} no tiene correo registrado.")
-        return False
+    # --- ENCABEZADO PRINCIPAL ---
+    p.setFont("Helvetica-Bold", 18)
+    p.drawString(50, y, "REPORTE DETALLADO DE CIERRE DE CAJA")
+    y -= 20
+    p.setFont("Helvetica", 10)
+    p.drawString(50, y, f"Fecha de Cierre: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    y -= 30
 
+    total_bruto_general = 0
+    total_pagos_empleados = 0
+
+    for emp in lista_empleados:
+        reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
+        if not reservas:
+            continue
+
+        if y < 150:
+            p.showPage()
+            y = 750
+
+        # --- BLOQUE DE COLABORADOR ---
+        p.setFillColorRGB(0.95, 0.95, 0.95)
+        p.rect(50, y-15, 512, 20, fill=1)
+        p.setFillColorRGB(0, 0, 0)
+        p.setFont("Helvetica-Bold", 11)
+        p.drawString(60, y-10, f"COLABORADOR: {emp.empl_nombre.upper()}")
+        y -= 35
+
+        # Encabezados de tabla
+        p.setFont("Helvetica-Bold", 8)
+        columnas = [
+            (55, "FECHA/HORA"), (140, "SERVICIO"), (250, "BASE"), 
+            (300, "DESC %"), (350, "FINAL"), (400, "COMISIÓN"), (470, "AL LOCAL")
+        ]
+        for pos, texto in columnas:
+            p.drawString(pos, y, texto)
+        
+        y -= 5
+        p.line(50, y, 562, y)
+        y -= 12
+
+        subtotal_bruto_emp = 0
+        subtotal_pago_emp = 0
+        porcentaje_comision = float(emp.empl_porcentaje or 40)
+
+        p.setFont("Helvetica", 8)
+        for res in reservas:
+            ser = Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
+            if ser:
+                precio_base = float(ser.ser_precio)
+                porc_desc = float(res.res_descuento_valor or 0)
+                precio_final = precio_base - (precio_base * (porc_desc / 100))
+                comision_servicio = precio_final * (porcentaje_comision / 100)
+                local_servicio = precio_final - comision_servicio
+
+                p.drawString(55, y, f"{res.res_fecha.strftime('%d/%m')} {res.res_hora.strftime('%H:%M')}")
+                p.drawString(140, y, res.res_tipo_servicio[:20])
+                p.drawString(250, y, f"${precio_base:,.0f}")
+                p.drawString(300, y, f"{int(porc_desc)}%")
+                p.drawString(350, y, f"${precio_final:,.0f}")
+                p.drawString(400, y, f"${comision_servicio:,.0f}")
+                p.drawString(470, y, f"${local_servicio:,.0f}")
+
+                subtotal_bruto_emp += precio_final
+                subtotal_pago_emp += comision_servicio
+                y -= 12
+
+                if y < 60:
+                    p.showPage()
+                    y = 750
+                    p.setFont("Helvetica", 8)
+
+        # Totales por colaborador
+        y -= 5
+        p.line(340, y+10, 562, y+10)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(240, y, "TOTALES:")
+        p.drawString(350, y, f"${subtotal_bruto_emp:,.0f}")
+        p.drawString(400, y, f"${subtotal_pago_emp:,.0f}")
+        p.drawString(470, y, f"${(subtotal_bruto_emp - subtotal_pago_emp):,.0f}")
+        
+        total_bruto_general += subtotal_bruto_emp
+        total_pagos_empleados += subtotal_pago_emp
+        y -= 35
+
+    # --- RESUMEN FINAL ---
+    if y < 160: p.showPage(); y = 750
+    y -= 10
+    p.setStrokeColorRGB(0.5, 0.5, 0.5)
+    p.roundRect(50, y-70, 512, 85, 10, fill=0)
+    y -= 15
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(70, y, f"PRODUCCIÓN TOTAL BRUTA GENERAL:   ${total_bruto_general:,.0f}")
+    y -= 20
+    p.setFillColorRGB(0.7, 0, 0)
+    p.drawString(70, y, f"TOTAL EGRESOS (PAGOS EMPLEADOS):  -${total_pagos_empleados:,.0f}")
+    y -= 25
+    p.setFillColorRGB(0, 0.4, 0.2)
+    p.setFont("Helvetica-Bold", 15)
+    p.drawString(70, y, f"UTILIDAD NETA TOTAL LOCAL:        ${(total_bruto_general - total_pagos_empleados):,.0f}")
+
+    # Pie de página
+    p.setStrokeColorRGB(0.8, 0.8, 0.8)
+    p.line(50, 50, 562, 50)
+    p.setFont("Helvetica-Oblique", 9)
+    p.setFillColorRGB(0.4, 0.4, 0.4)
+    p.drawCentredString(width/2, 35, "Impreso por AgendApp - Reserva fácil e inteligente")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+# --- FUNCIÓN 2: ENVIAR CORREO AL DUEÑO ---
+def enviar_correo_reporte_general(empresa, pdf_binario, nombre_archivo):
+    if not empresa.emp_email or not empresa.emp_cuenta_smtp: return False
     try:
-        # Configuración del mensaje
         msg = MIMEMultipart()
         msg['From'] = empresa.emp_cuenta_smtp
-        msg['To'] = empleado.empl_correo
-        msg['Subject'] = f"Recibo de Pago - {empresa.emp_razon_social}"
-
-        cuerpo = f"""
-        Hola {empleado.empl_nombre},
-        
-        Se ha realizado el cierre de caja. Adjunto encontrarás tu comprobante de servicios realizados y comisiones.
-        
-        Recuerda que la clave para abrir tu PDF es tu número de cédula.
-        
-        Atentamente,
-        {empresa.emp_razon_social}
-        """
-        msg.attach(MIMEText(cuerpo, 'plain'))
-
-        # Adjuntar el PDF (usamos el valor cifrado que ya tienes)
+        msg['To'] = empresa.emp_email
+        msg['Subject'] = f"CIERRE DE CAJA - {empresa.emp_razon_social}"
+        msg.attach(MIMEText("Se adjunta el reporte detallado de utilidades del cierre actual.", 'plain'))
         part = MIMEApplication(pdf_binario, Name=nombre_archivo)
         part['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
         msg.attach(part)
-
-        # Conexión SMTP
         servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
-        servidor.starttls()  # Iniciamos seguridad
+        servidor.starttls()
         servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
         servidor.send_message(msg)
         servidor.quit()
         return True
     except Exception as e:
-        print(f"Error enviando correo a {empleado.empl_correo}: {e}")
-        return False
+        print(f"Error correo dueño: {e}"); return False
+
+# --- FUNCIÓN 3: ENVIAR CORREO AL EMPLEADO ---
+def enviar_correo_comision_empleado(empresa, empleado, pdf_binario, nombre_archivo):
+    if not empleado.empl_correo or not empresa.emp_cuenta_smtp: return False
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = empresa.emp_cuenta_smtp
+        msg['To'] = empleado.empl_correo
+        msg['Subject'] = f"Tu Recibo de Pago - {empresa.emp_razon_social}"
+        msg.attach(MIMEText(f"Hola {empleado.empl_nombre}, adjuntamos tu recibo de comisiones.", 'plain'))
+        part = MIMEApplication(pdf_binario, Name=nombre_archivo)
+        part['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+        msg.attach(part)
+        servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
+        servidor.starttls()
+        servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
+        servidor.send_message(msg)
+        servidor.quit()
+        return True
+    except Exception as e:
+        print(f"Error correo empleado: {e}"); return False
+    
+
 
 
 
@@ -2440,266 +2559,307 @@ def generar_pdf_binario(emp, reservas, current_user):
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
+    # --- CONFIGURACIÓN DE PÁGINA Y CABECERA ---
+    y = 750
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
+    
+    y -= 20
+    p.setFont("Helvetica", 10)
+    p.setFillColorRGB(0.3, 0.3, 0.3)
+    p.drawString(50, y, f"Colaborador: {emp.empl_nombre} | Cédula: {emp.empl_cedula}")
+    y -= 15
+    p.drawString(50, y, f"Fecha de reporte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    y -= 20
+    p.setStrokeColorRGB(0.8, 0.8, 0.8)
+    p.line(50, y, 560, y)
+
+    # --- CABECERA DE TABLA (Igual al reporte de descarga) ---
+    y -= 25
+    p.setFillColorRGB(0, 0, 0)
+    p.setFont("Helvetica-Bold", 9)
+    
+    # Definición de columnas
+    col_fecha = 50
+    col_ser = 110
+    col_valor = 280
+    col_desc = 360
+    col_v_desc = 430
+    col_total = 500
+
+    p.drawString(col_fecha, y, "FECHA")
+    p.drawString(col_ser, y, "SERVICIO")
+    p.drawString(col_valor, y, "VALOR")
+    p.drawString(col_desc, y, "DESC %")
+    p.drawString(col_v_desc, y, "V. DESC")
+    p.drawString(col_total, y, "TOTAL")
+    
+    y -= 8
+    p.line(50, y, 560, y)
+    y -= 15
+
+    # --- PROCESAMIENTO DE DATOS ---
     total_bruto = 0
-    servicios_pdf = []
+    p.setFont("Courier", 9)
     
     for res in reservas:
         ser = Servicio.query.filter_by(
             ser_nombre=res.res_tipo_servicio, 
             emp_id=current_user.emp_id
         ).first()
+        
         if ser:
-            # --- NUEVA LÓGICA DE DESCUENTO POR PORCENTAJE ---
             precio_base = float(ser.ser_precio)
             porcentaje_desc = float(res.res_descuento_valor or 0)
-            
-            # Calculamos el valor del descuento y lo restamos
             valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
             precio_final = precio_base - valor_descuento_dinero
-            
             total_bruto += precio_final
-            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio_final:,.0f}")
 
-    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
-    pago_empleado = total_bruto * (porcentaje / 100)
-
-    # --- INICIO DE TU DISEÑO ---
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(100, 750, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
-    p.setFont("Helvetica", 10)
-    p.setFillColorRGB(0.3, 0.3, 0.3)
-    p.drawString(100, 735, f"Empleado: {emp.empl_nombre}")
-    p.drawString(100, 722, f"Fecha de reporte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    p.setStrokeColorRGB(0.8, 0.8, 0.8)
-    p.line(100, 715, 512, 715)
-
-    y = 690
-    p.setFillColorRGB(0, 0, 0)
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, y, "DETALLE DE SERVICIOS REALIZADOS:")
-    
-    y -= 25
-    p.setFont("Courier", 10)
-    
-    if not servicios_pdf:
-        p.drawString(120, y, "No se encontraron servicios finalizados.")
-    else:
-        for s in servicios_pdf:
+            # Control de salto de página
             if y < 80:
                 p.showPage()
                 y = 750
-                p.setFont("Courier", 10)
-            p.drawString(120, y, s)
+                p.setFont("Courier", 9)
+
+            # Dibujar Fila
+            p.drawString(col_fecha, y, res.res_fecha.strftime('%d/%m'))
+            p.drawString(col_ser, y, res.res_tipo_servicio[:22])
+            p.drawString(col_valor, y, f"{precio_base:,.0f}")
+            p.drawString(col_desc, y, f"{int(porcentaje_desc)}%")
+            p.drawString(col_v_desc, y, f"{valor_descuento_dinero:,.0f}")
+            p.drawString(col_total, y, f"{precio_final:,.0f}")
+            
             y -= 15
 
+    # --- TOTALES FINALES ---
     if y < 150:
         p.showPage()
         y = 750
 
-    y -= 30
-    p.setStrokeColorRGB(0.7, 0.7, 0.7)
-    p.line(100, y+15, 512, y+15)
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, y, f"SUBTOTAL BRUTO: ${total_bruto:,.0f}")
     y -= 20
-    p.setFont("Helvetica-Bold", 14)
-    p.setFillColorRGB(0, 0.4, 0.2)
-    p.drawString(100, y, f"TOTAL A PAGAR ({int(porcentaje)}%): ${pago_empleado:,.0f}")
+    p.setStrokeColorRGB(0.5, 0.5, 0.5)
+    p.line(350, y+10, 560, y+10)
+    
+    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
+    pago_empleado = total_bruto * (porcentaje / 100)
 
-    p.setStrokeColorRGB(0.8, 0.8, 0.8)
-    p.line(100, 60, 512, 60)
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(350, y, "SUBTOTAL:")
+    p.drawRightString(555, y, f"${total_bruto:,.0f}")
+    
+    y -= 20
+    p.setFont("Helvetica-Bold", 13)
+    p.setFillColorRGB(0, 0.4, 0.2) 
+    p.drawString(350, y, f"TOTAL PAGO ({int(porcentaje)}%):")
+    p.drawRightString(555, y, f"${pago_empleado:,.0f}")
+
+    # --- PIE DE PÁGINA ---
     p.setFont("Helvetica-Oblique", 8)
     p.setFillColorRGB(0.5, 0.5, 0.5)
-    p.drawCentredString(width/2, 45, "AgendApp - Reporte de procesos de pago a empleados")
+    p.drawCentredString(width/2, 40, "AgendApp - Comprobante oficial de servicios")
 
     p.showPage()
     p.save()
+    
     buffer.seek(0)
     return buffer
 
 
 
 
-# --- 2. RUTA DE CIERRE CORREGIDA ---
 @admin_bp.route('/cerrar-caja-comisiones', methods=['POST'])
 @login_required
 def cerrar_caja_comisiones():
-    # Obtenemos datos de la empresa y empleados activos
     empresa = Empresa.query.get(current_user.emp_id)
     empleados = Empleado.query.filter_by(emp_id=empresa.emp_id, empl_activo=1).all()
-    
     ahora = datetime.now()
-    fecha_carpeta = ahora.strftime('%Y-%m-%d')
+    fecha_hoy = ahora.strftime('%Y-%m-%d')
     dia_hora_archivo = ahora.strftime('%Y%m%d_%H%M%S') 
     
-    # Configuración de rutas de archivos
     ruta_recursos = str(empresa.emp_ruta_recursos) if empresa.emp_ruta_recursos else 'recursos'
-    ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_carpeta)
+    ruta_base_comisiones = os.path.join(ruta_recursos, 'comisiones', fecha_hoy)
+    ruta_base_cierres = os.path.join(ruta_recursos, 'cierrecaja', fecha_hoy)
 
     try:
         servicios_liquidados = 0
-        correos_enviados = 0
+        # Validar si hay algo que cerrar
+        hay_datos = any(Reserva.query.filter_by(empl_id=e.empl_id, res_estado='Realizada').first() for e in empleados)
         
+        if not hay_datos:
+            flash('ℹ️ No hay servicios para liquidar.', 'info')
+            return redirect(url_for('admin.reporte_comisiones'))
+
+        # --- 1. GENERAR REPORTE DETALLADO DEL NEGOCIO ---
+        buffer_general = generar_reporte_general_binario(empleados, current_user)
+        
+        # CIFRAR CON CLAVE "123"
+        pdf_gen_cifrado = BytesIO()
+        reader_gen = PdfReader(buffer_general)
+        writer_gen = PdfWriter()
+        for page in reader_gen.pages: writer_gen.add_page(page)
+        writer_gen.encrypt("123")
+        writer_gen.write(pdf_gen_cifrado)
+        contenido_general = pdf_gen_cifrado.getvalue()
+
+        # GUARDAR FÍSICAMENTE EN RECURSOS/cierrecaja
+        os.makedirs(ruta_base_cierres, exist_ok=True)
+        nombre_cierre = f"cierrecaja_{dia_hora_archivo}.pdf"
+        with open(os.path.join(ruta_base_cierres, nombre_cierre), "wb") as f:
+            f.write(contenido_general)
+
+        # ENVIAR AL DUEÑO
+        enviar_correo_reporte_general(empresa, contenido_general, nombre_cierre)
+
+        # --- 2. PROCESAR CADA EMPLEADO ---
         for emp in empleados:
-            # Solo procesamos empleados con servicios 'Realizada'
             reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
+            if not reservas: continue
             
-            if not reservas:
-                continue
+            # PDF Individual
+            buf_emp = generar_pdf_binario(emp, reservas, current_user)
+            pdf_emp_cifrado = BytesIO()
+            reader_e = PdfReader(buf_emp)
+            writer_e = PdfWriter()
+            for page in reader_e.pages: writer_e.add_page(page)
+            writer_e.encrypt(str(emp.empl_cedula))
+            writer_e.write(pdf_emp_cifrado)
+            cont_emp = pdf_emp_cifrado.getvalue()
             
-            # A. Generar PDF base
-            buffer_pdf = generar_pdf_binario(emp, reservas, current_user)
-            
-            # B. Cifrar el PDF con la cédula del empleado
-            pdf_cifrado = BytesIO()
-            reader = PdfReader(buffer_pdf)
-            writer = PdfWriter()
-            
-            for page in reader.pages:
-                writer.add_page(page)
-            
-            cedula_str = str(emp.empl_cedula)
-            writer.encrypt(cedula_str)
-            writer.write(pdf_cifrado)
-            
-            contenido_final_pdf = pdf_cifrado.getvalue()
-            
-            # C. Guardar físicamente en el servidor
-            ruta_final_empleado = os.path.join(ruta_base_comisiones, cedula_str)
-            os.makedirs(ruta_final_empleado, exist_ok=True)
-            
-            nombre_archivo = f"Recibo_{emp.empl_nombre.replace(' ', '_')}_{dia_hora_archivo}.pdf"
-            ruta_completa = os.path.join(ruta_final_empleado, nombre_archivo)
-            
-            with open(ruta_completa, "wb") as f:
-                f.write(contenido_final_pdf)
+            # Guardar PDF Empleado
+            ruta_emp_folder = os.path.join(ruta_base_comisiones, str(emp.empl_cedula))
+            os.makedirs(ruta_emp_folder, exist_ok=True)
+            n_archivo_emp = f"Recibo_{emp.empl_nombre.replace(' ', '_')}_{dia_hora_archivo}.pdf"
+            with open(os.path.join(ruta_emp_folder, n_archivo_emp), "wb") as f:
+                f.write(cont_emp)
 
-            # D. ENVÍO DE CORREO ELECTRÓNICO
+            # Correo Empleado
             if emp.empl_correo:
-                exito_mail = enviar_correo_comision(empresa, emp, contenido_final_pdf, nombre_archivo)
-                if exito_mail:
-                    correos_enviados += 1
+                enviar_correo_comision_empleado(empresa, emp, cont_emp, n_archivo_emp)
 
-            # E. Marcar servicios como 'Completada' para que salgan del reporte actual
+            # Cambiar estados
             for res in reservas:
                 res.res_estado = 'Completada'
                 servicios_liquidados += 1
 
-        if servicios_liquidados > 0:
-            db.session.commit()
-            flash(f'✅ Caja cerrada con éxito. {servicios_liquidados} servicios liquidados. Se enviaron {correos_enviados} correos.', 'success')
-        else:
-            flash('ℹ️ No se encontraron servicios pendientes por liquidar.', 'info')
+        db.session.commit()
+        flash(f'✅ Cierre exitoso. Reporte detallado guardado y enviado. Clave: 123', 'success')
 
     except Exception as e:
         db.session.rollback()
-        print(f"🔥 Error crítico en proceso de cierre: {e}")
-        flash(f'Hubo un problema al procesar la liquidación: {str(e)}', 'danger')
+        print(f"🔥 Error: {e}")
+        flash(f'Error: {str(e)}', 'danger')
 
     return redirect(url_for('admin.reporte_comisiones'))
-
-
 
 
 @admin_bp.route('/descargar-recibo/<int:emp_id>')
 @login_required
 def descargar_recibo(emp_id):
     emp = Empleado.query.get_or_404(emp_id)
-    
-    # 1. Obtenemos las reservas en estado 'Realizada'
     reservas = Reserva.query.filter(
             Reserva.empl_id == emp_id, 
             Reserva.res_estado == 'Realizada'
         ).all()
     
-    total_bruto = 0
-    servicios_pdf = []
-    
-    for res in reservas:
-        # Buscamos el servicio para traer el precio base
-        ser = Servicio.query.filter_by(
-            ser_nombre=res.res_tipo_servicio, 
-            emp_id=current_user.emp_id
-        ).first()
-        
-        if ser:
-            # --- LÓGICA DE DESCUENTO POR PORCENTAJE ---
-            precio_base = float(ser.ser_precio)
-            porcentaje_desc = float(res.res_descuento_valor or 0)
-            
-            # Calculamos el dinero del descuento y lo restamos del base
-            valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
-            precio_final = precio_base - valor_descuento_dinero
-            
-            total_bruto += precio_final
-            
-            # Guardamos el detalle con el precio ya descontado para el PDF
-            servicios_pdf.append(f"{res.res_fecha.strftime('%d/%m')} - {res.res_tipo_servicio}: ${precio_final:,.0f}")
-
-    # Cálculo de comisión sobre el total con descuentos aplicados
-    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
-    pago_empleado = total_bruto * (porcentaje / 100)
-
-    # 2. Configuración del PDF (ReportLab)
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
+    y = 750
 
     # --- ENCABEZADO ---
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(100, 750, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
-    
+    p.drawString(50, y, f"COMPROBANTE DE PAGO - {emp.empl_nombre.upper()}")
+    y -= 20
     p.setFont("Helvetica", 10)
     p.setFillColorRGB(0.3, 0.3, 0.3)
-    p.drawString(100, 735, f"Empleado: {emp.empl_nombre}")
-    p.drawString(100, 722, f"Fecha de reporte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    p.drawString(50, y, f"Colaborador: {emp.empl_nombre} | Cédula: {emp.empl_cedula}")
+    y -= 15
+    p.drawString(50, y, f"Fecha de reporte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     
+    y -= 20
     p.setStrokeColorRGB(0.8, 0.8, 0.8)
-    p.line(100, 715, 512, 715)
+    p.line(50, y, 560, y)
 
-    # --- CUERPO ---
-    y = 690
-    p.setFillColorRGB(0, 0, 0)
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, y, "DETALLE DE SERVICIOS REALIZADOS:")
-    
+    # --- CABECERA DE TABLA ---
     y -= 25
-    p.setFont("Courier", 10)
+    p.setFillColorRGB(0, 0, 0)
+    p.setFont("Helvetica-Bold", 9)
+    # Definimos posiciones X para las columnas
+    col_fecha = 50
+    col_ser = 110
+    col_valor = 280
+    col_desc = 360
+    col_v_desc = 430
+    col_total = 500
+
+    p.drawString(col_fecha, y, "FECHA")
+    p.drawString(col_ser, y, "SERVICIO")
+    p.drawString(col_valor, y, "VALOR")
+    p.drawString(col_desc, y, "DESC %")
+    p.drawString(col_v_desc, y, "V. DESC")
+    p.drawString(col_total, y, "TOTAL")
     
-    if not servicios_pdf:
-        p.drawString(120, y, "No se encontraron servicios finalizados.")
-    else:
-        for s in servicios_pdf:
+    y -= 8
+    p.line(50, y, 560, y)
+    y -= 15
+
+    # --- LISTADO DE SERVICIOS ---
+    total_bruto = 0
+    p.setFont("Courier", 9)
+    
+    for res in reservas:
+        ser = Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
+        
+        if ser:
+            precio_base = float(ser.ser_precio)
+            porcentaje_desc = float(res.res_descuento_valor or 0)
+            valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
+            precio_final = precio_base - valor_descuento_dinero
+            total_bruto += precio_final
+
             if y < 80:
                 p.showPage()
                 y = 750
-                p.setFont("Courier", 10)
-            p.drawString(120, y, s)
+                p.setFont("Courier", 9)
+
+            # Escribir fila
+            p.drawString(col_fecha, y, res.res_fecha.strftime('%d/%m'))
+            p.drawString(col_ser, y, res.res_tipo_servicio[:22]) # Truncar nombre largo
+            p.drawString(col_valor, y, f"{precio_base:,.0f}")
+            p.drawString(col_desc, y, f"{int(porcentaje_desc)}%")
+            p.drawString(col_v_desc, y, f"{valor_descuento_dinero:,.0f}")
+            p.drawString(col_total, y, f"{precio_final:,.0f}")
+            
             y -= 15
 
-    # --- TOTALES ---
+    # --- SECCIÓN DE TOTALES ---
     if y < 150:
         p.showPage()
         y = 750
 
-    y -= 30
-    p.setStrokeColorRGB(0.7, 0.7, 0.7)
-    p.line(100, y+15, 512, y+15)
+    y -= 20
+    p.setStrokeColorRGB(0.5, 0.5, 0.5)
+    p.line(350, y+10, 560, y+10) # Línea decorativa para el total
     
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, y, f"SUBTOTAL BRUTO: ${total_bruto:,.0f}")
+    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
+    pago_empleado = total_bruto * (porcentaje / 100)
+
+    p.setFont("Helvetica-Bold", 11)
+    p.setFillColorRGB(0, 0, 0)
+    p.drawString(350, y, f"SUBTOTAL:")
+    p.drawRightString(555, y, f"${total_bruto:,.0f}")
     
     y -= 20
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont("Helvetica-Bold", 13)
     p.setFillColorRGB(0, 0.4, 0.2) 
-    p.drawString(100, y, f"TOTAL A PAGAR ({int(porcentaje)}%): ${pago_empleado:,.0f}")
+    p.drawString(350, y, f"TOTAL PAGO ({int(porcentaje)}%):")
+    p.drawRightString(555, y, f"${pago_empleado:,.0f}")
 
     # --- PIE DE PÁGINA ---
-    p.setStrokeColorRGB(0.8, 0.8, 0.8)
-    p.line(100, 60, 512, 60)
     p.setFont("Helvetica-Oblique", 8)
     p.setFillColorRGB(0.5, 0.5, 0.5)
-    p.drawCentredString(width/2, 45, "AgendApp - Reporte de procesos de pago a empleados")
+    p.drawCentredString(width/2, 40, "AgendApp - Comprobante oficial de servicios")
 
     p.showPage()
     p.save()
