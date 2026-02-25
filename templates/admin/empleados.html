@@ -181,9 +181,9 @@
                             </button>
 
                             <button type="button" 
-                                    onclick="prepararEdicion('{{ emp.empl_id }}', '{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_cedula }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }})"
+                                    onclick="prepararEdicion('{{ emp.empl_id }}', '{{ emp.empl_nombre|replace("'", "") }}', '{{ emp.empl_cedula }}', '{{ emp.empl_telefono }}', '{{ emp.empl_porcentaje }}', '{{ emp.empl_cargo or 'General' }}', {{ emp.servicios|map(attribute='ser_id')|list|tojson }}, '{{ emp.empl_correo }}')"
                                     title="Editar Empleado"
-                                    class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500/70 hover:text-sky-400 hover:bg-sky-500/20 hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all border border-sky-500/20 flex items-center justify-center">
+                                    class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500/70 hover:text-sky-400 hover:bg-sky-500/20 transition-all border border-sky-500/20 flex items-center justify-center">
                                 <i class="fa-solid fa-pen-to-square text-lg"></i>
                             </button>
 
