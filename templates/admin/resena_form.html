@@ -45,33 +45,43 @@
         <span class="text-[9px] bg-white/10 px-2 py-0.5 rounded-full text-slate-400">{{ empleados|length }} disponibles</span>
     </div>
     
-    <div class="grid grid-cols-3 gap-2" id="contenedor-empleados">
-        {% for emp in empleados %}
-        <div class="relative emp-card {% if loop.index > 3 %}hidden{% endif %}">
-            <input type="radio" name="empl_id" id="emp_{{ emp.empl_id }}" value="{{ emp.empl_id }}" class="hidden emp-radio">
+<div class="grid grid-cols-3 gap-2" id="contenedor-empleados">
+    {% for emp in empleados %}
+        {# Lógica: Si hay un seleccionado, solo mostramos ese. Si no, mostramos todos los activos. #}
+        {% if not empl_seleccionado or emp.empl_id == empl_seleccionado %}
+        <div class="relative emp-card">
+            <input type="radio" name="empl_id" id="emp_{{ emp.empl_id }}" value="{{ emp.empl_id }}" 
+                   class="hidden emp-radio" 
+                   {% if emp.empl_id == empl_seleccionado or empleados|length == 1 %}checked{% endif %}>
             
-            <label for="emp_{{ emp.empl_id }}" class="flex flex-col items-center p-2 bg-white/5 border border-white/10 rounded-2xl cursor-pointer transition-all hover:bg-white/10 border-2 border-transparent h-full justify-center">
+            <label for="emp_{{ emp.empl_id }}" 
+                   class="flex flex-col items-center p-2 bg-white/5 border-2 rounded-2xl cursor-pointer transition-all h-full justify-center
+                   {% if emp.empl_id == empl_seleccionado %}border-sky-500 bg-sky-500/10 scale-105 shadow-lg shadow-sky-500/20{% else %}border-white/10{% endif %}">
                 
                 <div class="relative">
                     <img src="{{ url_for('admin.obtener_foto_empleado', emp_id=empresa.emp_id, cedula=emp.empl_cedula|int) }}" 
                          onerror="this.src='https://ui-avatars.com/api/?name={{ emp.empl_nombre }}&background=0ea5e9&color=fff'"
-                         class="w-12 h-12 rounded-full object-cover border-2 border-transparent shadow-md transition-transform">
+                         class="w-12 h-12 rounded-full object-cover border-2 {% if emp.empl_id == empl_seleccionado %}border-sky-500{% else %}border-transparent{% endif %}">
+                    
+                    {% if emp.empl_id == empl_seleccionado %}
+                    <div class="absolute -top-1 -right-1 bg-sky-500 text-white text-[8px] rounded-full w-4 h-4 flex items-center justify-center border-2 border-slate-900">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    {% endif %}
                 </div>
                 
                 <span class="text-[9px] font-bold text-white text-center line-clamp-1 mt-1 w-full">{{ emp.empl_nombre.split(' ')[0] }}</span>
             </label>
         </div>
-        {% endfor %}
-    </div>
+        {% endif %}
+    {% endfor %}
+</div>
 
-{% if empleados|length > 3 %}
-<button type="button" 
-        id="btn-toggle-empleados" 
-        onclick="toggleEmpleados()" 
+{# Ocultar el botón de 'Ver más' si solo hay un empleado visible #}
+{% if not empl_seleccionado and empleados|length > 3 %}
+<button type="button" id="btn-toggle-empleados" onclick="toggleEmpleados()" 
         class="w-full py-2.5 mt-2 text-[10px] font-black text-sky-500 bg-sky-500/5 rounded-xl border border-sky-500/20 hover:bg-sky-500/10 transition-all uppercase tracking-[0.15em] flex items-center justify-center gap-2">
-    
-    <span id="texto-boton">Ver {{ empleados|length - 3 }} más</span>
-    
+    <span id="texto-boton">Ver más</span>
     <i id="icono-boton" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
 </button>
 {% endif %}

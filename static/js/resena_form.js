@@ -61,38 +61,81 @@ function actualizarMensaje(valor) {
     }
 }
 
+// Al final de tu archivo resena_form.js añade esto:
+
+document.addEventListener('DOMContentLoaded', function() {
+    const radios = document.querySelectorAll('.emp-radio');
+    
+    radios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            // 1. Resetear todos los estilos de las tarjetas
+            document.querySelectorAll('.emp-card label').forEach(label => {
+                label.classList.remove('border-sky-500', 'bg-sky-500/10');
+                label.classList.add('border-white/10');
+            });
+            document.querySelectorAll('.emp-card img').forEach(img => {
+                img.classList.remove('border-sky-500');
+                img.classList.add('border-transparent');
+            });
+
+            // 2. Aplicar estilo solo al seleccionado
+            if (this.checked) {
+                const container = this.closest('.emp-card');
+                const label = container.querySelector('label');
+                const img = container.querySelector('img');
+                
+                label.classList.remove('border-white/10');
+                label.classList.add('border-sky-500', 'bg-sky-500/10');
+                img.classList.remove('border-transparent');
+                img.classList.add('border-sky-500');
+            }
+        });
+    });
+});
+
 /**
  * Expande o colapsa la lista de empleados
+ * Versión compatible con filtrado por ID de empleado
  */
 function toggleEmpleados() {
-    const cards = document.querySelectorAll('.emp-card');
     const texto = document.getElementById('texto-boton');
     const icono = document.getElementById('icono-boton');
     
+    // 1. Verificación de seguridad: si no existe el botón, no hacemos nada
+    if (!texto || !icono) return;
+
+    const cards = document.querySelectorAll('.emp-card');
+    
+    // Si hay 3 o menos tarjetas, no hay nada que colapsar
     if (cards.length <= 3) return;
 
-    const estaExpandido = !cards[3].classList.contains('hidden');
-    const cantidadRestante = cards.length - 3;
+    // 2. Verificamos el estado actual buscando la primera tarjeta que debería estar oculta
+    // Usamos el índice 3 (la cuarta tarjeta) como referencia
+    const estaCerrado = cards[3].classList.contains('hidden');
 
-    if (!estaExpandido) {
-        cards.forEach((card, index) => {
-            if (index >= 3) {
-                card.classList.remove('hidden');
-                card.classList.add('animate-fade-in');
-            }
+    if (estaCerrado) {
+        // ABRIR: Mostrar todos
+        cards.forEach(card => {
+            card.classList.remove('hidden');
+            card.classList.add('animate-fade-in'); // Por si tienes la animación de Tailwind
         });
         texto.innerText = "Ver menos";
         icono.classList.add('rotate-180');
     } else {
+        // CERRAR: Ocultar los que sobran, pero NUNCA el que está seleccionado
         cards.forEach((card, index) => {
             if (index >= 3) {
-                card.classList.add('hidden');
-                card.classList.remove('animate-fade-in');
+                const radio = card.querySelector('.emp-radio');
+                // Solo ocultamos si no es el que el usuario marcó
+                if (radio && !radio.checked) {
+                    card.classList.add('hidden');
+                }
             }
         });
-        texto.innerText = `Ver ${cantidadRestante} más`;
+        texto.innerText = "Ver más";
         icono.classList.remove('rotate-180');
         
+        // Scroll suave hacia arriba para no perder el contexto
         document.getElementById('contenedor-empleados').scrollIntoView({ 
             behavior: 'smooth', 
             block: 'nearest' 

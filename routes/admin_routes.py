@@ -3312,24 +3312,17 @@ def obtener_foto_empleado(emp_id, cedula):
 @admin_bp.route('/valorar/<emp_id>', methods=['GET', 'POST'])
 def dejar_resena(emp_id):
     empresa = Empresa.query.filter_by(emp_id=emp_id).first_or_404()
-    ruta_limpia = empresa.emp_ruta_recursos.replace('\\', '/') if empresa.emp_ruta_recursos else ''
+    # Capturamos el empl_id si viene en la URL (ej: /valorar/1?empl_id=5)
+    empl_seleccionado = request.args.get('empl_id', type=int)
 
     if request.method == 'POST':
-        # --- LÍNEA DE PRUEBA: Mira tu terminal cuando des click ---
-        print(f"DEBUG: Recibido POST para empresa {emp_id}")
-        print(f"DEBUG: Datos del Formulario: {request.form}")
-
         try:
             puntuacion = request.form.get('puntuacion')
-            
-            # Si no hay puntuación, redirigimos con aviso
             if not puntuacion:
-                print("DEBUG: Error - No se recibió puntuación")
-                flash('Por favor, selecciona una puntuación antes de enviar.', 'warning')
+                flash('Por favor, selecciona una puntuación.', 'warning')
                 return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
 
             empl_id_raw = request.form.get('empl_id')
-            # Validamos que el ID sea numérico para evitar errores de base de datos
             empl_id_final = int(empl_id_raw) if empl_id_raw and str(empl_id_raw).isdigit() else None
 
             nueva_resena = Resena(
@@ -3341,18 +3334,12 @@ def dejar_resena(emp_id):
                 res_fecha=datetime.now(),
                 res_visible=1
             )
-            
             db.session.add(nueva_resena)
             db.session.commit()
-            print("DEBUG: Reseña guardada exitosamente")
-            
-            # Asegúrate de que el archivo 'admin/gracias.html' exista
             return render_template('admin/gracias.html', empresa=empresa)
-
         except Exception as e:
             db.session.rollback()
-            print(f"DEBUG: ERROR CRÍTICO: {e}")
-            flash('Error interno al guardar. Inténtalo de nuevo.', 'danger')
+            flash('Error al guardar.', 'danger')
             return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
 
     # GET: Cargar empleados
@@ -3365,7 +3352,7 @@ def dejar_resena(emp_id):
     return render_template('admin/resena_form.html', 
                            empresa=empresa, 
                            empleados=empleados, 
-                           ruta_recursos=ruta_limpia)
+                           empl_seleccionado=empl_seleccionado) # <-- Enviado al HTML
 
 @admin_bp.route('/panel-resenas')
 @login_required
