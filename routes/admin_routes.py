@@ -229,12 +229,16 @@ def dashboard():
         .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc())\
         .limit(10).all()
 
-    # 4. CONSULTA DE VENTAS ÚLTIMOS 7 DÍAS (CON SELECT_FROM PARA EVITAR ERROR)
+    # 4. VENTAS ÚLTIMOS 7 DÍAS (CORREGIDO)
+# 4. VENTAS ÚLTIMOS 7 DÍAS (Cálculo por Porcentaje)
     ventas_data = db.session.query(
         func.date(Reserva.res_fecha).label('fecha'),
-        func.sum(Servicio.ser_precio).label('total')
+        func.sum(
+            Servicio.ser_precio - (Servicio.ser_precio * (func.coalesce(Reserva.res_descuento_valor, 0) / 100))
+        ).label('total')
     ).select_from(Reserva).join(
-        Servicio, Reserva.res_tipo_servicio == Servicio.ser_nombre
+        Servicio, 
+        (Reserva.res_tipo_servicio == Servicio.ser_nombre) & (Servicio.emp_id == emp_id_actual)
     ).filter(
         Reserva.emp_id == emp_id_actual,
         Reserva.res_fecha >= siete_dias_atras,
@@ -245,6 +249,7 @@ def dashboard():
     labels_ventas = []
     valores_ventas = []
     dict_ventas = {v.fecha.strftime('%Y-%m-%d'): float(v.total) for v in ventas_data}
+    ingresos_hoy = dict_ventas.get(hoy.strftime('%Y-%m-%d'), 0)
     
     # Días en español para que se vea 
     dias_es = {'Mon': 'Lun', 'Tue': 'Mar', 'Wed': 'Mié', 'Thu': 'Jue', 'Fri': 'Vie', 'Sat': 'Sáb', 'Sun': 'Dom'}
@@ -255,13 +260,15 @@ def dashboard():
         labels_ventas.append(dias_es.get(dia.strftime('%a'), dia.strftime('%a'))) 
         valores_ventas.append(dict_ventas.get(fecha_str, 0))
 
-    # 6. INGRESOS HOY E INGRESOS TOTALES (FUERA DEL BUCLE)
-    ingresos_hoy = dict_ventas.get(hoy.strftime('%Y-%m-%d'), 0)
 
+# 6. TOTAL HISTÓRICO (Cálculo por Porcentaje)
     total_historico = db.session.query(
-        func.sum(Servicio.ser_precio)
+        func.sum(
+            Servicio.ser_precio - (Servicio.ser_precio * (func.coalesce(Reserva.res_descuento_valor, 0) / 100))
+        )
     ).select_from(Reserva).join(
-        Servicio, Reserva.res_tipo_servicio == Servicio.ser_nombre
+        Servicio, 
+        (Reserva.res_tipo_servicio == Servicio.ser_nombre) & (Servicio.emp_id == emp_id_actual)
     ).filter(
         Reserva.emp_id == emp_id_actual,
         Reserva.res_estado.in_(['Realizada', 'Completada'])
