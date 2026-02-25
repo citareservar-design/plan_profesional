@@ -44,7 +44,7 @@ admin_bp = Blueprint('admin', __name__)
 # --- 8. CONFIGURACIÓN DE EMPRESA 
 # --- 9. PERMISOS Y GESTIÓN DE USUARIOS
 # ----10. GESTION DE COMISIONES 
-# ----11. HISTORIAL DE RESERVAS Y REPORTES
+#----11. HISTORIAL DE RESERVAS Y REPORTES
 #-----12. CÓDIGOS QR
 # ----13  configuracion panel de control
 #-----14  Gestion de plantillas de correo
@@ -3008,86 +3008,119 @@ def descargar_recibo(emp_id):
 
 
 
-## ---11. HISTORIAL DE RESERVAS Y REPORTES
+# ---11. HISTORIAL DE RESERVAS Y REPORTES
 
 @admin_bp.route('/historial')
 @login_required
 def gestion_historial():
+    import json
+    from datetime import datetime
+    from sqlalchemy import text
+    from models.models import db, Empleado, Servicio # Asegúrate de importar Servicio
+
     try:
-        from sqlalchemy import text
-        import json
-        from flask import request
-
-        # 1. Obtener el parámetro de búsqueda
+        # 1. Capturar parámetros de la URL
         busqueda = request.args.get('busqueda', '').strip()
-        
-        # 2. Consulta Base
-        query_base = """
-            SELECT 
-                r.res_id as id,
-                c.cli_nombre as cliente,
-                s.ser_nombre as servicio_nombre,
-                r.res_tipo_servicio as servicio_manual,
-                e.empl_nombre as empleado,
-                r.res_fecha as fecha,
-                r.res_hora as hora,
-                r.res_estado as estado
-            FROM RESERVAS r
-            LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
-            LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
-            LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
-            WHERE 1=1
-        """
-        
-        params = {}
-        if busqueda:
-            query_base += " AND (c.cli_nombre LIKE :val OR s.ser_nombre LIKE :val OR r.res_tipo_servicio LIKE :val)"
-            params['val'] = f"%{busqueda}%"
+        f_inicio = request.args.get('fecha_inicio', '').strip()
+        f_fin = request.args.get('fecha_fin', '').strip()
+        empleados_ids = request.args.getlist('empleados') 
+        servicios_ids = request.args.getlist('servicios') # Captura lista de servicios
+        estados = request.args.getlist('estados')
 
-        query_base += " ORDER BY r.res_fecha DESC, r.res_hora DESC LIMIT 100"
-        
-        # 3. Ejecutar
-        resultado_db = db.session.execute(text(query_base), params)
-        
+        # Detectar si hay una búsqueda activa
+        parametros_interes = [busqueda, f_inicio, f_fin, empleados_ids, servicios_ids, estados]
+        tiene_filtros = any(parametros_interes)
+
         resultados = []
-        for fila in resultado_db:
-            servicio_final = fila.servicio_manual if fila.servicio_manual else (fila.servicio_nombre or "Servicio General")
+        
+        # 2. Ejecutar consulta solo si hay filtros
+        if tiene_filtros:
+            query_base = """
+                SELECT 
+                    r.res_id as id, 
+                    COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
+                    COALESCE(s.ser_nombre, r.res_tipo_servicio, 'Servicio General') as servicio,
+                    COALESCE(e.empl_nombre, 'No asignado') as empleado, 
+                    r.res_fecha as fecha,
+                    r.res_hora as hora, 
+                    r.res_estado as estado
+                FROM RESERVAS r
+                LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
+                LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
+                LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
+                WHERE r.emp_id = :emp_id
+            """
             
-            # --- LÓGICA DE HORA 12H ---
-            hora_12 = ""
-            if fila.hora:
-                # Forzamos la conversión a formato 12 horas con AM/PM
-                # %I = Hora 01-12 | %M = Minutos | %p = AM/PM
-                try:
-                    # Si es un objeto de hora, lo formateamos directamente
-                    hora_12 = fila.hora.strftime('%I:%M %p')
-                except AttributeError:
-                    # Si llega como un string "14:30:00", lo convertimos primero
-                    from datetime import datetime
-                    t = datetime.strptime(str(fila.hora), '%H:%M:%S')
-                    hora_12 = t.strftime('%I:%M %p')
+            params = {'emp_id': current_user.emp_id}
 
-            resultados.append({
-                'id': fila.id,
-                'cliente': fila.cliente or "Sin Nombre",
-                'servicio': servicio_final,
-                'empleado': fila.empleado or "No asignado",
-                # FECHA PARA FILTRAR (Formato: 2026-01-24)
-                'fecha_iso': fila.fecha.strftime('%Y-%m-%d') if fila.fecha else "", 
-                # FECHA PARA MOSTRAR EN TABLA (Formato: 24/01/2026)
-                'fecha_display': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else "",
-                'hora': hora_12,
-                'estado': fila.estado
-            })
+            # Filtro de búsqueda (Solo Cliente ahora)
+            if busqueda:
+                query_base += " AND c.cli_nombre LIKE :val"
+                params['val'] = f"%{busqueda}%"
             
+            # Filtro por Servicios (IN)
+            if servicios_ids:
+                s_limpios = [sid for sid in servicios_ids if sid.isdigit()]
+                if s_limpios:
+                    query_base += f" AND s.ser_id IN ({','.join([':s'+str(i) for i in range(len(s_limpios))])})"
+                    for i, v in enumerate(s_limpios): params[f's{i}'] = v
+
+            # Filtros de Fecha
+            if f_inicio:
+                query_base += " AND r.res_fecha >= :f_ini"
+                params['f_ini'] = f_inicio
+            if f_fin:
+                query_base += " AND r.res_fecha <= :f_fin"
+                params['f_fin'] = f_fin
+                
+            # Filtro de Empleados (IN)
+            if empleados_ids:
+                e_limpios = [eid for eid in empleados_ids if eid.isdigit()]
+                if e_limpios:
+                    query_base += f" AND e.empl_id IN ({','.join([':e'+str(i) for i in range(len(e_limpios))])})"
+                    for i, v in enumerate(e_limpios): params[f'e{i}'] = v
+
+            # Filtro de Estados (IN)
+            if estados:
+                query_base += f" AND r.res_estado IN ({','.join([':st'+str(i) for i in range(len(estados))])})"
+                for i, v in enumerate(estados): params[f'st{i}'] = v
+
+            query_base += " ORDER BY r.res_fecha DESC, r.res_hora DESC LIMIT 500"
+            resultado_db = db.session.execute(text(query_base), params)
             
-        reservas_json = json.dumps(resultados, ensure_ascii=False)
-        return render_template('admin/historial.html', reservas_json=reservas_json, busqueda_actual=busqueda)
+            for fila in resultado_db:
+                fecha_f = fila.fecha.strftime('%d/%m/%Y') if hasattr(fila.fecha, 'strftime') else str(fila.fecha)
+                if hasattr(fila.hora, 'strftime'):
+                    hora_f = fila.hora.strftime('%I:%M %p')
+                else:
+                    try:
+                        hora_f = datetime.strptime(str(fila.hora), '%H:%M:%S').strftime('%I:%M %p')
+                    except: hora_f = str(fila.hora)
+
+                resultados.append({
+                    'id': fila.id, 'cliente': fila.cliente, 'servicio': fila.servicio,
+                    'empleado': fila.empleado, 'fecha_display': fecha_f, 'hora': hora_f,
+                    'estado': fila.estado or "Pendiente"
+                })
+
+        # Listas para cargar los checkboxes del modal
+        lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id).all()
+        lista_servicios = Servicio.query.filter_by(emp_id=current_user.emp_id).all()
+
+        return render_template('admin/historial.html', 
+                               reservas_json=json.dumps(resultados), 
+                               empleados=lista_empleados,
+                               servicios=lista_servicios,
+                               filtros_activos=tiene_filtros)
 
     except Exception as e:
-        print(f"Error en historial: {str(e)}")
-        # Importante: devolver algo para que no explote la página
-        return render_template('admin/historial.html', reservas_json="[]", busqueda_actual="")
+        print(f"---------- ERROR ----------\n{str(e)}\n---------------------------")
+        return f"Error: {str(e)}", 500
+    
+    
+    
+    
+    
     
     
 
