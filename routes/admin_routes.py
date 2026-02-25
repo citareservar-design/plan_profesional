@@ -495,7 +495,6 @@ def gestion_empleados():
 
 @admin_bp.route('/api/empleado/nuevo', methods=['POST'])
 def nuevo_empleados():
-    # 1. Imports internos necesarios
     import os
     from flask import request, jsonify
     from werkzeug.utils import secure_filename
@@ -503,14 +502,13 @@ def nuevo_empleados():
     from models.models import Empleado, Servicio, Empresa, db
 
     try:
-        # 2. Recolección de datos
+        # 1. Recolección de datos
         nombre = request.form.get('nombre', '').strip()
         cedula = str(request.form.get('cedula', '')).strip()
         correo = request.form.get('correo', '').strip()
         telefono = request.form.get('telefono', '').strip()
         cargo = request.form.get('cargo', 'Especialista').strip()
         
-        # Manejo seguro del porcentaje
         try:
             porcentaje = int(float(request.form.get('porcentaje', 40)))
         except:
@@ -519,31 +517,32 @@ def nuevo_empleados():
         servicios_ids = request.form.getlist('servicios[]') 
         foto_archivo = request.files.get('foto') 
 
-        # 3. Validaciones iniciales
+        # 2. Validaciones
         if not nombre or not cedula:
             return jsonify({'status': 'error', 'message': 'Nombre y Cédula son obligatorios'}), 400
 
         empresa = Empresa.query.get(current_user.emp_id)
-        if not empresa or not empresa.emp_ruta_recursos:
-            return jsonify({'status': 'error', 'message': 'La empresa no tiene ruta de recursos configurada'}), 400
-
-        # 4. Gestión de Archivos (Física solamente, ya que no hay columna en DB)
+        
+        # 3. Gestión de Archivo con RENOMBRADO
         if foto_archivo and foto_archivo.filename != '':
             ruta_raiz = empresa.emp_ruta_recursos.strip()
-            # Creamos la ruta: carpeta_empresa/empleados/cedula/
             carpeta_empleado = os.path.join(ruta_raiz, 'empleados', cedula)
             
             if not os.path.exists(carpeta_empleado):
                 os.makedirs(carpeta_empleado, exist_ok=True)
             
-            # Guardamos con un nombre fijo o el original
-            filename = secure_filename(foto_archivo.filename)
-            ruta_fisica_final = os.path.join(carpeta_empleado, filename)
+            # --- AQUÍ CAMBIAMOS EL NOMBRE ---
+            # Obtenemos la extensión original (ej: .jpg)
+            extension = os.path.splitext(foto_archivo.filename)[1].lower()
+            # El nuevo nombre será la cédula (ej: 1088830434.jpg)
+            nuevo_nombre_archivo = f"{cedula}{extension}"
             
+            ruta_fisica_final = os.path.join(carpeta_empleado, nuevo_nombre_archivo)
+            
+            # Si ya existía una foto, la sobrescribe
             foto_archivo.save(ruta_fisica_final)
-            # Nota: No guardamos la ruta en 'nuevo_emp' porque la columna no existe en tu DB
 
-        # 5. Guardado en Base de Datos (Sin el campo empl_foto)
+        # 4. Guardado en Base de Datos
         nuevo_emp = Empleado(
             empl_nombre=nombre,
             empl_cedula=cedula,
@@ -553,13 +552,12 @@ def nuevo_empleados():
             empl_cargo=cargo,
             emp_id=current_user.emp_id,
             empl_activo=True,
-            empl_mostrar_en_reserva=True # Según la estructura de tu tabla
+            empl_mostrar_en_reserva=True
         )
         
         db.session.add(nuevo_emp)
         db.session.flush() 
 
-        # 6. Vincular Servicios
         if servicios_ids:
             for s_id in servicios_ids:
                 servicio = Servicio.query.filter_by(ser_id=s_id, emp_id=current_user.emp_id).first()
@@ -567,12 +565,12 @@ def nuevo_empleados():
                     nuevo_emp.servicios.append(servicio)
 
         db.session.commit()
-        return jsonify({'status': 'success', 'message': '¡Empleado creado correctamente!'})
+        return jsonify({'status': 'success', 'message': '¡Empleado creado y foto renombrada!'})
     
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ERROR CRÍTICO EN NUEVO_EMPLEADO: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error en el servidor: {str(e)}'}), 500
+        print(f"❌ ERROR: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'Error: {str(e)}'}), 500
     
 
 
