@@ -175,6 +175,8 @@ class Resena(db.Model):
     res_comentario = db.Column(db.Text)
     res_fecha = db.Column(db.DateTime, default=datetime.now)
     res_visible = db.Column(db.Integer, default=1)
+    empleado = db.relationship('Empleado', backref='resenas')
+    res_id_reserva = db.Column(db.String(50), unique=True)
     
 class Servicio(db.Model):
     __tablename__ = 'SERVICIOS'

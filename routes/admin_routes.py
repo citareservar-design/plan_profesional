@@ -3312,22 +3312,42 @@ def obtener_foto_empleado(emp_id, cedula):
 @admin_bp.route('/valorar/<emp_id>', methods=['GET', 'POST'])
 def dejar_resena(emp_id):
     empresa = Empresa.query.filter_by(emp_id=emp_id).first_or_404()
-    # Capturamos el empl_id si viene en la URL (ej: /valorar/1?empl_id=5)
+    
+    # 1. CAPTURA DE DATOS
+    reserva_id_url = request.args.get('res_id')
     empl_seleccionado = request.args.get('empl_id', type=int)
+
+    # --- HUECO TAPADO: Si no hay res_id, prohibido pasar ---
+    if not reserva_id_url:
+        # Aquí puedes redirigir a donde quieras o mostrar un error
+        flash('Acceso no válido. Necesitas un código de reserva para comentar.', 'danger')
+        return "Acceso denegado: Se requiere un ID de reserva válido.", 403
+    
+    # Capturamos los datos de la URL (?empl_id=2&res_id=111)
+    empl_seleccionado = request.args.get('empl_id', type=int)
+    reserva_id_url = request.args.get('res_id') # <--- CORRECCIÓN: Capturamos el res_id de la URL
+
+    # 1. VALIDACIÓN: ¿Ya existe este reserva_id en la base de datos?
+    if reserva_id_url:
+        resena_previa = Resena.query.filter_by(res_id_reserva=reserva_id_url).first()
+        if resena_previa:
+            return render_template('admin/gracias.html', empresa=empresa, ya_calificado=True)
 
     if request.method == 'POST':
         try:
             puntuacion = request.form.get('puntuacion')
             if not puntuacion:
                 flash('Por favor, selecciona una puntuación.', 'warning')
-                return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
+                return redirect(url_for('admin.dejar_resena', emp_id=emp_id, res_id=reserva_id_url))
 
             empl_id_raw = request.form.get('empl_id')
             empl_id_final = int(empl_id_raw) if empl_id_raw and str(empl_id_raw).isdigit() else None
 
+            # 2. GUARDADO: Pasamos el reserva_id_url al modelo
             nueva_resena = Resena(
                 emp_id=emp_id,
                 empl_id=empl_id_final,
+                res_id_reserva=reserva_id_url, # <--- CORRECCIÓN: Ahora sí se guarda en la DB
                 res_cliente_nombre=request.form.get('nombre', 'Anónimo').strip() or 'Anónimo',
                 res_puntuacion=int(puntuacion),
                 res_comentario=request.form.get('comentario', '').strip(),
@@ -3337,10 +3357,12 @@ def dejar_resena(emp_id):
             db.session.add(nueva_resena)
             db.session.commit()
             return render_template('admin/gracias.html', empresa=empresa)
+            
         except Exception as e:
             db.session.rollback()
+            print(f"DEBUG ERROR: {e}")
             flash('Error al guardar.', 'danger')
-            return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
+            return redirect(url_for('admin.dejar_resena', emp_id=emp_id, res_id=reserva_id_url))
 
     # GET: Cargar empleados
     empleados = Empleado.query.filter_by(
@@ -3352,12 +3374,14 @@ def dejar_resena(emp_id):
     return render_template('admin/resena_form.html', 
                            empresa=empresa, 
                            empleados=empleados, 
-                           empl_seleccionado=empl_seleccionado) # <-- Enviado al HTML
+                           empl_seleccionado=empl_seleccionado)
+
 
 @admin_bp.route('/panel-resenas')
 @login_required
 def ver_resenas():
-    # Usamos join para traer los nombres de los empleados en una sola consulta (más rápido)
+    # El .joinedload trae los datos del empleado de una vez
     resenas = Resena.query.filter_by(emp_id=current_user.emp_id)\
+                          .options(db.joinedload(Resena.empleado))\
                           .order_by(Resena.res_fecha.desc()).all()
     return render_template('admin/resenas_listado.html', resenas=resenas)

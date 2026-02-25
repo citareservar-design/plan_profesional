@@ -10,18 +10,36 @@
 <body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-slate-900 rounded-[2.5rem] p-10 border border-white/5 shadow-2xl text-center">
         
-        <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-sky-500/10 rounded-full border border-sky-500/20 animate-bounce">
-            <i class="fa-solid fa-check text-4xl text-sky-500"></i>
-        </div>
+        {% if ya_calificado %}
+            <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-amber-500/10 rounded-full border border-amber-500/20">
+                <i class="fa-solid fa-clock-rotate-left text-4xl text-amber-500"></i>
+            </div>
 
-        <h1 class="text-3xl font-black italic uppercase leading-tight mb-4">¡Muchas Gracias!</h1>
-        
-        <p class="text-slate-400 text-sm leading-relaxed mb-8">
-            Tu opinión es muy importante para nosotros. Nos ayuda a que 
-            <span class="text-sky-500 font-bold">{{ empresa.emp_razon_social }}</span> 
-            siga mejorando cada día.
-        </p>
-        <p class="mt-8 text-[9px] text-slate-600 uppercase tracking-widest">Apoyado por AgendApp</p>
+            <h1 class="text-3xl font-black italic uppercase leading-tight mb-4 text-amber-500">¡Ya participaste!</h1>
+            
+            <p class="text-slate-400 text-sm leading-relaxed mb-8">
+                Esta reserva ya ha sido calificada anteriormente. 
+                <br><br>
+                Agradecemos mucho tu interés en compartir tu experiencia con 
+                <span class="text-sky-500 font-bold">{{ empresa.emp_razon_social }}</span> de nuevo.
+            </p>
+        {% else %}
+            <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-sky-500/10 rounded-full border border-sky-500/20 animate-bounce">
+                <i class="fa-solid fa-check text-4xl text-sky-500"></i>
+            </div>
+
+            <h1 class="text-3xl font-black italic uppercase leading-tight mb-4">¡Muchas Gracias!</h1>
+            
+            <p class="text-slate-400 text-sm leading-relaxed mb-8">
+                Tu opinión es muy importante para nosotros. Nos ayuda a que 
+                <span class="text-sky-500 font-bold">{{ empresa.emp_razon_social }}</span> 
+                siga mejorando cada día.
+            </p>
+        {% endif %}
+
+        <div class="pt-6 border-t border-white/5">
+            <p class="text-[9px] text-slate-600 uppercase tracking-widest">Apoyado por AgendApp</p>
+        </div>
     </div>
 </body>
 </html>

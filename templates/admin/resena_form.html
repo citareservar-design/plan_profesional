@@ -22,7 +22,7 @@
             <p class="text-sky-500 font-bold text-xs tracking-widest mt-1">{{ empresa.emp_razon_social }}</p>
         </div>
 
-        <form action="{{ url_for('admin.dejar_resena', emp_id=empresa.emp_id) }}" method="POST" class="space-y-6">
+        <form action="{{ url_for('admin.dejar_resena', emp_id=empresa.emp_id, res_id=request.args.get('res_id', '')) }}" method="POST" class="space-y-6">
             
 <div class="space-y-2 mb-6">
     <div class="flex flex-row-reverse justify-center gap-3 text-4xl">
