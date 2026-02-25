@@ -1690,6 +1690,9 @@ def generar_recibo_cliente(res_id):
     return response
 
 
+from sqlalchemy.orm import joinedload
+from sqlalchemy import text
+
 @admin_bp.route('/reservas')
 @login_required
 def reservas():
@@ -1698,42 +1701,61 @@ def reservas():
     ayer = hoy - timedelta(days=1)
     manana = hoy + timedelta(days=1)
     
-    # 1. Datos básicos
+    # 1. Filtro de fecha: Solo cargamos 3 días atrás y 30 días adelante por defecto
+    # Esto reduce drásticamente el procesamiento de los 2500 registros.
+    fecha_limite_inf = hoy - timedelta(days=3)
+    fecha_limite_sup = hoy + timedelta(days=30)
+
+    # 2. Datos básicos de la empresa
     datos_empresa = Empresa.query.get(current_user.emp_id)
-    lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
     
-    # 2. Carga de reservas
-    todas_las_reservas = Reserva.query.filter_by(emp_id=current_user.emp_id)\
-                        .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc()).all()
+    # 3. Cacheamos TODOS los servicios y empleados una sola vez
+    # Esto evita hacer miles de SELECT dentro del bucle for
+    servicios_raw = Servicio.query.filter_by(emp_id=current_user.emp_id).all()
+    dict_servicios = {s.ser_nombre: s for s in servicios_raw}
+    dict_servicios_id = {s.ser_id: s for s in servicios_raw}
+    
+    lista_empleados_todos = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
+
+    # 4. Mapeo de Empleados Aptos (Pre-cargado para evitar el problema N+1)
+    # Creamos un diccionario donde la clave es ser_id y el valor la lista de empleados que saben hacer ese servicio
+    mapa_aptos = {}
+    relaciones_es = db.session.execute(text("""
+        SELECT ser_id, empl_id FROM EMPLEADO_SERVICIOS 
+        WHERE empl_id IN (SELECT empl_id FROM EMPLEADOS WHERE emp_id = :emp_id)
+    """), {'emp_id': current_user.emp_id}).fetchall()
+
+    for row in relaciones_es:
+        s_id, e_id = row
+        if s_id not in mapa_aptos:
+            mapa_aptos[s_id] = []
+        # Buscamos el objeto empleado de nuestra lista ya cargada
+        emp_obj = next((emp for emp in lista_empleados_todos if emp.empl_id == e_id), None)
+        if emp_obj:
+            mapa_aptos[s_id].append(emp_obj)
+
+    # 5. Carga de reservas OPTIMIZADA con joinedload(Reserva.cliente)
+    # El index que creaste en (emp_id, res_fecha) hará que esto vuele.
+    todas_las_reservas = Reserva.query.options(joinedload(Reserva.cliente))\
+        .filter(Reserva.emp_id == current_user.emp_id)\
+        .filter(Reserva.res_fecha >= fecha_limite_inf)\
+        .filter(Reserva.res_fecha <= fecha_limite_sup)\
+        .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc()).all()
     
     reservas_data = []
     
     for r in todas_las_reservas:
         r.estado_normalizado = r.res_estado.lower().strip() if r.res_estado else ""
-        # --- 3. LÓGICA DE PRECIO Y DESCUENTO REAL (COLUMNA PROPIA) ---
-        servicio_obj = Servicio.query.filter_by(
-            ser_nombre=r.res_tipo_servicio, 
-            emp_id=current_user.emp_id
-        ).first()
         
-        # Convertimos Decimal a float para evitar errores de cálculo
-        if servicio_obj and servicio_obj.ser_precio:
-            precio_base = float(servicio_obj.ser_precio)
-        else:
-            precio_base = 0.0
-            
+        # Obtenemos servicio del diccionario en memoria (O(1) de velocidad)
+        servicio_obj = dict_servicios.get(r.res_tipo_servicio) or dict_servicios_id.get(r.ser_id)
+        
+        precio_base = float(servicio_obj.ser_precio) if servicio_obj else 0.0
         r.precio_estimado = precio_base 
         
-        # PRIORIDAD: Usamos la nueva columna res_descuento_valor que "congelamos" al reservar
-        # Si es None o 0, el float lo manejará correctamente.
         porcentaje_desc = float(r.res_descuento_valor or 0.0)
         
-        # Si por alguna razón la reserva no tiene descuento guardado (reservas viejas),
-        # revisamos si el cliente tiene uno activo ahora mismo.
-        if porcentaje_desc == 0 and r.cliente and r.cliente.cli_descuento:
-            porcentaje_desc = float(r.res_descuento_valor or 0.0) # Ahora vendrá un 20.0
-
-        # Cálculo de precio final
+        # Lógica de descuento
         if porcentaje_desc > 0:
             r.precio_final = precio_base * (1 - (porcentaje_desc / 100))
             r.tiene_descuento = True
@@ -1742,31 +1764,17 @@ def reservas():
             r.precio_final = precio_base
             r.tiene_descuento = False
 
-        # --- 4. ASIGNACIÓN DE EMPLEADOS APTOS ---
-        empleados_aptos = [] 
-        if servicio_obj:
-            from sqlalchemy import text
-            sql = text("""
-                SELECT e.* FROM EMPLEADOS e
-                JOIN EMPLEADO_SERVICIOS es ON e.empl_id = es.empl_id
-                WHERE es.ser_id = :s_id AND e.empl_activo = 1
-            """)
-            try:
-                # Usamos la conexión de base de datos para ejecutar el SQL crudo
-                empleados_aptos = db.session.query(Empleado).from_statement(sql).params(s_id=servicio_obj.ser_id).all()
-            except Exception as e:
-                print(f"Error SQL empleados: {e}")
-                empleados_aptos = lista_empleados
-        
-        if not empleados_aptos:
-            empleados_aptos = lista_empleados
+        # Asignación de empleados aptos desde el mapa pre-cargado
+        if servicio_obj and servicio_obj.ser_id in mapa_aptos:
+            empleados_aptos = mapa_aptos[servicio_obj.ser_id]
+        else:
+            empleados_aptos = lista_empleados_todos
 
-        # --- 5. EMPAQUETADO FINAL ---
         reservas_data.append((r, r.cliente, empleados_aptos))
 
     return render_template('admin/reservas.html', 
                            reservas_data=reservas_data, 
-                           lista_empleados=lista_empleados,
+                           lista_empleados=lista_empleados_todos,
                            hoy=hoy, ayer=ayer, manana=manana,
                            empresa=datos_empresa)
     

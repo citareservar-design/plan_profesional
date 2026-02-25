@@ -120,14 +120,6 @@
     <i class="fa-solid fa-calendar-check text-lg {% if 'reservas' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
     
     <span class="font-bold tracking-wide">Reservas</span>
-
-    {# --- PING MINIMALISTA (8px) --- #}
-    {% if pendientes_count > 0 %}
-    <span class="absolute top-4 right-5 flex h-2 w-2">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60"></span>
-        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
-    </span>
-    {% endif %}
 </a>
 {% endif %}
 
