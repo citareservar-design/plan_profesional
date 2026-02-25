@@ -186,41 +186,44 @@
 
 
 
-    {% if current_user.tiene_permiso('ver_historial') %}
-    <div x-data="{ open: {{ 'true' if request.endpoint == 'admin.gestion_historial' else 'false' }} }" class="w-full">
+{% if current_user.tiene_permiso('ver_historial') %}
+<div x-data="{ open: {{ 'true' if request.endpoint in ['admin.gestion_historial', 'admin.historial_comisiones'] else 'false' }} }" class="w-full">
+    
+    <button @click="open = !open" 
+        type="button"
+        class="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl transition-all group 
+        {% if request.endpoint in ['admin.gestion_historial', 'admin.historial_comisiones'] %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
         
-        <button @click="open = !open" 
-            type="button"
-            class="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl transition-all group 
-            {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">
-            
-            <div class="flex items-center gap-4">
-                <i class="fa-solid fa-clock-rotate-left text-lg {% if request.endpoint == 'admin.gestion_historial' %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
-                <span class="font-bold tracking-wide">Historial</span>
-            </div>
-
-            <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300" 
-            :class="open ? 'rotate-180' : ''"></i>
-        </button>
-
-        <div x-show="open" 
-            x-cloak
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 -translate-y-2"
-            x-transition:enter-end="opacity-100 translate-y-0"
-            class="mt-1 ml-4 border-l-2 border-white/10 pl-4 flex flex-col gap-1">
-            
-            <a href="{{ url_for('admin.gestion_historial') }}" 
-            class="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm
-            {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500/10 text-sky-400 font-bold {% else %} text-slate-400 hover:text-white hover:bg-white/5 {% endif %}">
-                
-                <div class="w-1.5 h-1.5 rounded-full {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500 {% else %} bg-slate-600 {% endif %}"></div>
-                Historial de Reservas
-            </a>
+        <div class="flex items-center gap-4">
+            <i class="fa-solid fa-clock-rotate-left text-lg {% if request.endpoint in ['admin.gestion_historial', 'admin.historial_comisiones'] %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+            <span class="font-bold tracking-wide">Historial</span>
         </div>
-    </div>
-    {% endif %}
 
+        <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300" 
+        :class="open ? 'rotate-180' : ''"></i>
+    </button>
+
+    <div x-show="open" 
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        class="mt-1 ml-4 border-l-2 border-white/10 pl-4 flex flex-col gap-1">
+        
+        <a href="{{ url_for('admin.gestion_historial') }}" 
+           class="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm
+           {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500/10 text-sky-400 font-bold {% else %} text-slate-400 hover:text-white hover:bg-white/5 {% endif %}">
+            <div class="w-1.5 h-1.5 rounded-full {% if request.endpoint == 'admin.gestion_historial' %} bg-sky-500 {% else %} bg-slate-600 {% endif %}"></div>
+            Historial de Reservas
+        </a>
+
+        <a href="{{ url_for('admin.historial_comisiones') }}" 
+           class="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm
+           {% if request.endpoint == 'admin.historial_comisiones' %} bg-sky-500/10 text-sky-400 font-bold {% else %} text-slate-400 hover:text-white hover:bg-white/5 {% endif %}">
+            <div class="w-1.5 h-1.5 rounded-full {% if request.endpoint == 'admin.historial_comisiones' %} bg-sky-500 {% else %} bg-slate-600 {% endif %}"></div>
+            Historial de Comisiones
+        </a>
+    </div>
+</div>
+{% endif %}
 
 
 

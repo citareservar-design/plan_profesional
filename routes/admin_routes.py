@@ -26,6 +26,8 @@ import threading
 
 
 
+
+
 # Definición del Blueprint para Administración
 print("✅ El archivo admin_routes.py se ha cargado correctamente")
 admin_bp = Blueprint('admin', __name__)
@@ -48,6 +50,7 @@ admin_bp = Blueprint('admin', __name__)
 #-----14  Gestion de plantillas de correo
 #-----15  funciones promoccionales y de fidelización
 #-----16  reseñas y testimonios
+#-----16  Historial de comisiones y pagos
 #
 
 
@@ -3385,3 +3388,53 @@ def ver_resenas():
                           .options(db.joinedload(Resena.empleado))\
                           .order_by(Resena.res_fecha.desc()).all()
     return render_template('admin/resenas_listado.html', resenas=resenas)
+
+
+
+
+#-----16  Historial de comisiones y pagos
+
+
+import os
+from pathlib import Path
+from flask import send_from_directory, render_template, current_app
+
+@admin_bp.route('/historial-comisiones')
+@login_required
+def historial_comisiones():
+    empresa = Empresa.query.get(current_user.emp_id)
+    
+    # Usamos Path para normalizar la ruta automáticamente
+    # Esto convierte C:\Apps\cocoanails en una ruta válida para el sistema actual
+    base_dir = Path(empresa.emp_ruta_recursos) / 'cierrecaja'
+    
+    registros = []
+    
+    # Verificamos si la ruta existe
+    if base_dir.exists():
+        # Listamos las carpetas de fecha
+        for carpeta_fecha in sorted(os.listdir(base_dir), reverse=True):
+            ruta_carpeta = base_dir / carpeta_fecha
+            
+            if ruta_carpeta.is_dir():
+                # Listamos los PDFs
+                for pdf in os.listdir(ruta_carpeta):
+                    if pdf.lower().endswith('.pdf'):
+                        registros.append({
+                            'fecha': carpeta_fecha,
+                            'archivo': pdf,
+                            # La ruta relativa debe usar barras normales para la URL
+                            'ruta_relativa': f"{carpeta_fecha}/{pdf}"
+                        })
+    
+    return render_template('admin/historial_comisiones.html', registros=registros)
+
+@admin_bp.route('/ver-pdf-comision/<path:filename>')
+@login_required
+def ver_pdf_comision(filename):
+    empresa = Empresa.query.get(current_user.emp_id)
+    # Importante: Path aquí también
+    directory = Path(empresa.emp_ruta_recursos) / 'cierrecaja'
+    
+    # send_from_directory se encarga de servir el archivo
+    return send_from_directory(str(directory), filename)
