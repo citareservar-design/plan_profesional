@@ -579,13 +579,16 @@ def editar_empleado(id):
     from models.models import Empleado, Servicio, Empresa, db
     import os
     from werkzeug.utils import secure_filename
+    from flask import jsonify, request
 
-    # Configuración de extensiones permitidas
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+    # 1. Configuración ESTRICTA a JPG
+    ALLOWED_EXTENSIONS = {'jpg', 'jpeg'}
+    
     def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    # 1. Buscar empleado y empresa
+    # 2. Buscar empleado y empresa
     emp = Empleado.query.filter_by(empl_id=id, emp_id=current_user.emp_id).first()
     if not emp:
         return jsonify({'status': 'error', 'message': 'Empleado no encontrado'}), 404
@@ -593,7 +596,7 @@ def editar_empleado(id):
     empresa = Empresa.query.get(current_user.emp_id)
     ruta_raiz = empresa.emp_ruta_recursos.strip()
 
-    # 2. Recibir datos
+    # 3. Recibir datos del formulario
     nombre = request.form.get('nombre', '').strip()
     cedula_nueva = str(request.form.get('cedula', '')).strip()
     correo = request.form.get('correo', '').strip()
@@ -610,34 +613,31 @@ def editar_empleado(id):
 
         if cedula_nueva != cedula_anterior:
             if os.path.exists(ruta_vieja):
-                # Si la carpeta nueva ya existe por error, la borramos o manejamos
                 os.rename(ruta_vieja, ruta_nueva)
-            
-        # Asegurar que la carpeta (nueva o vieja) existe
+        
+        # Asegurar que la carpeta de destino existe
         if not os.path.exists(ruta_nueva):
             os.makedirs(ruta_nueva, exist_ok=True)
 
-        # --- LÓGICA DE LA FOTO (Renombrar a la cédula) ---
+        # --- LÓGICA DE LA FOTO (Solo JPG) ---
         if foto_nueva and foto_nueva.filename != '':
-            # Validar extensión
             if not allowed_file(foto_nueva.filename):
-                return jsonify({'status': 'error', 'message': 'Solo se permiten imágenes (JPG, PNG, WEBP)'}), 400
+                return jsonify({
+                    'status': 'error', 
+                    'message': 'Formato no permitido. Solo se admiten imágenes JPG/JPEG.'
+                }), 400
 
-            # Extraer extensión original
-            extension = foto_nueva.filename.rsplit('.', 1)[1].lower()
-            
-            # Nombre final: "10888304344.png" (por ejemplo)
-            nombre_foto = f"{cedula_nueva}.{extension}"
+            # Forzamos la extensión a .jpg para estandarizar la base de datos
+            nombre_foto = f"{cedula_nueva}.jpg"
             ruta_destino = os.path.join(ruta_nueva, nombre_foto)
 
-            # Si ya existía una foto con otro nombre o extensión, podrías borrarla aquí
-            # Pero lo más limpio es guardar la nueva:
+            # Guardar físicamente el archivo
             foto_nueva.save(ruta_destino)
             
-            # Guardamos solo el nombre del archivo en la DB
+            # Actualizar nombre del archivo en el objeto empleado
             emp.empl_foto = nombre_foto
 
-        # 3. Actualizar datos básicos
+        # 4. Actualizar datos básicos
         emp.empl_nombre = nombre
         emp.empl_cedula = cedula_nueva
         emp.empl_correo = correo
@@ -645,7 +645,7 @@ def editar_empleado(id):
         emp.empl_porcentaje = request.form.get('porcentaje', 40)
         emp.empl_cargo = request.form.get('cargo', 'Especialista')
 
-        # 4. Actualizar Servicios
+        # 5. Actualizar relación de Servicios
         servicios_ids = request.form.getlist('servicios[]')
         emp.servicios = [] 
         if servicios_ids:

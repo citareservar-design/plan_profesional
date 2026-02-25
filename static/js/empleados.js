@@ -666,22 +666,21 @@ fetch('/admin/api/configuracion/visibilidad-empleados', {
 
 function previsualizarImagen(input) {
     const file = input.files[0];
-    const tiposPermitidos = ['image/jpg'];
+    // ÚNICAMENTE permitimos el tipo oficial de JPG
+    const tiposPermitidos = ['image/jpeg']; 
 
     if (file) {
-        // VALIDACIÓN DE FORMATO
         if (!tiposPermitidos.includes(file.type)) {
             Swal.fire({
                 icon: 'error',
-                title: 'Archivo no válido',
-                text: 'Solo se permiten imágenes JPG.',
+                title: 'Formato no permitido',
+                text: 'El sistema solo admite imágenes en formato JPG.',
                 confirmButtonColor: '#0ea5e9'
             });
-            input.value = ''; // Limpia el input
+            input.value = ''; 
             return false;
         }
 
-        // Si es válido, mostrar la miniatura
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('img_preview').src = e.target.result;
