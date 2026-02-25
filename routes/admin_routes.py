@@ -711,114 +711,83 @@ def cambiar_estado_empleado(id):
     
 
 
-@admin_bp.route('/empleados/importar', methods=['POST'])
+@admin_bp.route('/api/empleado/importar', methods=['POST'])
 @login_required
 def importar_empleados():
     from models.models import Empleado, Empresa, db
     import pandas as pd
 
     if 'archivo' not in request.files:
-        flash('No se seleccionó ningún archivo', 'error')
-        return redirect(url_for('admin.gestion_empleados'))
+        return jsonify({'status': 'error', 'message': 'No se seleccionó ningún archivo'}), 400
 
     file = request.files['archivo']
     
     try:
-        # 1. Leer el Excel
-        df = pd.read_excel(file)
+        # Usamos openpyxl como motor explícitamente
+        df = pd.read_excel(file, engine='openpyxl')
         df.columns = df.columns.str.strip()
 
-        # 2. Obtener límites de la empresa
         empresa = Empresa.query.get(current_user.emp_id)
-        limite_max = empresa.emp_max_usuarios if empresa.emp_max_usuarios else 1
-        
-        # --- CAMBIO CLAVE AQUÍ ---
-        # Contamos solo los empleados que están ACTIVOS actualmente
-        total_activos_ahora = Empleado.query.filter_by(
-            emp_id=current_user.emp_id, 
-            empl_activo=True
-        ).count()
+        limite_max = empresa.emp_max_usuarios or 100
 
-        # 3. Analizar el Excel antes de guardar
-        filas_nuevas_a_crear = 0
-        df_valido = []
-
-        for _, row in df.iterrows():
-            nombre = str(row.get('Nombre', '')).strip()
-            cedula = str(row.get('Identificación', '')).strip().replace(".0", "").replace("'", "")
-            
-            if nombre and nombre != 'nan' and cedula and cedula != 'nan':
-                # Buscamos si el empleado ya existe (sea activo o inactivo)
-                empleado_existente = Empleado.query.filter_by(
-                    empl_cedula=cedula, 
-                    emp_id=current_user.emp_id
-                ).first()
-                
-                # Si NO existe, sumará como un nuevo activo
-                if not empleado_existente:
-                    filas_nuevas_a_crear += 1
-                
-                # Si EXISTE pero está INACTIVO y el Excel lo va a reactivar (opcional)
-                # o si simplemente lo vamos a procesar:
-                df_valido.append(row)
-
-        # 4. VALIDACIÓN DE LÍMITE (Basado solo en activos)
-        if (total_activos_ahora + filas_nuevas_a_crear) > limite_max:
-            flash(f'Cupos agotados: Tu plan permite {limite_max} empleados activos. '
-                  f'Tienes {total_activos_ahora} activos y el archivo intenta crear {filas_nuevas_a_crear} nuevos.', 'error')
-            return redirect(url_for('admin.gestion_empleados'))
-
-        # 5. Procesar la importación
         nuevos = 0
         actualizados = 0
 
-        for row in df_valido:
+        for _, row in df.iterrows():
             nombre = str(row.get('Nombre', '')).strip()
             cargo = str(row.get('Cargo', 'General')).strip()
-            cedula = str(row.get('Identificación', '')).strip().replace(".0", "").replace("'", "")
+            correo = str(row.get('Correo', '')).strip() # <-- NUEVO: Leer correo
+            cedula = str(row.get('Identificación', '')).split('.')[0].strip()
             telefono = str(row.get('Teléfono', '')).strip()
             
+            # Validación de limpieza para evitar que cargue "nan" o basura
+            if nombre.lower() == 'nan' or not cedula or cedula.lower() == 'nan': 
+                continue
+
+            # Limpiar cargo basura (evita las iniciales "A", "Y" etc)
+            if len(cargo) <= 1:
+                cargo = "General"
+
             comision_raw = str(row.get('Comisión', '40')).replace('%', '').strip()
             try:
                 porcentaje = float(comision_raw)
-            except ValueError:
+            except:
                 porcentaje = 40.0
 
             empleado = Empleado.query.filter_by(empl_cedula=cedula, emp_id=current_user.emp_id).first()
 
             if empleado:
-                # Si ya existe, actualizamos sus datos
                 empleado.empl_nombre = nombre
                 empleado.empl_cargo = cargo
+                empleado.empl_correo = correo # <-- NUEVO: Actualizar correo
                 empleado.empl_telefono = telefono
                 empleado.empl_porcentaje = porcentaje
-                # Nota: Aquí decides si al importar quieres que los inactivos se vuelvan activos
-                # empleado.empl_activo = True 
                 actualizados += 1
             else:
-                # Si es nuevo, se crea como ACTIVO por defecto
-                nuevo_emp = Empleado(
-                    empl_nombre=nombre,
-                    empl_cedula=cedula,
-                    empl_telefono=telefono,
-                    empl_cargo=cargo,
-                    empl_porcentaje=porcentaje,
-                    empl_activo=True,
-                    emp_id=current_user.emp_id
-                )
-                db.session.add(nuevo_emp)
-                nuevos += 1
+                activos = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=True).count()
+                if activos < limite_max:
+                    nuevo_emp = Empleado(
+                        empl_nombre=nombre,
+                        empl_cedula=cedula,
+                        empl_correo=correo, # <-- NUEVO: Guardar correo
+                        empl_telefono=telefono,
+                        empl_cargo=cargo,
+                        empl_porcentaje=porcentaje,
+                        empl_activo=True,
+                        emp_id=current_user.emp_id
+                    )
+                    db.session.add(nuevo_emp)
+                    nuevos += 1
 
         db.session.commit()
-        flash(f'Importación exitosa: {nuevos} nuevos activos creados y {actualizados} actualizados.', 'success')
+        return jsonify({
+            'status': 'success', 
+            'message': f'Importación exitosa: {nuevos} creados, {actualizados} actualizados.'
+        })
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error detallado: {str(e)}")
-        flash(f'Error al procesar el archivo Excel.', 'error')
-
-    return redirect(url_for('admin.gestion_empleados'))
-
+        return jsonify({'status': 'error', 'message': f'Error al procesar: {str(e)}'}), 500
 
 
 

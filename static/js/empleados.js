@@ -308,72 +308,56 @@ function cerrarModalInactivos() {
 
 function exportarExcel() {
     try {
-        const filas = document.querySelectorAll('tbody tr');
-        
-        // Validamos que la tabla tenga datos (evitamos exportar la fila de "Sin resultados")
+        const filas = document.querySelectorAll('#tablaEmpleados tbody tr');
+        // Filtramos para no traer filas vacías o de error
         const filasValidas = Array.from(filas).filter(tr => tr.offsetParent !== null && tr.id !== 'sinResultados');
 
         if (filasValidas.length === 0) {
-            Swal.fire({
-                icon: 'info',
-                title: 'Sin datos',
-                text: ' No hay empleados visibles para exportar.'
-            });
+            Swal.fire('Sin datos', 'No hay empleados para exportar', 'info');
             return;
         }
 
         const datosExcel = filasValidas.map(tr => {
-            const celdas = tr.getElementsByTagName('td');
-            
-            // --- EXTRACCIÓN SEGURA DE NOMBRE Y CARGO ---
-            // Buscamos el nombre en el elemento con clase font-bold
-            const nombreElem = celdas[0].querySelector('.font-bold');
-            // Buscamos el cargo en el texto pequeño (ajusta la clase si usas otra para el cargo)
-            const cargoElem = celdas[0].querySelector('.text-slate-500') || celdas[0].querySelector('span:last-child');
-
-            const nombre = nombreElem ? nombreElem.innerText.trim() : celdas[0].innerText.split('\n')[0].trim();
-            const cargo = cargoElem ? cargoElem.innerText.trim() : "General";
-
-            // --- EXTRACCIÓN DE IDENTIFICACIÓN ---
-            // Quitamos comillas o caracteres extraños que puedan venir del front
-            const identificacion = celdas[1]?.innerText.trim().replace(/'/g, "") || "N/A";
-
+            // Extraemos los datos usando las clases específicas que pusimos en el HTML
             return {
-                "Nombre": nombre,
-                "Cargo": cargo,
-                "Identificación": identificacion,
-                "Teléfono": celdas[2]?.innerText.trim() || "N/A",
-                "Comisión": celdas[3]?.innerText.trim() || "0%",
+                "Nombre": tr.querySelector('.empl-nombre')?.innerText.trim() || "N/A",
+                "Cargo": tr.querySelector('.empl-cargo')?.innerText.trim() || "General",
+                "Correo": tr.querySelector('.empl-correo')?.innerText.trim() || "", // NUEVA COLUMNA
+                "Identificación": tr.querySelector('.empl-cedula')?.innerText.trim() || "0",
+                "Teléfono": tr.querySelector('.empl-telefono')?.innerText.trim() || "",
+                "Comisión": tr.innerText.includes('%') ? tr.querySelector('.text-center span')?.innerText.replace('%', '').trim() : "40",
                 "Servicios": tr.getAttribute('data-servicios') || "No asignados"
             };
         });
 
-        // --- GENERACIÓN DEL ARCHIVO ---
+        // Crear el libro de Excel
         const worksheet = XLSX.utils.json_to_sheet(datosExcel);
         
-        // Ajustamos el ancho de las columnas automáticamente para que se vea pro
-        const wscols = [
-            {wch: 30}, // Nombre
-            {wch: 20}, // Cargo
-            {wch: 20}, // Identificación
-            {wch: 15}, // Teléfono
-            {wch: 12}, // Comisión
-            {wch: 50}  // Servicios
+        // Ajustar anchos de columna para que el correo y nombre se vean bien
+        worksheet['!cols'] = [
+            { wch: 25 }, // Nombre
+            { wch: 15 }, // Cargo
+            { wch: 30 }, // Correo
+            { wch: 15 }, // Identificación
+            { wch: 15 }, // Teléfono
+            { wch: 10 }, // Comisión
+            { wch: 40 }  // Servicios
         ];
-        worksheet['!cols'] = wscols;
 
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Lista_Empleados");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Empleados");
         
-        // Descarga el archivo con la fecha de hoy
         const fecha = new Date().toISOString().slice(0, 10);
         XLSX.writeFile(workbook, `Reporte_Empleados_${fecha}.xlsx`);
 
     } catch (error) {
         console.error("Error al exportar:", error);
-        Swal.fire('Error', 'Hubo un fallo al generar el Excel. Revisa la consola.', 'error');
+        Swal.fire('Error', 'No se pudo generar el reporte', 'error');
     }
 }
+
+
+
 
 function importarExcel(input) {
     if (input.files && input.files[0]) {
@@ -431,124 +415,74 @@ function importarExcel(input) {
     }
 }
 
-// La asignamos a window para que SweetAlert la encuentre siempre
-window.descargarPlantillaEmpleados = function() {
-    try {
-        if (typeof XLSX === 'undefined') {
-            throw new Error('Librería XLSX no encontrada');
-        }
 
-        // 1. Estructura de la plantilla (IMPORTANTE: Nombres exactos para Python)
-        // Usamos los mismos nombres que genera tu función de Exportar
-        const data = [
-            ["Nombre", "Cargo", "Identificación", "Teléfono", "Comisión", "Servicios"],
-            ["Ejemplo Nombre", "Especialista", "1111222333", "3001234567", "40", "Corte, Barba"]
-        ];
-
-        // 2. Crear libro
-        const ws = XLSX.utils.aoa_to_sheet(data);
-
-        // Ajustar anchos de columna para que se vea bien en móvil/PC
-        ws['!cols'] = [
-            {wch: 25}, // Nombre
-            {wch: 15}, // Cargo
-            {wch: 15}, // Identificación
-            {wch: 15}, // Teléfono
-            {wch: 10}, // Comisión
-            {wch: 30}  // Servicios
-        ];
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
-
-        // 3. Generar descarga
-        XLSX.writeFile(wb, "Plantilla_Empleados.xlsx");
-
-        // Notificación de éxito
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'success',
-            title: 'Plantilla descargada',
-            showConfirmButton: false,
-            timer: 3000,
-            background: '#0f172a',
-            color: '#fff'
-        });
-    } catch (error) {
-        console.error(error);
-        Swal.fire({
-            title: 'Error',
-            text: 'Asegúrate de tener conexión a internet para cargar los recursos de Excel.',
-            icon: 'error',
-            background: '#0f172a',
-            color: '#fff'
-        });
-    }
-};
 
 function enviarFormularioImportar() {
     const input = document.getElementById('inputImportar');
-    if (input.files.length > 0) {
-        // Mostrar un aviso de carga (opcional pero pro)
-        Swal.fire({
-            title: 'Procesando archivo...',
-            text: 'Espere un momento mientras cargamos los datos',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-        // Enviar el formulario
-        document.getElementById('formImportar').submit();
-    }
-}
+    const archivo = input.files[0];
 
-function abrirAyudaEmpleados() {
+    if (!archivo) return;
+
+    // 1. Mostrar carga (Loading)
     Swal.fire({
-        title: '<span class="text-emerald-500 font-black">Guía de Personal</span>',
-        html: `
-            <div class="text-left space-y-4 text-slate-300 text-sm leading-relaxed">
-                
-                <div class="space-y-2">
-                    <p><strong class="text-white">👥 Gestión de Staff:</strong></p>
-                    <ul class="space-y-2 ml-2">
-                        <li class="flex items-start gap-2">
-                            <span class="text-sky-400 font-bold min-w-[85px]">📝 Cargos:</span> 
-                            <span>Define roles (Barbero, Manicurista, etc.) para organizar tu agenda.</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="text-emerald-400 font-bold min-w-[85px]">💰 Comisión:</span> 
-                            <span>El % configurado se aplicará automáticamente al calcular los pagos.</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <hr class="border-white/5">
-
-                <div class="p-4 bg-sky-500/5 rounded-2xl border border-sky-500/10">
-                    <p class="mb-1"><strong class="text-sky-500 italic">📥 Importación Masiva:</strong></p>
-                    <p class="text-[11px] mb-3 text-slate-400">El sistema usa la <b>Identificación</b> como llave. Si ya existe, se actualizarán los datos automáticamente.</p>
-                    
-                    <button type="button" onclick="descargarPlantillaEmpleados()" class="w-full flex items-center justify-center gap-2 bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 py-2.5 rounded-xl transition-all font-bold text-xs border border-sky-500/20">
-                        <i class="fa-solid fa-download"></i> Descargar Plantilla Excel
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 gap-3">
-                    <p><strong class="text-emerald-500">📊 Reportes:</strong> Genera un Excel con el listado de personal y sus porcentajes de ganancia.</p>
-                </div>
-
-            </div>
-        `,
-        showConfirmButton: true,
-        confirmButtonText: '¡Entendido!',
-        confirmButtonColor: '#10b981',
+        title: 'Procesando Excel...',
+        text: 'Estamos cargando tu equipo, por favor espera.',
+        allowOutsideClick: false,
         background: '#0f172a',
-        color: '#ffffff',
-        customClass: {
-            popup: 'rounded-[2rem] border border-white/10 shadow-2xl'
+        color: '#fff',
+        didOpen: () => {
+            Swal.showLoading();
         }
+    });
+
+    // 2. Preparar los datos
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+
+    // 3. Enviar al servidor
+    fetch('/admin/api/empleado/importar', { // Verifica que esta ruta sea la misma de tu @admin_bp
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // MENSAJE DE ÉXITO (Aquí es donde sale lo de "4 creados, 2 actualizados")
+            Swal.fire({
+                icon: 'success',
+                title: '¡Tarea Completada!',
+                text: data.message, // Aquí viene el mensaje de Python
+                background: '#0f172a',
+                color: '#fff',
+                confirmButtonColor: '#0ea5e9',
+                confirmButtonText: 'Genial'
+            }).then(() => {
+                window.location.reload(); // Recargamos para ver los nuevos empleados
+            });
+        } else {
+            // MENSAJE DE ERROR DEL SERVIDOR
+            Swal.fire({
+                icon: 'error',
+                title: 'Hubo un problema',
+                text: data.message,
+                background: '#0f172a',
+                color: '#fff',
+                confirmButtonColor: '#f43f5e'
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de red',
+            text: 'No se pudo conectar con el servidor.',
+            background: '#0f172a',
+            color: '#fff'
+        });
+    })
+    .finally(() => {
+        input.value = ''; // Limpiamos el input
     });
 }
 
