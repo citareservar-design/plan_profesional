@@ -3122,7 +3122,6 @@ def gestion_historial():
     
     
     
-    
 
 #---12. CÓDIGOS QR
     
