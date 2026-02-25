@@ -5,6 +5,13 @@ from datetime import date, datetime, timedelta
 
 db = SQLAlchemy()
 
+# 1. TABLA INTERMEDIA (Debe ir primero)
+USUARIO_PERMISOS = db.Table('USUARIO_PERMISOS',
+    db.Column('usu_id', db.Integer, db.ForeignKey('USUARIOS.usu_id'), primary_key=True),
+    db.Column('perm_id', db.Integer, db.ForeignKey('PERMISOS.perm_id'), primary_key=True),
+    extend_existing=True
+)
+
 class Empresa(db.Model):
     __tablename__ = 'EMPRESAS'
     emp_id = db.Column(db.String(2), primary_key=True)
@@ -28,6 +35,17 @@ class Empresa(db.Model):
     # Relaciones
     clientes = db.relationship('Cliente', backref='empresa', lazy=True)
     reservas = db.relationship('Reserva', backref='empresa', lazy=True) # Paréntesis cerrado aquí
+    
+    
+    
+
+# 2. CLASE PERMISO (Debe existir para poder importarse)
+class Permiso(db.Model):
+    __tablename__ = 'PERMISOS'
+    __table_args__ = {'extend_existing': True}
+    perm_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    perm_nombre = db.Column(db.String(50), unique=True, nullable=False) # Ej: 'ver_clientes'
+    perm_descripcion = db.Column(db.String(100))
     
     
     
@@ -61,53 +79,22 @@ class Empleado(db.Model):
         return f'<Empleado {self.empl_nombre}>'
     
     
-class Usuario(db.Model, UserMixin):
-    __tablename__ = 'USUARIOS'
-    __table_args__ = {'extend_existing': True} 
+
+
+class Servicio(db.Model):
+    __tablename__ = 'SERVICIOS'
+
+    ser_id = db.Column(db.Integer, primary_key=True)
+    ser_nombre = db.Column(db.String(100), nullable=False)
+    ser_precio = db.Column(db.Numeric(10,2), nullable=False)
+    ser_estado = db.Column(db.Integer, default=1)
+    emp_id = db.Column(db.String(2))
+    ser_tiempo = db.Column(db.Integer, default=60)
+    mostrar_precio = db.Column(db.Boolean, default=True)
+    mostrar_tiempo = db.Column(db.Boolean, default=True)
     
-    usu_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    # Este será el ID de acceso (ej: 'admin24')
-    usu_login = db.Column(db.String(50), unique=True, nullable=False) 
-    # Este será el nombre de la persona (ej: 'Juan Pérez')
-    usu_nombre = db.Column(db.String(100), nullable=False) 
-    usu_password = db.Column(db.String(255), nullable=False)
-    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
     
-    usu_is_admin = db.Column(db.Boolean, default=False)
-    PERMISOS = db.relationship('Permiso', secondary='USUARIO_PERMISOS', backref='USUARIOS')
-
-    def set_password(self, password):
-        self.usu_password = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.usu_password, password)
-
-    # Método para verificar PERMISOS en el HTML y Decoradores
-    def tiene_permiso(self, nombre_permiso):
-        if self.usu_is_admin:
-            return True
-        return any(p.perm_nombre == nombre_permiso for p in self.PERMISOS)
-    # Añade esto al final de tu clase USUARIO
-    def get_id(self):
-        return str(self.usu_id)
-
-
-# --- NUEVAS TABLAS PARA LA FLEXIBILIDAD ---
-
-class Permiso(db.Model):
-    __tablename__ = 'PERMISOS'
-    perm_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    perm_nombre = db.Column(db.String(50), unique=True, nullable=False) # Ej: 'ver_clientes'
-    perm_descripcion = db.Column(db.String(100))
-
-# Tabla intermedia para la relación Muchos a Muchos
-USUARIO_PERMISOS = db.Table('USUARIO_PERMISOS',
-    db.Column('usu_id', db.Integer, db.ForeignKey('USUARIOS.usu_id'), primary_key=True),
-    db.Column('perm_id', db.Integer, db.ForeignKey('PERMISOS.perm_id'), primary_key=True),
-    extend_existing=True
-)
     
-
 class Cliente(db.Model):
     __tablename__ = 'CLIENTES'
     
@@ -136,6 +123,45 @@ class Cliente(db.Model):
 
     def __repr__(self):
         return f'<Cliente {self.cli_nombre}>'
+    
+    
+  
+    
+
+# 3. CLASE USUARIO
+class Usuario(db.Model, UserMixin):
+    __tablename__ = 'USUARIOS'
+    __table_args__ = {'extend_existing': True} 
+    
+    usu_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    usu_login = db.Column(db.String(50), unique=True, nullable=False) 
+    usu_nombre = db.Column(db.String(100), nullable=False) 
+    usu_password = db.Column(db.String(255), nullable=False)
+    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
+    
+    usu_is_admin = db.Column(db.Boolean, default=False)
+    
+    # Relación Muchos a Muchos
+    PERMISOS = db.relationship('Permiso', secondary=USUARIO_PERMISOS, backref='USUARIOS')
+
+    def set_password(self, password):
+        self.usu_password = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.usu_password, password)
+
+    def tiene_permiso(self, nombre_permiso):
+        if self.usu_is_admin:
+            return True
+        if not self.PERMISOS:
+            return False
+        return any(p.perm_nombre.lower() == nombre_permiso.lower() for p in self.PERMISOS)
+
+    def get_id(self):
+        return str(self.usu_id)
+    
+    
+    
     
 
 class Reserva(db.Model):
@@ -178,17 +204,6 @@ class Resena(db.Model):
     empleado = db.relationship('Empleado', backref='resenas')
     res_id_reserva = db.Column(db.String(50), unique=True)
     
-class Servicio(db.Model):
-    __tablename__ = 'SERVICIOS'
-
-    ser_id = db.Column(db.Integer, primary_key=True)
-    ser_nombre = db.Column(db.String(100), nullable=False)
-    ser_precio = db.Column(db.Numeric(10,2), nullable=False)
-    ser_estado = db.Column(db.Integer, default=1)
-    emp_id = db.Column(db.String(2))
-    ser_tiempo = db.Column(db.Integer, default=60)
-    mostrar_precio = db.Column(db.Boolean, default=True)
-    mostrar_tiempo = db.Column(db.Boolean, default=True)
 
     
     

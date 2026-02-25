@@ -134,7 +134,7 @@
                     {% endif %}
 
 
-{% if current_user.tiene_permiso('ver_promocion') %}
+{% if current_user.tiene_permiso('ver_Promocion') %}
 <a href="{{ url_for('admin.fidelizacion_promociones') }}" 
     class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
     {% if request.endpoint == 'admin.fidelizacion_promociones' %} 
@@ -158,7 +158,7 @@
 
 
 
-{% if current_user.tiene_permiso('ver_resenas') %}
+{% if current_user.tiene_permiso('ver_resena') %}
 <a href="{{ url_for('admin.ver_resenas') }}" 
     class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
     {% if 'ver_resenas' in request.endpoint %} 
@@ -220,7 +220,7 @@
 
 
 
-    {% if current_user.tiene_permiso('ver_configuracion') %}
+    {% if current_user.tiene_permiso('ver_Configuracion') %}
     <a href="{{ url_for('admin.panel_configuracion') }}" 
         class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
         {% if request.endpoint == 'admin.panel_configuracion' %} bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 {% else %} text-slate-400 hover:bg-white/5 hover:text-white border border-transparent {% endif %}">

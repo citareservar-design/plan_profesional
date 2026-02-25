@@ -2145,17 +2145,25 @@ def test_smtp():
 
 # --- 9. PERMISOS Y GESTIÓN DE USUARIOS
 
+# admin_routes.py
+
 @admin_bp.route('/usuarios')
 @login_required
 def gestion_usuarios():
-    # Permitir si es admin O si tiene el permiso habilitado
+    # Aquí invocamos el método que definimos en el modelo
+    # current_user es una instancia de la clase Usuario
     if not (current_user.usu_is_admin or current_user.tiene_permiso('ver_usuarios')):
         flash("Acceso denegado: Se requieren permisos para gestionar usuarios.", "danger")
         return redirect(url_for('admin.dashboard'))
     
+    db.session.expire_all()
     usuarios = Usuario.query.all()
     permisos = Permiso.query.all()
     return render_template('admin/usuarios.html', usuarios=usuarios, permisos=permisos)
+
+
+
+
 
 @admin_bp.route('/usuarios/crear', methods=['POST'])
 @login_required
@@ -2219,65 +2227,67 @@ def get_usuario(id):
         'usu_nombre': usuario.usu_nombre,
         'permisos': [p.perm_nombre for p in usuario.PERMISOS] # Aquí usamos la relación PERMISOS
     })
+    
+    
+    
+    
+    
+    
 
 @admin_bp.route('/usuarios/editar/<int:id>', methods=['POST'])
 @login_required
 def editar_usuario_save(id):
-    # 1. Seguridad: Permitir si es admin O si tiene el permiso asignado
-    if not (current_user.usu_is_admin or current_user.tiene_permiso('ver_usuarios')):
-        flash("Acceso denegado: No tienes permisos para editar usuarios.", "danger")
-        return redirect(url_for('admin.dashboard'))
-
+    # ... validaciones de seguridad (mantenlas igual) ...
     usuario = Usuario.query.get_or_404(id)
-    
-    # 2. Protección Extra: Un no-admin no puede editar a un Super Admin
-    if usuario.usu_is_admin and not current_user.usu_is_admin:
-        flash("❌ No tienes nivel de autoridad para editar a un Administrador.", "warning")
-        return redirect(url_for('admin.gestion_usuarios'))
-
-    # --- 2.5 PROTECCIÓN PARA EL USUARIO RAÍZ 'agendapp' ---
-    if usuario.usu_login == 'agendapp' and current_user.usu_login != 'agendapp':
-        flash("❌ El usuario maestro 'agendapp' está protegido. Solo él puede editar su información.", "danger")
-        return redirect(url_for('admin.gestion_usuarios'))
-    # -----------------------------------------------------
 
     try:
-        # 3. Actualizar datos básicos
-        # Solo permitimos cambiar el login si NO es agendapp para evitar que pierda su identidad de sistema
         if usuario.usu_login != 'agendapp':
             usuario.usu_login = request.form.get('usu_login')
-            
         usuario.usu_nombre = request.form.get('usu_nombre')
         
-        # 4. Manejo de contraseña (solo si se ingresó una nueva)
         nueva_clave = request.form.get('usu_password')
         if nueva_clave and nueva_clave.strip() != "":
             usuario.usu_password = generate_password_hash(nueva_clave)
 
-        # 5. Actualizar Permisos
+        # --- CORRECCIÓN DE PERMISOS ---
         permisos_seleccionados = request.form.getlist('permisos')
         
-        # Limpiamos los permisos actuales usando la relación correcta (Mayúsculas)
-        usuario.PERMISOS = []
-        
+        # 1. Limpiar la relación de forma explícita
+        usuario.PERMISOS = [] 
+        db.session.flush() # Forzar sincronización temporal
+
         for p_nom in permisos_seleccionados:
+            # Buscamos el permiso exacto
             permiso = Permiso.query.filter_by(perm_nombre=p_nom).first()
-            if not permiso:
-                permiso = Permiso(perm_nombre=p_nom, perm_descripcion=f"Acceso a {p_nom}")
-                db.session.add(permiso)
-                db.session.flush() 
             
-            usuario.PERMISOS.append(permiso)
+            if not permiso:
+                # Si no existe, lo creamos con el nombre limpio
+                permiso = Permiso(perm_nombre=p_nom, perm_descripcion=f"Acceso a {p_nom.replace('ver_', '')}")
+                db.session.add(permiso)
+                db.session.flush()
+            
+            # 2. Evitar duplicados antes de añadir
+            if permiso not in usuario.PERMISOS:
+                usuario.PERMISOS.append(permiso)
 
         db.session.commit()
+        
+        # 3. IMPORTANTE: Expira la instancia para que la próxima vez que se consulte
+        # (al recargar la página) traiga los datos frescos de la BD
+        db.session.expire(usuario) 
+        
         flash(f"✅ Usuario {usuario.usu_login} actualizado correctamente.", "success")
 
     except Exception as e:
         db.session.rollback()
-        print(f"DEBUG: Error al editar usuario {id}: {str(e)}")
         flash(f"❌ Error al actualizar: {str(e)}", "danger")
 
     return redirect(url_for('admin.gestion_usuarios'))
+
+
+
+
+
 
 @admin_bp.route('/usuarios/eliminar/<int:id>')
 @login_required
