@@ -2050,23 +2050,23 @@ def configurar_empresa():
 
     if request.method == 'POST':
         try:
-            # Estos nombres deben coincidir exactamente con el 'name' en el HTML
+            # Datos básicos
             empresa.emp_razon_social = request.form.get('nombre')
             empresa.emp_nit = request.form.get('nit')
             empresa.emp_direccion = request.form.get('direccion')
             empresa.emp_email = request.form.get('email')
-            
-            # --- NUEVA LÍNEA PARA EL TELÉFONO ---
-            # Guardamos el teléfono que viene del input name="telefono"
             empresa.emp_telefono = request.form.get('telefono')
-            # ------------------------------------
+            
+            # --- NUEVA LÍNEA PARA RUTA DE RECURSOS ---
+            empresa.emp_ruta_recursos = request.form.get('ruta_recursos').strip() if request.form.get('ruta_recursos') else None
+            # ----------------------------------------
 
-            # SMTP (Aseguramos que no tengan espacios accidentales con .strip())
+            # SMTP
             empresa.emp_servidor_smtp = request.form.get('smtp_servidor').strip() if request.form.get('smtp_servidor') else None
             empresa.emp_puerto_smtp = request.form.get('smtp_puerto').strip() if request.form.get('smtp_puerto') else None
             empresa.emp_cuenta_smtp = request.form.get('smtp_cuenta').strip() if request.form.get('smtp_cuenta') else None
 
-            # Licencia (Con la validación de clave que querías)
+            # Licencia
             clave = request.form.get('clave_autorizacion')
             if clave == "agendapp2026*":
                 empresa.emp_max_usuarios = request.form.get('max_usuarios')

@@ -51,6 +51,21 @@
                    placeholder="Ej: 573185861444"
                    class="w-full bg-slate-900/60 border border-white/5 rounded-2xl px-5 py-3 text-white outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 transition-all placeholder:text-slate-600">
         </div>
+
+            <div class="space-y-2 group">
+                <label class="block text-slate-400 text-sm font-medium ml-1 group-focus-within:text-sky-400 transition-colors">
+                    Ruta de Recursos
+                </label>
+                <div class="relative">
+                    <i class="fa-solid fa-folder-open absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sky-500 transition-colors"></i>
+                    
+                    <input type="text" 
+                        name="ruta_recursos" 
+                        value="{{ empresa.emp_ruta_recursos or '' }}" 
+                        placeholder="Ej: https://cdn.tusistema.com/recursos"
+                        class="w-full bg-slate-900/60 border border-white/5 rounded-2xl pl-12 pr-5 py-3 text-white outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 transition-all placeholder:text-slate-600">
+                </div>
+            </div>
     </div>
 </div>
 
