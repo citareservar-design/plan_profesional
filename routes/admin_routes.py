@@ -2996,7 +2996,7 @@ def gestion_historial():
     import json
     from datetime import datetime
     from sqlalchemy import text
-    from models.models import db, Empleado, Servicio # Asegúrate de importar Servicio
+    from models.models import db, Empleado, Servicio
 
     try:
         # 1. Capturar parámetros de la URL
@@ -3004,7 +3004,7 @@ def gestion_historial():
         f_inicio = request.args.get('fecha_inicio', '').strip()
         f_fin = request.args.get('fecha_fin', '').strip()
         empleados_ids = request.args.getlist('empleados') 
-        servicios_ids = request.args.getlist('servicios') # Captura lista de servicios
+        servicios_ids = request.args.getlist('servicios') 
         estados = request.args.getlist('estados')
 
         # Detectar si hay una búsqueda activa
@@ -3015,11 +3015,12 @@ def gestion_historial():
         
         # 2. Ejecutar consulta solo si hay filtros
         if tiene_filtros:
+            # Seleccionamos r.res_tipo_servicio directamente para evitar problemas con ser_id NULL
             query_base = """
                 SELECT 
                     r.res_id as id, 
                     COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
-                    COALESCE(s.ser_nombre, r.res_tipo_servicio, 'Servicio General') as servicio,
+                    COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
                     COALESCE(e.empl_nombre, 'No asignado') as empleado, 
                     r.res_fecha as fecha,
                     r.res_hora as hora, 
@@ -3033,17 +3034,26 @@ def gestion_historial():
             
             params = {'emp_id': current_user.emp_id}
 
-            # Filtro de búsqueda (Solo Cliente ahora)
+            # Filtro de búsqueda (Nombre Cliente)
             if busqueda:
                 query_base += " AND c.cli_nombre LIKE :val"
                 params['val'] = f"%{busqueda}%"
             
-            # Filtro por Servicios (IN)
+            # --- CORRECCIÓN CLAVE: Filtro por Nombres de Servicios ---
             if servicios_ids:
-                s_limpios = [sid for sid in servicios_ids if sid.isdigit()]
-                if s_limpios:
-                    query_base += f" AND s.ser_id IN ({','.join([':s'+str(i) for i in range(len(s_limpios))])})"
-                    for i, v in enumerate(s_limpios): params[f's{i}'] = v
+                # 1. Buscamos los nombres de los servicios que corresponden a los IDs seleccionados
+                servicios_obj = Servicio.query.filter(
+                    Servicio.ser_id.in_(servicios_ids),
+                    Servicio.emp_id == current_user.emp_id
+                ).all()
+                nombres_servicios = [ser.ser_nombre for ser in servicios_obj]
+
+                if nombres_servicios:
+                    # 2. Filtramos la tabla RESERVAS por la columna de texto res_tipo_servicio
+                    placeholder_s = ", ".join([f":s{i}" for i in range(len(nombres_servicios))])
+                    query_base += f" AND r.res_tipo_servicio IN ({placeholder_s})"
+                    for i, nombre in enumerate(nombres_servicios):
+                        params[f's{i}'] = nombre
 
             # Filtros de Fecha
             if f_inicio:
@@ -3053,37 +3063,47 @@ def gestion_historial():
                 query_base += " AND r.res_fecha <= :f_fin"
                 params['f_fin'] = f_fin
                 
-            # Filtro de Empleados (IN)
+            # Filtro de Empleados (IDs)
             if empleados_ids:
-                e_limpios = [eid for eid in empleados_ids if eid.isdigit()]
+                e_limpios = [eid for eid in empleados_ids if eid.strip()]
                 if e_limpios:
-                    query_base += f" AND e.empl_id IN ({','.join([':e'+str(i) for i in range(len(e_limpios))])})"
+                    placeholder_e = ", ".join([f":e{i}" for i in range(len(e_limpios))])
+                    query_base += f" AND r.empl_id IN ({placeholder_e})"
                     for i, v in enumerate(e_limpios): params[f'e{i}'] = v
 
-            # Filtro de Estados (IN)
+            # Filtro de Estados
             if estados:
-                query_base += f" AND r.res_estado IN ({','.join([':st'+str(i) for i in range(len(estados))])})"
+                placeholder_st = ", ".join([f":st{i}" for i in range(len(estados))])
+                query_base += f" AND r.res_estado IN ({placeholder_st})"
                 for i, v in enumerate(estados): params[f'st{i}'] = v
 
             query_base += " ORDER BY r.res_fecha DESC, r.res_hora DESC LIMIT 500"
             resultado_db = db.session.execute(text(query_base), params)
             
             for fila in resultado_db:
+                # Formatear Fecha
                 fecha_f = fila.fecha.strftime('%d/%m/%Y') if hasattr(fila.fecha, 'strftime') else str(fila.fecha)
+                
+                # Formatear Hora
                 if hasattr(fila.hora, 'strftime'):
                     hora_f = fila.hora.strftime('%I:%M %p')
                 else:
                     try:
                         hora_f = datetime.strptime(str(fila.hora), '%H:%M:%S').strftime('%I:%M %p')
-                    except: hora_f = str(fila.hora)
+                    except: 
+                        hora_f = str(fila.hora)
 
                 resultados.append({
-                    'id': fila.id, 'cliente': fila.cliente, 'servicio': fila.servicio,
-                    'empleado': fila.empleado, 'fecha_display': fecha_f, 'hora': hora_f,
+                    'id': fila.id, 
+                    'cliente': fila.cliente, 
+                    'servicio': fila.servicio,
+                    'empleado': fila.empleado, 
+                    'fecha_display': fecha_f, 
+                    'hora': hora_f,
                     'estado': fila.estado or "Pendiente"
                 })
 
-        # Listas para cargar los checkboxes del modal
+        # Cargar listas para los filtros del Modal/Frontend
         lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id).all()
         lista_servicios = Servicio.query.filter_by(emp_id=current_user.emp_id).all()
 
@@ -3094,9 +3114,9 @@ def gestion_historial():
                                filtros_activos=tiene_filtros)
 
     except Exception as e:
-        print(f"---------- ERROR ----------\n{str(e)}\n---------------------------")
-        return f"Error: {str(e)}", 500
-    
+        db.session.rollback()
+        print(f"---------- ERROR HISTORIAL ----------\n{str(e)}\n---------------------------")
+        return f"Error interno: {str(e)}", 500
     
     
     
