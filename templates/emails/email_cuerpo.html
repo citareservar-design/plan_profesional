@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="90%" style="max-width: 600px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                    
+                    <tr>
+                        <td align="center" style="background-color: #0ea5e9; padding: 40px 20px;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">¡Tu servicio está listo!</h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 30px; text-align: center;">
+                            <p style="font-size: 18px; color: #1e293b; margin-bottom: 10px;">Hola <strong>{{ cliente.cli_nombre }}</strong>,</p>
+                            <p style="font-size: 16px; color: #64748b; line-height: 1.6;">
+                                Es un gusto saludarte. En <strong>{{ empresa.emp_razon_social }}</strong> trabajamos para que te sientas increíble.
+                            </p>
+
+                            <div style="background-color: #f8fafc; border-radius: 16px; padding: 25px; margin: 30px 0; text-align: left; border: 1px solid #e2e8f0;">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold; width: 40%;">Servicio:</td>
+                                        <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.res_tipo_servicio }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
+                                        <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.empleado.empl_nombre if reserva.empleado else 'Nuestro Profesional' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Fecha y Hora:</td>
+                                        <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.res_fecha.strftime('%d/%m/%Y') }} a las {{ reserva.res_hora.strftime('%H:%M %p') }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
+                                Hemos adjuntado el <strong>recibo detallado</strong> de tu servicio en este correo para tu control personal.
+                            </p>
+
+                            <div style="margin-top: 20px;">
+                                <p style="font-size: 13px; color: #0ea5e9; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;">¿Qué tal fue tu experiencia?</p>
+                                <a href="{{ link_resena }}" 
+                                   style="background-color: #0ea5e9; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4); font-size: 15px;">
+                                   CALIFICAR MI ATENCIÓN ⭐
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; font-size: 15px; color: #1e293b; font-weight: bold;">
+                                ¡Gracias por agendar en {{ empresa.emp_razon_social }}!
+                            </p>
+                            <p style="margin: 5px 0 0; font-size: 13px; color: #94a3b8;">
+                                Te esperamos pronto. Si tienes dudas, contáctanos al {{ empresa.emp_telefono }}.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="height: 40px;">
+                    <tr><td></td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
