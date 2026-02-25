@@ -85,26 +85,70 @@
             <input type="password" id="usu_password" name="usu_password" placeholder="Contraseña" required 
                    class="w-full bg-slate-800 border-none rounded-2xl p-4 text-white font-bold outline-none focus:ring-2 focus:ring-sky-500">
             
-            <div class="py-4">
-                <p class="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-4">Asignar Permisos de Acceso</p>
+<div class="py-4">
+    <p class="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-4 italic">Permisos de Acceso Estructurados</p>
 
-                
-                {% set modulos = ['estadisticas', 'clientes', 'empleados', 'servicios', 'reservas', 'horarios', 'usuarios', 'empresa', 'QR', 'comisiones', 'historial','Promocion','resena', 'Configuracion'] %}
+    <div class="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+        
+        <div class="grid grid-cols-2 gap-2">
+            {% for mod in ['estadisticas', 'clientes', 'reservas', 'comisiones', 'Promocion', 'resena'] %}
+            <label class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:border-sky-500/50 transition-all">
+                <input type="checkbox" name="permisos" value="ver_{{ mod }}" class="permiso-checkbox w-4 h-4 rounded border-none bg-slate-700 text-sky-500 focus:ring-sky-500">
+                <span class="text-white text-[11px] font-bold capitalize">{{ mod | replace('_', ' ') }}</span>
+            </label>
+            {% endfor %}
+        </div>
 
-                <div class="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                    {% for mod in modulos %}
-                    <label class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 cursor-pointer hover:border-sky-500/50 transition-all">
-                        <input type="checkbox" name="permisos" value="ver_{{ mod }}" 
-                               class="permiso-checkbox w-4 h-4 rounded border-none bg-slate-700 text-sky-500 focus:ring-sky-500">
-                        
-                        {# Si es historial, le damos un toque verde para que resalte #}
-                        <span class="text-white text-xs font-bold capitalize {% if mod == 'historial' %} text-emerald-400 {% endif %}">
-                            {{ mod | replace('_', ' ') }}
-                        </span>
-                    </label>
-                    {% endfor %}
+        <div x-data="{ open: false }" class="border border-white/5 rounded-2xl overflow-hidden bg-white/5">
+            <button type="button" @click="open = !open" class="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 transition-all">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-gears text-sky-500"></i>
+                    <span class="text-white text-xs font-black uppercase tracking-widest">Configuración</span>
                 </div>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+            </button>
+            <div x-show="open" x-cloak class="p-3 grid grid-cols-1 gap-2 bg-slate-950/30 border-t border-white/5">
+                {% set sub_config = [
+                    ('Configuracion', 'Panel Principal'),
+                    ('usuarios', 'Gestión de Usuarios'),
+                    ('empleados', 'Personal/Empleados'),
+                    ('servicios', 'Catálogo Servicios'),
+                    ('horarios', 'Horarios Laborales'),
+                    ('empresa', 'Datos Empresa'),
+                    ('QR', 'Generador QR'),
+                    ('plantillas', 'WhatsApp/Plantillas')
+                ] %}
+                {% for val, label in sub_config %}
+                <label class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-all">
+                    <input type="checkbox" name="permisos" value="ver_{{ val }}" class="permiso-checkbox w-4 h-4 rounded border-none bg-slate-700 text-sky-400">
+                    <span class="text-slate-300 text-[11px] font-bold">{{ label }}</span>
+                </label>
+                {% endfor %}
             </div>
+        </div>
+
+        <div x-data="{ open: false }" class="border border-white/5 rounded-2xl overflow-hidden bg-white/5">
+            <button type="button" @click="open = !open" class="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 transition-all">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i>
+                    <span class="text-white text-xs font-black uppercase tracking-widest">Historial</span>
+                </div>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+            </button>
+            <div x-show="open" x-cloak class="p-3 space-y-2 bg-slate-950/30 border-t border-white/5">
+                <label class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer">
+                    <input type="checkbox" name="permisos" value="ver_historial" class="permiso-checkbox w-4 h-4 rounded border-none bg-slate-700 text-emerald-500">
+                    <span class="text-slate-300 text-[11px] font-bold">Historial de Reservas</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer">
+                    <input type="checkbox" name="permisos" value="ver_historial_comisiones" class="permiso-checkbox w-4 h-4 rounded border-none bg-slate-700 text-emerald-500">
+                    <span class="text-slate-300 text-[11px] font-bold">Historial de Comisiones</span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+</div>
 
             <div class="flex gap-3 pt-4">
                 <button type="button" onclick="document.getElementById('modalUsuario').classList.add('hidden')" 
