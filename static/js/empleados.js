@@ -63,96 +63,106 @@ function prepararEdicion(id, nombre, cedula, telefono, porcentaje, cargo, servic
     modal.classList.add('flex');
 }
 
-function guardarEmpleado() {
+async function guardarEmpleado() {
     const modal = document.getElementById('modalEmpleado');
     if (!modal) return;
 
-    let id = modal.getAttribute('data-id'); 
-    if (id === "null" || id === "undefined" || id === "" || !id) {
-        id = null;
-    }
-
-    const url = id ? `/admin/api/empleado/editar/${id}` : '/admin/api/empleado/nuevo';
-    const formData = new FormData();
-
-    // 3. Agregamos los campos de texto
-    formData.append('nombre', document.getElementById('empl_nombre')?.value.trim() || '');
-    formData.append('cedula', document.getElementById('empl_cedula')?.value.trim() || '');
-    formData.append('telefono', document.getElementById('empl_telefono')?.value || '');
+    // 1. Elementos de UI para feedback
+    const btnGuardar = event?.target || document.querySelector('button[onclick="guardarEmpleado()"]');
+    const originalBtnText = btnGuardar ? btnGuardar.innerText : 'Guardar';
     
-    // --- CIRUGÍA AQUÍ: Agregamos el correo al FormData ---
-    formData.append('correo', document.getElementById('empl_correo')?.value.trim() || '');
-    
-    formData.append('porcentaje', document.getElementById('empl_porcentaje')?.value || '40');
-    formData.append('cargo', document.getElementById('empl_cargo')?.value || 'Especialista');
+    // 2. Determinar ID y URL
+    let id = modal.getAttribute('data-id');
+    const esNuevo = (!id || id === "null" || id === "undefined" || id === "");
+    const url = esNuevo ? '/admin/api/empleado/nuevo' : `/admin/api/empleado/editar/${id}`;
 
-    // 4. Agregamos la Foto
-    const fotoInput = document.getElementById('empl_foto');
-    if (fotoInput && fotoInput.files[0]) {
-        formData.append('foto', fotoInput.files[0]);
-    }
-
-    // 5. Agregamos los Servicios
-    const checkboxes = document.querySelectorAll('input[name="servicios_empleado"]:checked');
-    checkboxes.forEach(cb => {
-        formData.append('servicios[]', cb.value); 
-    });
-
-    // 6. Validación previa básica
+    // 3. Validaciones rápidas
     const nombre = document.getElementById('empl_nombre')?.value.trim();
     const cedula = document.getElementById('empl_cedula')?.value.trim();
 
     if (!nombre || !cedula) {
         Swal.fire({ 
-            title: 'Atención', 
-            text: 'El nombre y la cédula son campos obligatorios', 
+            title: 'Campos Incompletos', 
+            text: 'Por favor, ingresa al menos el nombre y la cédula.', 
             icon: 'warning', 
-            background: '#0f172a', 
-            color: '#fff' 
+            background: '#0f172a', color: '#fff' 
         });
         return;
     }
 
-    // 7. Petición al servidor (Fetch se encarga del multipart/form-data)
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        body: formData 
-    })
-    .then(res => {
-        return res.json().then(data => {
-            if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
-            return data;
+    // 4. Preparar FormData
+    const formData = new FormData();
+    formData.append('nombre', nombre);
+    formData.append('cedula', cedula);
+    formData.append('telefono', document.getElementById('empl_telefono')?.value || '');
+    formData.append('correo', document.getElementById('empl_correo')?.value.trim() || '');
+    formData.append('porcentaje', document.getElementById('empl_porcentaje')?.value || '40');
+    formData.append('cargo', document.getElementById('empl_cargo')?.value || 'Especialista');
+
+    // Foto
+    const fotoInput = document.getElementById('empl_foto');
+    if (fotoInput?.files[0]) {
+        formData.append('foto', fotoInput.files[0]);
+    }
+
+    // Servicios
+    document.querySelectorAll('input[name="servicios_empleado"]:checked')
+            .forEach(cb => formData.append('servicios[]', cb.value));
+
+    try {
+        // Estado de "Cargando"
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Procesando...';
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            body: formData 
         });
-    })
-    .then(data => {
-        if (data.status === 'success') {
+
+        // --- SOLUCIÓN AL ERROR DE JSON ---
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const textError = await response.text();
+            console.error("Respuesta del servidor no es JSON:", textError);
+            throw new Error("El servidor tuvo un problema técnico y no respondió en formato correcto. Revisa la consola de Python.");
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'success' || data.success) {
             if (typeof cerrarModal === 'function') cerrarModal();
             
-            Swal.fire({
-                title: '¡Éxito!',
-                text: data.message,
+            await Swal.fire({
+                title: '¡Perfecto!',
+                text: data.message || 'Datos guardados correctamente',
                 icon: 'success',
-                background: '#0f172a',
-                color: '#fff',
-                timer: 1500,
-                showConfirmButton: false
+                background: '#0f172a', color: '#fff',
+                timer: 1500, showConfirmButton: false
             });
             
-            setTimeout(() => { window.location.reload(); }, 1600);
+            window.location.reload();
         } else {
-            throw new Error(data.message || 'Ocurrió un error inesperado');
+            throw new Error(data.message || 'Error al guardar');
         }
-    })
-    .catch(error => {
+
+    } catch (error) {
+        console.error("Error en guardarEmpleado:", error);
         Swal.fire({ 
-            title: 'Atención', 
+            title: 'Error de Sistema', 
             text: error.message, 
             icon: 'error', 
-            background: '#0f172a', 
-            color: '#fff' 
+            background: '#0f172a', color: '#fff' 
         });
-    });
+    } finally {
+        // Restaurar botón
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.innerText = originalBtnText;
+        }
+    }
 }
 
 
@@ -280,12 +290,21 @@ function abrirAyudaEquipo() {
 
 
 function abrirModalInactivos() {
-    document.getElementById('modalInactivos').classList.remove('hidden');
+    const modal = document.getElementById('modalInactivos');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
 }
 
 function cerrarModalInactivos() {
-    document.getElementById('modalInactivos').classList.add('hidden');
+    const modal = document.getElementById('modalInactivos');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
 }
+
 
 function exportarExcel() {
     try {
@@ -689,4 +708,34 @@ function previsualizarImagen(input) {
         }
         reader.readAsDataURL(file);
     }
+}
+
+
+function sincronizarDisplay(val) {
+    if (val > 100) val = 100;
+    if (val < 0) val = 0;
+    
+    document.getElementById('display_pct').innerText = val + '%';
+    document.getElementById('progress_bar').style.width = val + '%';
+    // Sincroniza el input oculto o el de número si usas varios
+    document.getElementById('empl_porcentaje').value = val;
+}
+
+function ajustarComision(cambio) {
+    const input = document.getElementById('empl_porcentaje');
+    let nuevoValor = parseInt(input.value) + cambio;
+    if (nuevoValor >= 0 && nuevoValor <= 100) {
+        setComision(nuevoValor);
+    }
+}
+
+function setComision(val) {
+    const input = document.getElementById('empl_porcentaje');
+    input.value = val;
+    sincronizarDisplay(val);
+}
+
+function sincronizarInput(val) {
+    document.getElementById('empl_porcentaje').value = val;
+    sincronizarDisplay(val);
 }

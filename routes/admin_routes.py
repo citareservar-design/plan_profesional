@@ -493,71 +493,73 @@ def gestion_empleados():
     
     
 
+@admin_bp.route('/api/empleado/nuevo', methods=['POST'])
 def nuevo_empleados():
+    # 1. Imports internos necesarios
+    import os
+    from flask import request, jsonify
+    from werkzeug.utils import secure_filename
+    from flask_login import current_user
     from models.models import Empleado, Servicio, Empresa, db
-    
-    # 1. Recibimos los datos (Usamos request.form porque ahora enviamos archivos)
-    nombre = request.form.get('nombre', '').strip()
-    cedula = str(request.form.get('cedula', '')).strip()
-    correo = request.form.get('correo', '').strip()
-    servicios_ids = request.form.getlist('servicios[]') 
-    foto_archivo = request.files.get('foto') 
 
-    if not nombre or not cedula:
-        return jsonify({'status': 'error', 'message': 'Nombre y Cédula son obligatorios'}), 400
-
-    # 2. Obtenemos la empresa del usuario actual
-    empresa = Empresa.query.get(current_user.emp_id)
-    
-    if not empresa or not empresa.emp_ruta_recursos:
-        return jsonify({'status': 'error', 'message': 'La empresa no tiene una ruta de recursos configurada'}), 400
-
-    # 3. LÓGICA DINÁMICA DE CARPETAS
-    # Usamos la ruta de la DB como punto de partida inicial
-    ruta_raiz_empresa = empresa.emp_ruta_recursos.strip()
-    nombre_foto_db = None
-
-    if foto_archivo:
+    try:
+        # 2. Recolección de datos
+        nombre = request.form.get('nombre', '').strip()
+        cedula = str(request.form.get('cedula', '')).strip()
+        correo = request.form.get('correo', '').strip()
+        telefono = request.form.get('telefono', '').strip()
+        cargo = request.form.get('cargo', 'Especialista').strip()
+        
+        # Manejo seguro del porcentaje
         try:
-            # Construimos: [ruta_de_la_db]/empleados/[cedula]/
-            carpeta_empleado = os.path.join(ruta_raiz_empresa, 'empleados', cedula)
+            porcentaje = int(float(request.form.get('porcentaje', 40)))
+        except:
+            porcentaje = 40
+
+        servicios_ids = request.form.getlist('servicios[]') 
+        foto_archivo = request.files.get('foto') 
+
+        # 3. Validaciones iniciales
+        if not nombre or not cedula:
+            return jsonify({'status': 'error', 'message': 'Nombre y Cédula son obligatorios'}), 400
+
+        empresa = Empresa.query.get(current_user.emp_id)
+        if not empresa or not empresa.emp_ruta_recursos:
+            return jsonify({'status': 'error', 'message': 'La empresa no tiene ruta de recursos configurada'}), 400
+
+        # 4. Gestión de Archivos (Física solamente, ya que no hay columna en DB)
+        if foto_archivo and foto_archivo.filename != '':
+            ruta_raiz = empresa.emp_ruta_recursos.strip()
+            # Creamos la ruta: carpeta_empresa/empleados/cedula/
+            carpeta_empleado = os.path.join(ruta_raiz, 'empleados', cedula)
             
-            # El código crea lo que falta (empleados y la carpeta de la cedula)
             if not os.path.exists(carpeta_empleado):
                 os.makedirs(carpeta_empleado, exist_ok=True)
             
-            # Limpiamos el nombre de la foto (ej: mi foto.jpg -> mi_foto.jpg)
+            # Guardamos con un nombre fijo o el original
             filename = secure_filename(foto_archivo.filename)
             ruta_fisica_final = os.path.join(carpeta_empleado, filename)
             
-            # Guardamos físicamente
             foto_archivo.save(ruta_fisica_final)
-            
-            # Guardamos en DB la ruta relativa: 'empleados/10888/foto.jpg'
-            nombre_foto_db = f"empleados/{cedula}/{filename}"
-            
-        except Exception as e:
-            print(f"❌ Error al crear carpetas o guardar: {str(e)}")
-            return jsonify({'status': 'error', 'message': f'Error al gestionar archivos: {str(e)}'}), 500
+            # Nota: No guardamos la ruta en 'nuevo_emp' porque la columna no existe en tu DB
 
-    # 4. Guardado en la base de datos del Empleado
-    try:
+        # 5. Guardado en Base de Datos (Sin el campo empl_foto)
         nuevo_emp = Empleado(
             empl_nombre=nombre,
             empl_cedula=cedula,
             empl_correo=correo,
-            empl_telefono=request.form.get('telefono'),
-            empl_porcentaje=request.form.get('porcentaje', 40),
-            empl_cargo=request.form.get('cargo', 'Especialista'),
-            empl_foto=nombre_foto_db, # Aquí queda la ruta relativa
+            empl_telefono=telefono,
+            empl_porcentaje=porcentaje,
+            empl_cargo=cargo,
             emp_id=current_user.emp_id,
-            empl_activo=True
+            empl_activo=True,
+            empl_mostrar_en_reserva=True # Según la estructura de tu tabla
         )
         
         db.session.add(nuevo_emp)
-        db.session.flush()
+        db.session.flush() 
 
-        # Relación de servicios
+        # 6. Vincular Servicios
         if servicios_ids:
             for s_id in servicios_ids:
                 servicio = Servicio.query.filter_by(ser_id=s_id, emp_id=current_user.emp_id).first()
@@ -565,11 +567,12 @@ def nuevo_empleados():
                     nuevo_emp.servicios.append(servicio)
 
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Empleado y carpeta creados correctamente'})
+        return jsonify({'status': 'success', 'message': '¡Empleado creado correctamente!'})
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({'status': 'error', 'message': f'Error en DB: {str(e)}'}), 500
+        print(f"❌ ERROR CRÍTICO EN NUEVO_EMPLEADO: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'Error en el servidor: {str(e)}'}), 500
     
 
 
