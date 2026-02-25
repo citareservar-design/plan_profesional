@@ -21,8 +21,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from flask_mail import Message
-# También asegúrate de importar el objeto 'mail' que configuraste en tu app
-
+import threading
 
 
 
@@ -1478,69 +1477,148 @@ def actualizar_servicios_masivo():
 # --- 6. GESTIÓN DE RESERVAS 
 
 
-def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc):
+def acciones_masivas_reservas_bg(ids, accion, empresa_id, links_resena):
+    from app import app 
+    with app.app_context():
+        try:
+            from models.models import Reserva, Cliente, Servicio, Empresa
+            reservas = Reserva.query.filter(Reserva.res_id.in_(ids)).all()
+            empresa = Empresa.query.get(empresa_id)
+
+            for res in reservas:
+                if accion == 'realizada':
+                    cliente = Cliente.query.get(res.cli_id)
+                    if cliente and cliente.cli_email:
+                        servicio = Servicio.query.get(res.ser_id) if res.ser_id else \
+                                   Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=res.emp_id).first()
+                        
+                        precio_base = float(servicio.ser_precio) if servicio else 0.0
+                        descuento_porc = float(res.res_descuento_valor or 0)
+                        precio_final = precio_base * (1 - (descuento_porc / 100))
+                        
+                        # Obtenemos el link pre-generado
+                        link_listo = links_resena.get(str(res.res_id))
+                        
+                        enviar_recibo_por_correo(res, cliente, empresa, precio_base, precio_final, descuento_porc, link_listo)
+        except Exception as e:
+            print(f"❌ Error en hilo: {e}")
+            
+            
+            
+            
+
+@admin_bp.route('/acciones-masivas-reservas', methods=['POST'])
+@login_required
+def acciones_masivas_reservas():
+    data = request.get_json()
+    ids = data.get('ids', [])
+    accion = data.get('accion') 
+    base_url = request.host_url.rstrip('/') 
+    
+    if not ids:
+        return jsonify({'success': False, 'message': 'No hay selecciones'}), 400
+
+    try:
+        if accion == 'eliminar':
+            Reserva.query.filter(Reserva.res_id.in_(ids)).delete(synchronize_session=False)
+        else:
+            nuevo_estado = accion.capitalize()
+            Reserva.query.filter(Reserva.res_id.in_(ids)).update({Reserva.res_estado: nuevo_estado}, synchronize_session=False)
+        
+        db.session.commit()
+
+        if accion == 'realizada':
+            # --- CAMBIO AQUÍ: Generamos un diccionario de links antes de lanzar el hilo ---
+            links_resena = {}
+            for r_id in ids:
+                res_obj = Reserva.query.get(r_id)
+                if res_obj:
+                    # Generamos la URL completa aquí mismo
+                    links_resena[str(r_id)] = url_for('admin.dejar_resena', 
+                                                     emp_id=current_user.emp_id, 
+                                                     res_id=res_obj.res_id, 
+                                                     empl_id=res_obj.empl_id, 
+                                                     _external=True)
+
+            import threading
+            hilo = threading.Thread(
+                target=acciones_masivas_reservas_bg, 
+                args=(ids, accion, current_user.emp_id, links_resena) # <--- Pasamos los links ya listos
+            )
+            hilo.start()
+            return jsonify({'success': True, 'message': 'Procesando envíos...'})
+
+        return jsonify({'success': True, 'message': 'Actualizado.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    
+    
+
+def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc, link_resena):
+    """
+    Versión corregida para hilos: 
+    Recibe 'link_resena' ya generado para evitar errores de contexto de Flask.
+    """
     if not cliente.cli_email or not empresa.emp_cuenta_smtp: 
-        print("Falta email del cliente o cuenta SMTP de la empresa")
+        print("Faltan datos de contacto para enviar el correo.")
         return False
         
     try:
-        # 1. Generar el PDF en memoria (Sigue igual)
+        from models.models import Empleado
+        # Buscamos el empleado para personalizar el saludo
+        empleado_obj = Empleado.query.get(reserva.empl_id) if reserva.empl_id else None
+        nombre_profesional = empleado_obj.empl_nombre if empleado_obj else "Nuestro Profesional"
+
+        # 1. Generar el PDF
         html_pdf = render_template('admin/pdf_recibo.html', 
                                    r=reserva, 
                                    c=cliente, 
                                    empresa=empresa,
-                                   p_original=precio_base,
-                                   p_final=precio_final,
+                                   p_original=precio_base, 
+                                   p_final=precio_final, 
                                    p_desc=descuento_porc)
         
         output = io.BytesIO()
         pisa.CreatePDF(io.BytesIO(html_pdf.encode("UTF-8")), dest=output, encoding='UTF-8')
-        pdf_binario = output.getvalue()
-        nombre_archivo = f"Recibo_{reserva.res_id}.pdf"
-
-        # --- NUEVO: 2. GENERAR EL LINK Y EL CUERPO HTML DEL CORREO ---
-        # Creamos el link que irá en el botón del correo
-        link_resena = url_for('admin.dejar_resena', 
-                             emp_id=empresa.emp_id, 
-                             res_id=reserva.res_id, 
-                             empl_id=reserva.empl_id, 
-                             _external=True)
-
-        # Renderizamos el nuevo template que creaste
+        
+        # 2. Renderizar el cuerpo del correo (Usa el link_resena que recibimos por parámetro)
         cuerpo_html = render_template('emails/email_cuerpo.html', 
                                      cliente=cliente, 
                                      empresa=empresa, 
-                                     reserva=reserva,
-                                     link_resena=link_resena)
+                                     reserva=reserva, 
+                                     link_resena=link_resena, 
+                                     nombre_atendio=nombre_profesional)
 
-        # 3. Configurar el Mensaje MIME
+        # 3. Configurar el mensaje MIME
         msg = MIMEMultipart()
         msg['From'] = empresa.emp_cuenta_smtp
         msg['To'] = cliente.cli_email
-        msg['Subject'] = f"Tu Recibo de Servicio - {empresa.emp_razon_social}"
-        
-        # CAMBIO AQUÍ: Usamos 'html' en lugar de 'plain'
+        msg['Subject'] = f"Tu Recibo - {empresa.emp_razon_social}"
         msg.attach(MIMEText(cuerpo_html, 'html'))
-
-        # 4. Adjuntar el PDF (Sigue igual)
-        part = MIMEApplication(pdf_binario, Name=nombre_archivo)
-        part['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+        
+        # Adjuntar PDF
+        pdf_content = output.getvalue()
+        part = MIMEApplication(pdf_content, Name=f"Recibo_{reserva.res_id}.pdf")
+        part['Content-Disposition'] = f'attachment; filename="Recibo_{reserva.res_id}.pdf"'
         msg.attach(part)
 
-        # 5. Conexión SMTP manual
+        # 4. Conexión y envío SMTP
         servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
         servidor.starttls()
         servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
         servidor.send_message(msg)
         servidor.quit()
         
-        print(f"✅ Recibo HTML enviado con éxito a {cliente.cli_email}")
+        print(f"✅ Recibo enviado a {cliente.cli_email}")
         return True
-        
-    except Exception as e:
-        print(f"❌ Error enviando recibo a cliente: {e}")
-        return False
 
+    except Exception as e:
+        print(f"❌ Error enviando correo: {e}")
+        return False
+    
+    
+    
 
 @admin_bp.app_context_processor
 def inject_pendientes():
@@ -1708,15 +1786,12 @@ def reserva_estado(id):
 
     nuevo_estado_clean = nuevo_estado.lower().strip()
 
-    # ... (Tu lógica de validación de conflictos se mantiene igual) ...
-
     # ACTUALIZACIÓN DE ESTADO
     reserva.res_estado = nuevo_estado
     db.session.commit()
 
     # --- NUEVA LÓGICA DE ENVÍO AUTOMÁTICO ---
     if nuevo_estado_clean == 'realizada':
-        # Buscamos datos para el recibo (reutilizando tu lógica del def generar_recibo_cliente)
         cliente = Cliente.query.get(reserva.cli_id)
         empresa = Empresa.query.get(current_user.emp_id)
         servicio = Servicio.query.get(reserva.ser_id) if reserva.ser_id else \
@@ -1727,7 +1802,16 @@ def reserva_estado(id):
         precio_final = precio_base * (1 - (descuento_porc / 100))
 
         if cliente and cliente.cli_email:
-            enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc)
+            # --- CORRECCIÓN: Generamos el link antes de enviar ---
+            link_resena = url_for('admin.dejar_resena', 
+                                 emp_id=empresa.emp_id, 
+                                 res_id=reserva.res_id, 
+                                 empl_id=reserva.empl_id, 
+                                 _external=True)
+
+            # Ahora pasamos los 7 argumentos incluyendo el link
+            enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc, link_resena)
+            
             flash(f"Reserva finalizada y recibo enviado a {cliente.cli_email}", "success")
         else:
             flash("Reserva finalizada, pero el cliente no tiene correo registrado.", "warning")
@@ -1755,66 +1839,7 @@ def asignar_empleado(id):
     return redirect(url_for('admin.reservas'))
 
 
-@admin_bp.route('/acciones-masivas-reservas', methods=['POST'])
-@login_required
-def acciones_masivas_reservas():
-    data = request.get_json()
-    ids = data.get('ids', [])
-    accion = data.get('accion') 
-    
-    if not ids:
-        return jsonify({'success': False, 'message': 'No hay selecciones'}), 400
-
-    try:
-        # Obtenemos las reservas y la empresa (una sola vez para ahorrar recursos)
-        reservas = Reserva.query.filter(Reserva.res_id.in_(ids)).all()
-        empresa = Empresa.query.get(current_user.emp_id)
-        
-        contador_correos = 0
-
-        for res in reservas:
-            if accion == 'realizada':
-                # Evitamos procesar si ya estaba realizada
-                if res.res_estado.lower().strip() != 'realizada':
-                    res.res_estado = 'Realizada'
-                    
-                    # --- LÓGICA DE ENVÍO DE CORREO ---
-                    cliente = Cliente.query.get(res.cli_id)
-                    if cliente and cliente.cli_email:
-                        # Buscamos el servicio para el precio
-                        servicio = Servicio.query.get(res.ser_id) if res.ser_id else \
-                                   Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=res.emp_id).first()
-                        
-                        precio_base = float(servicio.ser_precio) if servicio else 0.0
-                        descuento_porc = float(res.res_descuento_valor or 0)
-                        precio_final = precio_base * (1 - (descuento_porc / 100))
-                        
-                        # Llamamos a la función de utilidad (definida previamente)
-                        enviar_recibo_por_correo(res, cliente, empresa, precio_base, precio_final, descuento_porc)
-                        contador_correos += 1
-
-            elif accion == 'confirmada':
-                res.res_estado = 'Confirmada'
-            elif accion == 'pendiente':
-                res.res_estado = 'Pendiente'
-            elif accion == 'cancelada':
-                res.res_estado = 'Cancelada'
-            elif accion == 'eliminar':
-                db.session.delete(res)
-
-        db.session.commit()
-        
-        msg_extra = f" y se enviaron {contador_correos} recibos" if contador_correos > 0 else ""
-        return jsonify({
-            'success': True, 
-            'message': f'{len(ids)} reservas procesadas (Acción: {accion}){msg_extra}.'
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error en acciones masivas: {str(e)}")
-        return jsonify({'success': False, 'message': f"Error en el servidor: {str(e)}"}), 500
-    
+  
     
 
 @admin_bp.route('/cliente/update-nota/<int:id>', methods=['POST'])
@@ -1937,6 +1962,10 @@ def reagendar_hora():
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Error al procesar datos: {str(e)}"}), 500
+    
+    
+    
+    
 
 # --- 7. GESTION DE HORARIOS ---
 

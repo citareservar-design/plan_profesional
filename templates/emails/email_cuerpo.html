@@ -29,11 +29,13 @@
                                         <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold; width: 40%;">Servicio:</td>
                                         <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.res_tipo_servicio }}</td>
                                     </tr>
-                                    <tr>
-                                        <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
-                                        <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.empleado.empl_nombre if reserva.empleado else 'Nuestro Profesional' }}</td>
-                                    </tr>
-                                    <tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
+                                                <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">
+                                                    {{ nombre_atendio }}
+                                                </td>
+                                            </tr>
+                                                                                <tr>
                                         <td style="padding: 5px 0; font-size: 14px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Fecha y Hora:</td>
                                         <td style="padding: 5px 0; font-size: 16px; color: #0f172a; font-weight: bold;">{{ reserva.res_fecha.strftime('%d/%m/%Y') }} a las {{ reserva.res_hora.strftime('%H:%M %p') }}</td>
                                     </tr>
@@ -48,7 +50,7 @@
                                 <p style="font-size: 13px; color: #0ea5e9; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;">¿Qué tal fue tu experiencia?</p>
                                 <a href="{{ link_resena }}" 
                                    style="background-color: #0ea5e9; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4); font-size: 15px;">
-                                   CALIFICAR MI ATENCIÓN ⭐
+                                   CALIFICAR A {{ nombre_atendio.split(' ')[0] | upper }} ⭐
                                 </a>
                             </div>
                         </td>
@@ -61,6 +63,15 @@
                             </p>
                             <p style="margin: 5px 0 0; font-size: 13px; color: #94a3b8;">
                                 Te esperamos pronto. Si tienes dudas, contáctanos al {{ empresa.emp_telefono }}.
+                            </p>
+                            
+                            <p style="margin: 15px 0 0; font-size: 12px; color: #94a3b8;">
+                                Potenciado por 
+                                <a href="https://agendapp.co" 
+                                target="_blank" 
+                                style="color: #6366f1 !important; text-decoration: underline; font-weight: 700;">
+                                Agendapp.co
+                                </a>
                             </p>
                         </td>
                     </tr>
