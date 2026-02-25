@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opinión - {{ empresa.emp_razon_social }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='css/resena_form.css') }}"
+/>
+    <style>
+
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 shadow-2xl">
+        
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-black italic uppercase leading-tight">¿Cómo estuvo tu servicio?</h1>
+            <p class="text-sky-500 font-bold text-xs tracking-widest mt-1">{{ empresa.emp_razon_social }}</p>
+        </div>
+
+        <form action="{{ url_for('admin.dejar_resena', emp_id=empresa.emp_id) }}" method="POST" class="space-y-6">
+            
+<div class="space-y-2 mb-6">
+    <div class="flex flex-row-reverse justify-center gap-3 text-4xl">
+        {% for i in range(5, 0, -1) %}
+        <input type="radio" id="star{{i}}" name="puntuacion" value="{{i}}" class="hidden peer" required onchange="actualizarMensaje(this.value)" />
+        <label for="star{{i}}" class="cursor-pointer text-slate-700 peer-checked:text-sky-500 hover:text-sky-400 transition-all hover:scale-110">
+            <i class="fa-solid fa-star"></i>
+        </label>
+        {% endfor %}
+    </div>
+
+    <p id="mensaje-estrellas" class="text-center text-[10px] font-black uppercase tracking-widest text-slate-500 animate-pulse">
+        Selecciona una estrella
+    </p>
+</div>
+
+<div class="space-y-3">
+    <div class="flex justify-between items-center ml-1">
+        <p class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">¿Quién te atendió?</p>
+        <span class="text-[9px] bg-white/10 px-2 py-0.5 rounded-full text-slate-400">{{ empleados|length }} disponibles</span>
+    </div>
+    
+    <div class="grid grid-cols-3 gap-2" id="contenedor-empleados">
+        {% for emp in empleados %}
+        <div class="relative emp-card {% if loop.index > 3 %}hidden{% endif %}">
+            <input type="radio" name="empl_id" id="emp_{{ emp.empl_id }}" value="{{ emp.empl_id }}" class="hidden emp-radio">
+            
+            <label for="emp_{{ emp.empl_id }}" class="flex flex-col items-center p-2 bg-white/5 border border-white/10 rounded-2xl cursor-pointer transition-all hover:bg-white/10 border-2 border-transparent h-full justify-center">
+                
+                <div class="relative">
+                    <img src="{{ url_for('admin.obtener_foto_empleado', emp_id=empresa.emp_id, cedula=emp.empl_cedula|int) }}" 
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ emp.empl_nombre }}&background=0ea5e9&color=fff'"
+                         class="w-12 h-12 rounded-full object-cover border-2 border-transparent shadow-md transition-transform">
+                </div>
+                
+                <span class="text-[9px] font-bold text-white text-center line-clamp-1 mt-1 w-full">{{ emp.empl_nombre.split(' ')[0] }}</span>
+            </label>
+        </div>
+        {% endfor %}
+    </div>
+
+{% if empleados|length > 3 %}
+<button type="button" 
+        id="btn-toggle-empleados" 
+        onclick="toggleEmpleados()" 
+        class="w-full py-2.5 mt-2 text-[10px] font-black text-sky-500 bg-sky-500/5 rounded-xl border border-sky-500/20 hover:bg-sky-500/10 transition-all uppercase tracking-[0.15em] flex items-center justify-center gap-2">
+    
+    <span id="texto-boton">Ver {{ empleados|length - 3 }} más</span>
+    
+    <i id="icono-boton" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
+</button>
+{% endif %}
+</div>
+
+            <div class="space-y-3">
+                <input type="text" name="nombre" placeholder="Tu nombre (Opcional)" 
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all text-sm">
+                
+                <textarea name="comentario" rows="3" placeholder="Escribe un comentario..." 
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-all text-sm resize-none"></textarea>
+            </div>
+
+<button type="button" 
+        id="btn-enviar"
+        onclick="prepararEnvio(this)"
+        class="w-full bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 
+               text-white font-black py-5 rounded-2xl 
+               shadow-lg shadow-sky-500/30 transition-all duration-300
+               active:scale-[0.97] active:shadow-inner
+               flex items-center justify-center gap-3 group 
+               uppercase tracking-[0.2em] text-xs
+               disabled:from-slate-700 disabled:to-slate-800 disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-70">
+    
+    <span id="texto-enviar" class="drop-shadow-md">Enviar Calificación</span>
+    
+    <div class="relative flex items-center justify-center w-5 h-5">
+        <i id="icono-enviar" class="fa-solid fa-paper-plane transition-all duration-500 group-hover:translate-x-1 group-hover:-translate-y-1"></i>
+    </div>
+</button>
+        </form>
+    </div>
+</body>
+<script src="{{ url_for('static', filename='js/resena_form.js') }}"></script>
+
+
+</html>

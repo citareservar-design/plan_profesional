@@ -166,6 +166,26 @@
 
 
 
+{% if current_user.tiene_permiso('ver_resenas') %}
+<a href="{{ url_for('admin.ver_resenas') }}" 
+    class="flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group 
+    {% if 'ver_resenas' in request.endpoint %} 
+        bg-sky-500/10 text-white border border-sky-500/20 shadow-lg shadow-sky-500/5 
+    {% else %} 
+        text-slate-400 hover:bg-white/5 hover:text-white border border-transparent 
+    {% endif %}">
+    
+    <div class="relative">
+        <i class="fa-solid fa-star text-lg {% if 'ver_resenas' in request.endpoint %} text-sky-500 {% else %} group-hover:text-sky-400 {% endif %} transition-colors"></i>
+
+    </div>
+    
+    <span class="font-bold tracking-wide">Reseñas</span>
+</a>
+{% endif %}
+
+
+
     {% if current_user.tiene_permiso('ver_historial') %}
     <div x-data="{ open: {{ 'true' if request.endpoint == 'admin.gestion_historial' else 'false' }} }" class="w-full">
         

@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
 from io import BytesIO
-from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional
+from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional,Resena
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -45,6 +45,7 @@ admin_bp = Blueprint('admin', __name__)
 # ----13  configuracion panel de control
 #-----14  Gestion de plantillas de correo
 #-----15  funciones promoccionales y de fidelización
+#-----16  reseñas y testimonios
 #
 
 
@@ -3173,3 +3174,81 @@ def aviso_activo():
             "enlace_boton": aviso.enlace_boton
         }
     return {"activo": False}
+
+
+#-----16  reseñas y testimonios
+
+@admin_bp.route('/foto_perfil/<emp_id>/<cedula>')
+def obtener_foto_empleado(emp_id, cedula):
+    empresa = Empresa.query.get_or_404(emp_id)
+    # os.path.join detecta automáticamente si usar / o \
+    ruta_carpeta = os.path.join(empresa.emp_ruta_recursos, 'empleados', str(cedula))
+    return send_from_directory(ruta_carpeta, f"{cedula}.jpg")
+
+
+
+@admin_bp.route('/valorar/<emp_id>', methods=['GET', 'POST'])
+def dejar_resena(emp_id):
+    empresa = Empresa.query.filter_by(emp_id=emp_id).first_or_404()
+    ruta_limpia = empresa.emp_ruta_recursos.replace('\\', '/') if empresa.emp_ruta_recursos else ''
+
+    if request.method == 'POST':
+        # --- LÍNEA DE PRUEBA: Mira tu terminal cuando des click ---
+        print(f"DEBUG: Recibido POST para empresa {emp_id}")
+        print(f"DEBUG: Datos del Formulario: {request.form}")
+
+        try:
+            puntuacion = request.form.get('puntuacion')
+            
+            # Si no hay puntuación, redirigimos con aviso
+            if not puntuacion:
+                print("DEBUG: Error - No se recibió puntuación")
+                flash('Por favor, selecciona una puntuación antes de enviar.', 'warning')
+                return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
+
+            empl_id_raw = request.form.get('empl_id')
+            # Validamos que el ID sea numérico para evitar errores de base de datos
+            empl_id_final = int(empl_id_raw) if empl_id_raw and str(empl_id_raw).isdigit() else None
+
+            nueva_resena = Resena(
+                emp_id=emp_id,
+                empl_id=empl_id_final,
+                res_cliente_nombre=request.form.get('nombre', 'Anónimo').strip() or 'Anónimo',
+                res_puntuacion=int(puntuacion),
+                res_comentario=request.form.get('comentario', '').strip(),
+                res_fecha=datetime.now(),
+                res_visible=1
+            )
+            
+            db.session.add(nueva_resena)
+            db.session.commit()
+            print("DEBUG: Reseña guardada exitosamente")
+            
+            # Asegúrate de que el archivo 'admin/gracias.html' exista
+            return render_template('admin/gracias.html', empresa=empresa)
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG: ERROR CRÍTICO: {e}")
+            flash('Error interno al guardar. Inténtalo de nuevo.', 'danger')
+            return redirect(url_for('admin.dejar_resena', emp_id=emp_id))
+
+    # GET: Cargar empleados
+    empleados = Empleado.query.filter_by(
+        emp_id=emp_id, 
+        empl_activo=1, 
+        empl_mostrar_en_reserva=1
+    ).all()
+
+    return render_template('admin/resena_form.html', 
+                           empresa=empresa, 
+                           empleados=empleados, 
+                           ruta_recursos=ruta_limpia)
+
+@admin_bp.route('/panel-resenas')
+@login_required
+def ver_resenas():
+    # Usamos join para traer los nombres de los empleados en una sola consulta (más rápido)
+    resenas = Resena.query.filter_by(emp_id=current_user.emp_id)\
+                          .order_by(Resena.res_fecha.desc()).all()
+    return render_template('admin/resenas_listado.html', resenas=resenas)

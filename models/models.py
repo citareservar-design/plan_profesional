@@ -163,6 +163,19 @@ class Reserva(db.Model):
     # AGREGA ESTA LÍNEA PARA LA RELACIÓN:
     servicio = db.relationship('Servicio', backref='reservas')
     
+    
+    
+class Resena(db.Model):
+    __tablename__ = 'RESENAS'
+    res_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
+    empl_id = db.Column(db.Integer, db.ForeignKey('EMPLEADOS.empl_id'), nullable=True)
+    res_cliente_nombre = db.Column(db.String(100), default='Anónimo')
+    res_puntuacion = db.Column(db.Integer, nullable=False)
+    res_comentario = db.Column(db.Text)
+    res_fecha = db.Column(db.DateTime, default=datetime.now)
+    res_visible = db.Column(db.Integer, default=1)
+    
 class Servicio(db.Model):
     __tablename__ = 'SERVICIOS'
 

@@ -1,0 +1,62 @@
+/* --- Animaciones --- */
+@keyframes fadeInScale {
+    from { 
+        opacity: 0; 
+        transform: scale(0.9) translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1) translateY(0); 
+    }
+}
+
+.animate-fade-in {
+    animation: fadeInScale 0.3s ease-out forwards;
+}
+
+/* --- Estado Seleccionado (Sky 500) --- */
+.emp-radio:checked + label {
+    border-color: #0ea5e9 !important; /* sky-500 */
+    background-color: rgba(14, 165, 233, 0.15) !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.emp-radio:checked + label img {
+    border-color: #0ea5e9 !important;
+    transform: scale(1.1);
+}
+
+/* --- Componentes --- */
+.rotate-180 {
+    transform: rotate(180deg);
+}
+
+/* Scrollbar personalizada para la grilla si fuera necesaria */
+.custom-scroll::-webkit-scrollbar { 
+    width: 4px; 
+}
+
+.custom-scroll::-webkit-scrollbar-thumb { 
+    background: #334155; 
+    border-radius: 10px; 
+}
+
+/* Limitar ancho de texto en tarjetas pequeñas */
+.line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+}
+
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+.shake-animation {
+    animation: shake 0.2s ease-in-out 0s 2;
+}
