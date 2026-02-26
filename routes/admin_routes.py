@@ -3262,59 +3262,47 @@ def fidelizacion_promociones():
 @admin_bp.route('/ver-recurso-promo/<filename>')
 def servir_promo(filename):
     empresa = Empresa.query.first()
-    # C:\Apps\cocoanails
-    ruta_base = empresa.emp_ruta_recursos.strip()
+    # Usamos Path para que Linux encuentre la ruta sin importar las barras
+    directorio_final = Path(empresa.emp_ruta_recursos) / 'promociones'
     
-    # Unimos: C:\Apps\cocoanails + promociones
-    directorio_final = os.path.join(ruta_base, 'promociones')
-    directorio_final = os.path.normpath(directorio_final)
-
-    # filename aquí será '2222222222.jpg'
-    return send_from_directory(directorio_final, filename)
+    return send_from_directory(str(directorio_final), filename)
 
 
+
+from pathlib import Path # Asegúrate de tener esta importación arriba
 
 @admin_bp.route('/guardar-aviso', methods=['POST'])
+@login_required
 def guardar_aviso():
     try:
         aviso = AvisoPromocional.query.first()
-        # Obtenemos los datos de la empresa (asumiendo que hay una sola o usas la del usuario)
-        empresa = Empresa.query.first() 
-        
-        if not empresa:
-            flash('No se encontró la configuración de la empresa.', 'error')
-            return redirect(url_for('admin.fidelizacion_promociones'))
+        empresa = Empresa.query.filter_by(emp_id=current_user.emp_id).first() 
 
-        # 1. Actualizamos datos de texto
-        aviso.titulo = request.form.get('titulo')
-        aviso.mensaje = request.form.get('mensaje')
-        aviso.texto_boton = request.form.get('texto_boton', '¡Entendido!')
-        aviso.enlace_boton = request.form.get('enlace_boton')
-        aviso.activo = True if request.form.get('activo') else False
-        aviso.solo_una_vez = True if request.form.get('solo_una_vez') else False
-        
-        # 2. Manejo de la imagen
+        # ... (tus actualizaciones de texto igual) ...
+
         file = request.files.get('imagen')
         if file and file.filename != '':
-            # Validar que sea JPG
             if not file.filename.lower().endswith('.jpg'):
                 flash('Solo se permiten imágenes en formato .jpg', 'error')
                 return redirect(url_for('admin.fidelizacion_promociones'))
 
-            # Definir la ruta: ruta_recursos/promociones/
-            # Nota: empresa.emp_ruta_recursos debería ser algo como 'static/recursos'
-            ruta_base = empresa.emp_ruta_recursos.replace('\\', '/').strip('/')
-            carpeta_promo = os.path.abspath(os.path.join(current_app.root_path, ruta_base, 'promociones'))
+            # --- LÓGICA REPARADA PARA LINUX ---
+            # 1. Usamos Path para construir la ruta base de recursos
+            base_recursos = Path(empresa.emp_ruta_recursos)
             
-            # Crear la carpeta 'promociones' si no existe
-            if not os.path.exists(carpeta_promo):
-                os.makedirs(carpeta_promo, exist_ok=True)
+            # 2. Definimos la carpeta de promociones
+            carpeta_promo = base_recursos / 'promociones'
+            
+            # 3. Creamos la carpeta si no existe (Linux necesita permisos de escritura aquí)
+            carpeta_promo.mkdir(parents=True, exist_ok=True)
 
+            # 4. Nombre de archivo y ruta final
             nombre_archivo = f"{empresa.emp_nit}.jpg"
-            ruta_final = os.path.join(carpeta_promo, nombre_archivo)
+            ruta_final = carpeta_promo / nombre_archivo
 
-            file.save(ruta_final)
-            # Guardamos solo el nombre para que sea más fácil de manejar
+            # 5. Guardamos (str() convierte el objeto Path a texto que entiende file.save)
+            file.save(str(ruta_final))
+            
             aviso.imagen_url = nombre_archivo
 
         db.session.commit()
