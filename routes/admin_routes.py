@@ -404,7 +404,6 @@ def dashboard():
 
     # 7. RETURN (Asegúrate que el nombre total_ingresos coincida con tu HTML)
     return render_template('admin/dashboard.html', 
-                           empresa=empresa_data,
                            dia_pico=dia_pico_nombre,
                            conteo_semanal=conteo_semanal,
                            c_logradas=c_logradas_total,
@@ -1318,7 +1317,7 @@ def gestion_servicios():
 
     # Pasamos AMBAS listas al HTML
     return render_template(
-        'admin/servicios.html', 
+        'admin/servicios.html',
         servicios=servicios_activos, 
         inactivos=servicios_inactivos
     )
@@ -3115,7 +3114,7 @@ def gestion_historial():
         lista_servicios = Servicio.query.filter_by(emp_id=current_user.emp_id).all()
 
         return render_template('admin/historial.html', 
-                               reservas_json=json.dumps(resultados), 
+                               reservas_json=json.dumps(resultados),
                                empleados=lista_empleados,
                                servicios=lista_servicios,
                                filtros_activos=tiene_filtros)

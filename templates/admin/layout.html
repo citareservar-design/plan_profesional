@@ -251,28 +251,31 @@
         </aside>
 
         <main class="flex-1 overflow-x-hidden flex flex-col">
-            <header class="h-24 flex items-center justify-between px-8 bg-[#0f172a]/80 backdrop-blur-xl sticky top-0 z-20 border-b border-white/5">
-                <div class="w-12 lg:hidden"></div>
-                
-                <div class="relative w-96 hidden md:block">
-                    <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                    <input type="text" placeholder="Buscar reservas o clientes..." class="w-full bg-slate-800/40 border border-white/5 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:ring-2 focus:ring-sky-500/20 outline-none transition-all" />
-                </div>
+<header class="h-24 flex items-center justify-between px-8 bg-[#0f172a]/80 backdrop-blur-xl sticky top-0 z-20 border-b border-white/5">
+    <div class="flex flex-col">
+    </div>
 
-                <div class="flex items-center gap-5">
-                    <div class="hidden sm:block text-right">
-                        <p class="text-xs font-black text-white leading-none">{{ current_user.usu_nombre if current_user.is_authenticated else "Admin" }}</p>
-                        <p class="text-[9px] text-emerald-400 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center justify-end gap-1.5">
-                            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Sincronizado
-                        </p>
-                    </div>
-                    <div class="relative group cursor-pointer">
-                        <div class="p-0.5 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-500 group-hover:rotate-6 transition-transform">
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.usu_nombre if current_user.is_authenticated else 'A' }}&background=1e293b&color=0ea5e9" class="w-12 h-12 rounded-[14px] border-2 border-[#0f172a]" />
-                        </div>
-                    </div>
-                </div>
-            </header>
+    <div class="flex items-center gap-6">
+        <div class="hidden sm:block text-right">
+            <p class="text-sm font-black text-slate-200 leading-none">
+                {{ current_user.usu_nombre if current_user.is_authenticated else "Administrador" }}
+            </p>
+            <p class="text-[9px] text-emerald-400 font-bold uppercase tracking-[0.2em] mt-2 flex items-center justify-end gap-1.5">
+                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span> 
+                Sincronizado
+            </p>
+        </div>
+
+        <div class="relative group cursor-pointer">
+            <div class="p-0.5 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-500 group-hover:rotate-6 transition-transform duration-300 shadow-lg shadow-sky-500/20">
+                <img src="https://ui-avatars.com/api/?name={{ current_user.usu_nombre if current_user.is_authenticated else 'A' }}&background=1e293b&color=0ea5e9&bold=true" 
+                     class="w-12 h-12 rounded-[14px] border-2 border-[#0f172a] object-cover" 
+                     alt="Avatar">
+            </div>
+            <div class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-[#0f172a] rounded-full"></div>
+        </div>
+    </div>
+</header>
 
             <div class="p-6 md:p-12">
                 <div id="flash-container">
