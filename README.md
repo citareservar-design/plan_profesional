@@ -1,4 +1,4 @@
-📅 AgendApp Pro - Gestión de Citas Online
+📅 AgendApp - Gestión de Citas Online
 Sistema integral para la creación, gestión y automatización de reservas en línea.
 
 🚀 Requisitos para la Configuración Inicial
