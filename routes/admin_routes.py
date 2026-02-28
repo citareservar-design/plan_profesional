@@ -3270,47 +3270,58 @@ def servir_promo(filename):
 
 
 from pathlib import Path # Asegúrate de tener esta importación arriba
-
 @admin_bp.route('/guardar-aviso', methods=['POST'])
 @login_required
 def guardar_aviso():
     try:
+        # 1. Recuperar el registro (asumimos que siempre existe el ID 1)
         aviso = AvisoPromocional.query.first()
-        empresa = Empresa.query.filter_by(emp_id=current_user.emp_id).first() 
+        if not aviso:
+            flash('No se encontró el registro de aviso en la BD', 'error')
+            return redirect(url_for('admin.fidelizacion_promociones'))
 
-        # ... (tus actualizaciones de texto igual) ...
+        # 2. CAPTURAR Y ASIGNAR TEXTOS (Asegúrate que los 'name' coincidan con tu HTML)
+        # Usamos el segundo argumento de .get() para evitar que sea None si llega vacío
+        aviso.titulo = request.form.get('titulo', aviso.titulo)
+        aviso.mensaje = request.form.get('mensaje', aviso.mensaje)
+        aviso.texto_boton = request.form.get('texto_boton', '¡Entendido!')
+        aviso.enlace_boton = request.form.get('enlace_boton', '')
+        
+        # Manejo de Checkboxes (vienen como 'on' si están marcados o None si no)
+        aviso.activo = 1 if request.form.get('activo') == 'on' else 0
+        aviso.solo_una_vez = 1 if request.form.get('solo_una_vez') == 'on' else 0
+        
+        # 3. Actualizar fecha (importante para control)
+        from datetime import datetime
+        aviso.fecha_actualizacion = datetime.now()
 
+        # 4. LÓGICA DE IMAGEN (Tu código optimizado)
         file = request.files.get('imagen')
         if file and file.filename != '':
             if not file.filename.lower().endswith('.jpg'):
-                flash('Solo se permiten imágenes en formato .jpg', 'error')
+                flash('Solo se permiten imágenes .jpg', 'error')
                 return redirect(url_for('admin.fidelizacion_promociones'))
 
-            # --- LÓGICA REPARADA PARA LINUX ---
-            # 1. Usamos Path para construir la ruta base de recursos
+            empresa = Empresa.query.filter_by(emp_id=current_user.emp_id).first()
             base_recursos = Path(empresa.emp_ruta_recursos)
-            
-            # 2. Definimos la carpeta de promociones
             carpeta_promo = base_recursos / 'promociones'
-            
-            # 3. Creamos la carpeta si no existe (Linux necesita permisos de escritura aquí)
             carpeta_promo.mkdir(parents=True, exist_ok=True)
 
-            # 4. Nombre de archivo y ruta final
             nombre_archivo = f"{empresa.emp_nit}.jpg"
             ruta_final = carpeta_promo / nombre_archivo
-
-            # 5. Guardamos (str() convierte el objeto Path a texto que entiende file.save)
-            file.save(str(ruta_final))
             
+            file.save(str(ruta_final))
             aviso.imagen_url = nombre_archivo
 
+        # 5. GUARDAR CAMBIOS
         db.session.commit()
-        flash('¡Campaña de fidelización actualizada con éxito!', 'success')
+        flash('¡Campaña actualizada con éxito!', 'success')
         
     except Exception as e:
         db.session.rollback()
+        # Esto te dirá exactamente qué falló (ej: campo null, error de permisos, etc.)
         flash(f'Error al procesar: {str(e)}', 'error')
+        print(f"Error detallado: {e}") # Para verlo en la consola de Flask
     
     return redirect(url_for('admin.fidelizacion_promociones'))
 
