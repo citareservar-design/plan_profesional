@@ -512,11 +512,16 @@ function enviarRecordatorioMasivo() {
 function marcarContactado(enlace) {
     const fila = enlace.closest('.cliente-row');
     if (fila) {
-        fila.classList.add('opacity-40', 'grayscale-[0.5]'); // Se vuelve grisáceo y tenue
-        fila.style.borderLeft = "4px solid #10b981";
-        enlace.classList.remove('btn-brillante');
+        fila.classList.add('opacity-50'); // Menos agresivo que 40
+        // Mantenemos el color que indica por qué se le contactó
+        if (fila.dataset.cumple === 'true') fila.style.borderLeft = "4px solid #ec4899";
+        else if (fila.dataset.precumple === 'true') fila.style.borderLeft = "4px solid #0ea5e9";
+        else fila.style.borderLeft = "4px solid #10b981";
+        
+        enlace.classList.remove('btn-brillante', 'animate-pulse');
     }
 }
+
 
 function filtrarClientes() {
     const activeBtn = document.querySelector('.btn-filtro.active');
@@ -531,12 +536,21 @@ function filtrarClientes() {
 // --- LÓGICA DE WHATSAPP DINÁMICO (SELECTOR DE PLANTILLAS) ---
 
 // Añadimos esPreCumple como quinto parámetro
-function abrirSelectorPlantillas(id, nombre, esCumple, telefono, esPreCumple) {
+
+function abrirSelectorPlantillas(id, nombre, esCumple, telefono, esPreCumple, esRiesgo) {
     const lista = document.getElementById('listaPlantillasDisponibles');
-    lista.innerHTML = '<div class="text-center py-4 text-slate-500"><i class="fa-solid fa-circle-notch animate-spin"></i> Cargando plantillas...</div>';
+    
+    // 1. Mostrar estado de carga
+    lista.innerHTML = `
+        <div class="text-center py-8 text-slate-500">
+            <i class="fa-solid fa-circle-notch animate-spin text-2xl mb-2"></i>
+            <p class="text-xs">Cargando plantillas personalizadas...</p>
+        </div>`;
     
     document.getElementById('modalSelectorPlantillas').classList.remove('hidden');
+    document.getElementById('modalSelectorPlantillas').classList.add('flex');
 
+    // 2. Obtener plantillas desde la API
     fetch('/admin/obtener_plantillas')
         .then(response => response.json())
         .then(data => {
@@ -544,7 +558,7 @@ function abrirSelectorPlantillas(id, nombre, esCumple, telefono, esPreCumple) {
             const nombreEmpresa = data.empresa;
             const plantillas = data.plantillas;
 
-            // --- CIRUGÍA DE FILTRADO ---
+            // 3. FILTRADO ESTRICTO (Aquí es donde estaba el error)
             const filtradas = plantillas.filter(p => {
                 const tipo = p.plan_tipo ? p.plan_tipo.toLowerCase() : '';
                 
@@ -552,52 +566,75 @@ function abrirSelectorPlantillas(id, nombre, esCumple, telefono, esPreCumple) {
                     return tipo === 'cumpleaños';
                 } else if (esPreCumple) {
                     return tipo === 'pre-cumple';
+                } else if (esRiesgo) {
+                    // CAMBIO AQUÍ: Solo mostrar tipo 'ausente' para clientes en riesgo
+                    return tipo === 'ausente'; 
                 } else {
-                    // Si no es ninguna de las anteriores, mostramos las normales
-                    return tipo !== 'cumpleaños' && tipo !== 'pre-cumple';
+                    // Para clientes normales, ocultamos todas las especiales
+                    return tipo !== 'cumpleaños' && tipo !== 'pre-cumple' && tipo !== 'ausente';
                 }
             });
-            // ---------------------------
 
             if (filtradas.length === 0) {
                 lista.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">No hay plantillas configuradas para este estado.</div>';
                 return;
             }
 
+            // 4. Renderizado
             filtradas.forEach(plan => {
                 let msj = plan.plan_mensaje;
-                
                 msj = msj.replace(/{cliente}/gi, nombre);
                 msj = msj.replace(/{empresa}/gi, nombreEmpresa);
                 msj = msj.replace(/{fecha}/gi, new Date().toLocaleDateString());
-                msj = msj.replace(/{hora}/gi, new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
 
                 const btn = document.createElement('button');
                 
-                // Color dinámico del botón según el tipo
-                let colorClase = "text-emerald-500";
-                if (esCumple) colorClase = "text-pink-500";
-                if (esPreCumple) colorClase = "text-sky-500";
+                // Estilos dinámicos
+                let colorBorde = "border-l-emerald-500";
+                let colorTexto = "text-emerald-500";
+                let efectoExtra = ""; 
+                let icono = "📱";
 
-                btn.className = "w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-left hover:bg-white/10 transition-all mb-3 group border-l-4 " + (esCumple ? "border-l-pink-500" : esPreCumple ? "border-l-sky-500" : "border-l-emerald-500");
+                if (esCumple) {
+                    colorBorde = "border-l-pink-500";
+                    colorTexto = "text-pink-500";
+                    icono = "🎂";
+                } else if (esPreCumple) {
+                    colorBorde = "border-l-sky-500";
+                    colorTexto = "text-sky-500";
+                    icono = "✨";
+                } else if (esRiesgo) {
+                    // Estilo naranja para Riesgo/Ausente
+                    colorBorde = "border-l-orange-500";
+                    colorTexto = "text-orange-500";
+                    efectoExtra = "shadow-lg shadow-orange-500/20";
+                    icono = "⚠️";
+                }
+
+                btn.className = `w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-left hover:bg-white/10 transition-all mb-3 group border-l-4 ${colorBorde} ${efectoExtra}`;
                 
                 btn.onclick = () => {
                     window.open(`https://wa.me/57${telefono}?text=${encodeURIComponent(msj)}`, '_blank');
                     cerrarSelector();
+                    const fila = document.getElementById(`cli-${id}`);
+                    if (fila) {
+                        const btnOriginal = fila.querySelector('button[onclick*="abrirSelector"]');
+                        if (btnOriginal) marcarContactado(btnOriginal);
+                    }
                 };
 
                 btn.innerHTML = `
-                    <div class="${colorClase} font-black text-[10px] uppercase tracking-wider mb-1">${plan.plan_nombre}</div>
+                    <div class="${colorTexto} font-black text-[10px] uppercase tracking-wider mb-1 flex items-center gap-2">
+                        <span>${icono}</span> ${plan.plan_nombre}
+                    </div>
                     <div class="text-slate-300 text-xs leading-relaxed">${msj}</div>
                 `;
                 lista.appendChild(btn);
             });
-        })
-        .catch(err => {
-            console.error(err);
-            lista.innerHTML = '<div class="text-red-500 text-center text-xs">Error al conectar con el servidor.</div>';
         });
 }
+
+
 
 /**
  * Envía la orden al servidor para procesar el mensaje (reemplazar etiquetas) y abre el link

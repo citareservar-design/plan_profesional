@@ -99,32 +99,6 @@
           </div>
         </div>
 
-        <div
-          id="banner-riesgo"
-          class="hidden mb-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 shadow-xl shadow-amber-900/10"
-        >
-          <div
-            class="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left"
-          >
-            <div>
-              <h4
-                class="text-amber-500 font-black text-sm uppercase tracking-wider"
-              >
-                Operación Recuperación
-              </h4>
-              <p class="text-slate-400 text-[11px]">
-                Tienes clientes inactivos. ¡Escríbeles ahora!
-              </p>
-            </div>
-            <button
-              onclick="enviarRecordatorioMasivo()"
-              class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black px-6 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/40 flex items-center justify-center gap-2 active:scale-95"
-            >
-              <i class="fa-brands fa-whatsapp text-sm"></i> ENVIAR A TODOS
-            </button>
-          </div>
-        </div>
-
         <div class="relative group">
           <button
             class="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
@@ -243,22 +217,26 @@
                 </div>
 
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2 mb-0.5">
-                    <span class="font-bold text-white cli-nombre truncate"
-                      >{{ cliente.cli_nombre }}</span
-                    >
-                    {% if cliente.es_cumpleanos %}
-                    <span
-                      class="px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-500 text-[8px] font-black animate-pulse"
-                      >CUMPLEAÑOS HOY</span
-                    >
-                    {% elif cliente.es_pre_cumple %}
-                    <span
-                      class="px-1.5 py-0.5 rounded bg-yellow-200/20 text-yellow-300 text-[8px] font-black"
-                      >CUMPLEAÑOS PRONTO</span
-                    >
-                    {% endif %}
-                  </div>
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="font-bold text-white cli-nombre truncate">
+                    {{ cliente.cli_nombre }}
+                  </span>
+
+                  {% if cliente.es_cumpleanos %}
+                    <span class="px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-500 text-[8px] font-black animate-pulse">
+                      CUMPLEAÑOS HOY
+                    </span>
+                  {% elif cliente.es_pre_cumple %}
+                    <span class="px-1.5 py-0.5 rounded bg-yellow-200/20 text-yellow-300 text-[8px] font-black">
+                      CUMPLEAÑOS PRONTO
+                    </span>
+                  {% elif cliente.en_riesgo %}
+                    {# ESTA ES LA PARTE QUE FALTA #}
+                    <span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 text-[8px] font-black animacion-riesgo-latido">
+                      EN RIESGO
+                    </span>
+                  {% endif %}
+                </div>
 
                   <div class="mb-1">
                     <span class="text-xs text-sky-400 font-medium cli-alias"
@@ -308,14 +286,26 @@
 
             <td class="px-8 py-6 text-right">
               <div class="flex justify-end gap-2">
-                {# BOTÓN WHATSAPP #} {% if cliente.cli_telefono %}
-                <button
-                  onclick="abrirSelectorPlantillas('{{ cliente.cli_id }}', '{{ cliente.cli_nombre }}', {{ 'true' if cliente.es_cumpleanos else 'false' }}, '{{ cliente.cli_telefono }}', {{ 'true' if cliente.es_pre_cumple else 'false' }})"
-                  title="{{ '¡Cumpleaños Hoy!' if cliente.es_cumpleanos else '¡Próximo Cumpleaños!' if cliente.es_pre_cumple else 'Enviar WhatsApp' }}"
-                  class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-md hover:scale-110 {% if cliente.es_cumpleanos %} bg-pink-500/20 text-pink-500 animate-bounce {% elif cliente.es_pre_cumple %} bg-yellow-500/20 text-yellow-500 animate-pulse border border-yellow-500/40 {% else %} bg-emerald-500/10 text-emerald-500 {% endif %}"
-                >
-                  <i class="fa-brands fa-whatsapp text-lg"></i>
-                </button>
+      
+            {# BOTÓN WHATSAPP ACTUALIZADO CON RIESGO #}
+            {% if cliente.cli_telefono %}
+            <button
+              onclick="abrirSelectorPlantillas('{{ cliente.cli_id }}', '{{ cliente.cli_nombre }}', {{ 'true' if cliente.es_cumpleanos else 'false' }}, '{{ cliente.cli_telefono }}', {{ 'true' if cliente.es_pre_cumple else 'false' }}, {{ 'true' if cliente.en_riesgo else 'false' }})"
+              title="{% if cliente.es_cumpleanos %}¡Cumpleaños Hoy!{% elif cliente.es_pre_cumple %}¡Próximo Cumpleaños!{% elif cliente.en_riesgo %}¡CLIENTE EN RIESGO!{% else %}Enviar WhatsApp{% endif %}"
+              class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-md hover:scale-110 
+              {% if cliente.es_cumpleanos %} 
+                bg-pink-500/20 text-pink-500 animate-bounce 
+              {% elif cliente.es_pre_cumple %} 
+                bg-yellow-500/20 text-yellow-500 animate-pulse border border-yellow-500/40 
+              {% elif cliente.en_riesgo %} 
+                bg-orange-500/20 text-orange-500 animacion-riesgo-latido border border-orange-500/50
+              {% else %} 
+                bg-emerald-500/10 text-emerald-500 
+              {% endif %}"
+            >
+              <i class="fa-brands fa-whatsapp text-lg"></i>
+            </button>
+
                 {% endif %} {# BOTÓN EDITAR #}
                 <button
                   onclick='abrirModalEditar({{ {

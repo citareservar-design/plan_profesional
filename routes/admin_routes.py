@@ -985,18 +985,28 @@ def gestion_clientes():
             elif 1 <= diferencia <= 2:
                 cliente.es_pre_cumple = True
 
-        # --- C. LÓGICA DE CLIENTE EN RIESGO ---
+
+
+# --- C. LÓGICA DE CLIENTE EN RIESGO (CORREGIDA) ---
         ultima_reserva = Reserva.query.filter_by(cli_id=cliente.cli_id)\
             .order_by(Reserva.res_fecha.desc()).first()
         
         cliente.en_riesgo = False
+        cliente.en_riesgo_critico = False 
         cliente.dias_ausente = 0
         
         if ultima_reserva:
             diferencia_riesgo = hoy - ultima_reserva.res_fecha
             cliente.dias_ausente = diferencia_riesgo.days
             
-            if cliente.dias_ausente > 30:
+            # 1. RIESGO CRÍTICO: Entre 30 y 45 días
+            if 30 <= cliente.dias_ausente <= 45:
+                cliente.en_riesgo_critico = True
+            
+            # 2. RIESGO GENERAL: Ahora con LÍMITE de 50 días
+            # Solo marcará riesgo si está entre 31 y 50 días. 
+            # Si tiene 51 o más (como un año), ya no se considera "riesgo" activo para campaña.
+            if 30 < cliente.dias_ausente <= 50:
                 cliente.en_riesgo = True
     
     # Ordenamos: Cumpleaños Hoy > Pre-Cumple > En Riesgo > Más Reservas
