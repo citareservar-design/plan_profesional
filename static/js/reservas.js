@@ -142,7 +142,7 @@ async function enviarMensajeConfirmacion(ids) {
             let fraseFecha = calcularFraseFecha(fechaAttr); 
 
             // --- MENSAJE ---
-            let texto = `*¡Hola, ${nombre}!* 👋\n\nTe escribimos de *${empresa}*\n\nTe recordamos tu cita de *${fraseFecha}* a las *${hora12}*.\n`;
+            let texto = `*¡Hola, ${nombre}!* 👋\n\nTe escribimos de *${empresa}*.\n\nTe recordamos tu cita de *${fraseFecha}* a las *${hora12}*.\n`;
             if (direccion) texto += `📍 *Ubicación:* ${direccion}\n`;
             texto += `\n*📌 ACCIÓN REQUERIDA:* Por favor responde con la palabra *CONFIRMAR* o *CANCELAR*.\n\n⚠️ Si no respondes en las próximas horas, el turno se cancelará.`;
 
