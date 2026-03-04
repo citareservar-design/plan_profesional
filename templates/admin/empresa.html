@@ -97,8 +97,11 @@
                 </div>
                 <div class="space-y-2">
                     <label class="block text-slate-400 text-sm font-medium ml-1">Contraseña de Aplicación</label>
-                    <input type="password" name="smtp_clave" value="{{ empresa.emp_clave_smtp or '' }}" placeholder="••••••••••••"
-                           class="w-full bg-slate-950/40 border border-white/5 rounded-2xl px-5 py-3 text-white outline-none focus:border-purple-500/50 transition-all">
+                    <input type="password" 
+                        name="smtp_clave" 
+                        value="{{ empresa.emp_clave_cuenta_smtp or '' }}" 
+                        placeholder="••••••••••••"
+                        class="w-full bg-slate-950/40 border border-white/5 rounded-2xl px-5 py-3 text-white outline-none focus:border-purple-500/50 transition-all">
                 </div>
             </div>
             

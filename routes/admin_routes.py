@@ -2058,45 +2058,54 @@ def eliminar_bloqueo(id):
     return redirect(url_for('admin.configurar_horarios'))
 
 # --- 8. CONFIGURACIÓN DE EMPRESA ---
-
 @admin_bp.route('/empresa', methods=['GET', 'POST'])
 @login_required
 def configurar_empresa():
+    # Obtenemos la empresa del usuario actual
     empresa = Empresa.query.get_or_404(current_user.emp_id)
 
     if request.method == 'POST':
         try:
-            # Datos básicos
+            # 1. Datos básicos
             empresa.emp_razon_social = request.form.get('nombre')
             empresa.emp_nit = request.form.get('nit')
             empresa.emp_direccion = request.form.get('direccion')
             empresa.emp_email = request.form.get('email')
             empresa.emp_telefono = request.form.get('telefono')
             
-            # --- NUEVA LÍNEA PARA RUTA DE RECURSOS ---
-            empresa.emp_ruta_recursos = request.form.get('ruta_recursos').strip() if request.form.get('ruta_recursos') else None
-            # ----------------------------------------
+            # 2. Ruta de recursos
+            ruta = request.form.get('ruta_recursos')
+            empresa.emp_ruta_recursos = ruta.strip() if ruta else None
 
-            # SMTP
+            # 3. Configuración SMTP (Servidor, Puerto y Cuenta)
             empresa.emp_servidor_smtp = request.form.get('smtp_servidor').strip() if request.form.get('smtp_servidor') else None
             empresa.emp_puerto_smtp = request.form.get('smtp_puerto').strip() if request.form.get('smtp_puerto') else None
             empresa.emp_cuenta_smtp = request.form.get('smtp_cuenta').strip() if request.form.get('smtp_cuenta') else None
 
-            # Licencia
-            clave = request.form.get('clave_autorizacion')
-            if clave == "agendapp2026*":
+            # 4. Contraseña SMTP (Basado en tu definición de tabla SQL: emp_clave_cuenta_smtp)
+            # Solo la actualizamos si el usuario escribió algo en el campo, para no sobreescribir con vacío
+            nueva_clave = request.form.get('smtp_clave')
+            if nueva_clave and nueva_clave.strip():
+                empresa.emp_clave_cuenta_smtp = nueva_clave.strip()
+
+            # 5. Validación de Licencia / Plan
+            clave_aut = request.form.get('clave_autorizacion')
+            if clave_aut == "agendapp2026*":
                 empresa.emp_max_usuarios = request.form.get('max_usuarios')
                 empresa.emp_tipo_plan = request.form.get('plan')
 
+            # Guardamos los cambios en la base de datos
             db.session.commit()
-            flash("Datos actualizados correctamente", "success")
+            flash("Datos de la empresa actualizados correctamente", "success")
+
         except Exception as e:
             db.session.rollback()
-            print(f"ERROR AL GUARDAR EN BD: {e}") 
-            flash(f"Error al guardar: {str(e)}", "danger")
+            print(f"ERROR CRÍTICO AL GUARDAR EMPRESA: {e}") 
+            flash(f"Error al guardar los cambios: {str(e)}", "danger")
             
         return redirect(url_for('admin.configurar_empresa'))
 
+    # Si es GET, simplemente renderizamos la plantilla con el objeto empresa
     return render_template('admin/empresa.html', empresa=empresa)
 
 
