@@ -27,9 +27,6 @@
         body { font-family: "Inter", sans-serif; scroll-behavior: smooth; }
         .fade-up { transform: translateY(20px); opacity: 0; animation: fadeUpAnim 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         @keyframes fadeUpAnim { to { transform: translateY(0); opacity: 1; } }
-        .swal2-popup { border-radius: 1.5rem !important; padding: 1.5rem !important; background: #fff !important; }
-        .dark .swal2-popup { background: #0f172a !important; color: #f8fafc !important; }
-        .swal2-title { font-weight: 900 !important; letter-spacing: -0.025em !important; }
     </style>
 </head>
 
@@ -37,16 +34,16 @@
     
     <nav class="fixed top-0 left-0 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-sm py-3 z-50 border-b border-blue-100 dark:border-slate-800">
         <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
-            <a href="{{ url_for('appointment.index') }}" class="flex items-center gap-3 hover:opacity-80 transition-all active:scale-95 group">
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center p-1 border border-sky-100 dark:border-sky-500/20 shadow-sm">
+            <a href="{{ url_for('appointment.index') }}" class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center p-1 border border-sky-100 dark:border-sky-500/20 shadow-sm">
                     <img src="{{ url_for('static', filename='img/logo_company.png') }}" alt="Logo" class="w-full h-full object-contain" />
                 </div>
-                <div class="flex flex-col justify-center leading-none">
+                <div class="flex flex-col leading-none">
                     <span class="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Λgend<span class="text-sky-500">Λpp</span></span>
                     <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestión de Citas</span>
                 </div>
             </a>
-            <a href="{{ url_for('appointment.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700">
+            <a href="{{ url_for('appointment.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest">
                 Volver
             </a>
         </div>
@@ -54,25 +51,24 @@
 
     <div class="h-20"></div>
 
-    <main class="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-6 md:p-8 border border-slate-200 dark:border-slate-800 transition-all">
+    <main class="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-6 md:p-8 border border-slate-200 dark:border-slate-800">
         <div class="text-center mb-8 fade-up">
             <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tighter">Mis Citas Agendadas</h1>
-            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Busca tus registros por correo electrónico.</p>
         </div>
 
-        <form method="GET" action="{{ url_for('admin.mis_citas') }}" class="bg-blue-50/50 dark:bg-slate-800/40 p-5 md:p-6 rounded-2xl border border-blue-100 dark:border-slate-700 mb-10 fade-up">
-            <label class="block text-[10px] font-black text-blue-600 dark:text-brand-500 uppercase tracking-[0.2em] mb-3">Tu Email de Registro</label>
+        <form method="GET" action="{{ url_for('admin.mis_citas') }}" class="bg-blue-50/50 dark:bg-slate-800/40 p-5 rounded-2xl border border-blue-100 dark:border-slate-700 mb-10 fade-up">
+            <label class="block text-[10px] font-black text-blue-600 dark:text-brand-500 uppercase tracking-widest mb-3">Email de Registro</label>
             <div class="flex flex-col sm:flex-row gap-3">
                 <input type="email" name="email" required value="{{ email_buscado or '' }}" placeholder="nombre@correo.com"
-                    class="flex-1 px-4 py-3 rounded-xl border border-blue-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all font-medium" />
-                <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg shadow-brand-500/20 active:scale-95">
+                    class="flex-1 px-4 py-3 rounded-xl border border-blue-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 outline-none font-medium" />
+                <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg shadow-brand-500/20">
                     Buscar Citas
                 </button>
             </div>
         </form>
 
         {% if email_buscado %} 
-            {% if citas_cliente and citas_cliente|length > 0 %}
+            {% if citas_cliente %}
                 
                 <div class="md:hidden flex flex-col gap-4 fade-up">
                     {% for cita in citas_cliente %}
@@ -85,21 +81,38 @@
                                 {{ cita.res_estado }}
                             </span>
                         </div>
+                        
                         <div class="mb-5">
                             <h3 class="text-slate-900 dark:text-white font-black text-xl tracking-tight">{{ cita.res_fecha.strftime('%d/%m/%Y') }}</h3>
                             <p class="text-slate-500 dark:text-slate-400 font-bold text-sm">{{ cita.res_hora.strftime('%I:%M %p') }}</p>
                         </div>
 
+                        <div class="mb-5 py-3 border-t border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total a pagar</span>
+                                <span class="text-slate-900 dark:text-white font-black text-lg">${{ "{:,.0f}".format(cita.precio_display) if cita.precio_display else '0' }}</span>
+                            </div>
+                            
+                            {% if cita.res_estado_pago == 'pagado' %}
+                                <span class="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-lg font-black text-[10px] uppercase tracking-widest">Saldado ✅</span>
+                            {% elif cita.ser_id %}
+                                <a href="{{ url_for('admin.generar_pago_servicio', ser_id=cita.ser_id, email=email_buscado) }}" 
+                                   class="px-5 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-blue-500/30 active:scale-95 transition-transform">
+                                    Pagar ahora
+                                </a>
+                            {% else %}
+                                <span class="text-[9px] text-slate-400 italic">No disponible</span>
+                            {% endif %}
+                        </div>
+
                         <div class="flex gap-2 w-full">
                             {% if cita.res_estado.strip().lower() == 'pendiente' %}
-                                <button data-id="{{ cita.res_id }}" 
-                                        data-servicio="{{ cita.res_tipo_servicio }}"
-                                        onclick="prepararReagendar(this.getAttribute('data-id'), this.getAttribute('data-servicio'))"
-                                        class="flex-1 py-3 bg-white dark:bg-slate-900 border border-brand-200 dark:border-brand-900/30 text-brand-500 text-[10px] font-black rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
+                                <button onclick="prepararReagendar('{{ cita.res_id }}', '{{ cita.res_tipo_servicio }}')"
+                                        class="flex-1 py-3 border border-brand-200 dark:border-brand-900/30 text-brand-500 text-[10px] font-black rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
                                     Reagendar
                                 </button>
                                 <button onclick="confirmarCancelacion('{{ cita.res_id }}')" 
-                                        class="flex-1 py-3 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 text-red-500 text-[10px] font-black rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
+                                        class="flex-1 py-3 border border-red-200 dark:border-red-900/30 text-red-500 text-[10px] font-black rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
                                     Cancelar
                                 </button>
                             {% else %}
@@ -116,42 +129,55 @@
                     <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                         <thead class="bg-slate-50 dark:bg-slate-800/50">
                             <tr>
-                                <th class="px-6 py-4 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
-                                <th class="px-6 py-4 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Hora</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha / Hora</th>
                                 <th class="px-6 py-4 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Servicio</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Pago</th>
                                 <th class="px-6 py-4 text-right text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
                             {% for cita in citas_cliente %}
-                            <tr class="hover:bg-blue-50/30 dark:hover:bg-slate-800/30 transition-colors group">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800 dark:text-slate-200">
-                                    {{ cita.res_fecha.strftime('%d/%m/%Y') }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-600 dark:text-slate-400">
-                                    {{ cita.res_hora.strftime('%I:%M %p') }}
+                            <tr class="hover:bg-blue-50/30 dark:hover:bg-slate-800/30 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-bold text-slate-800 dark:text-slate-200">{{ cita.res_fecha.strftime('%d/%m/%Y') }}</div>
+                                    <div class="text-[11px] font-medium text-slate-500">{{ cita.res_hora.strftime('%I:%M %p') }}</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-3 py-1 bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400 text-[10px] font-black rounded-lg uppercase border border-brand-100 dark:border-brand-500/20">
                                         {{ cita.res_tipo_servicio }}
                                     </span>
                                 </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if cita.res_estado_pago == 'pagado' %}
+                                        <span class="flex items-center gap-1.5 text-emerald-500 font-black text-[10px] uppercase tracking-widest">
+                                            Saldado ✅
+                                        </span>
+                                    {% elif cita.ser_id %}
+                                        <a href="{{ url_for('admin.generar_pago_servicio', ser_id=cita.ser_id, email=email_buscado) }}" 
+                                           class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black uppercase tracking-tighter rounded-lg transition-all active:scale-95 shadow-sm shadow-blue-500/20">
+                                            <img src="https://www.mercadopago.com/org-img/MP_logo.png" class="h-2 filter brightness-0 invert" alt="MP">
+                                            Pagar ${{ "{:,.0f}".format(cita.precio_display) }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-[10px] text-slate-400 italic">No disponible</span>
+                                    {% endif %}
+                                </td>
+
                                 <td class="px-6 py-4 whitespace-nowrap text-right">
                                     {% if cita.res_estado.strip().lower() == 'pendiente' %}
                                         <div class="flex justify-end gap-4">
-                                            <button data-id="{{ cita.res_id }}" 
-                                                    data-servicio="{{ cita.res_tipo_servicio }}"
-                                                    onclick="prepararReagendar(this.getAttribute('data-id'), this.getAttribute('data-servicio'))" 
-                                                    class="text-brand-500 hover:text-brand-700 dark:hover:text-brand-400 text-xs font-black uppercase tracking-tighter transition-colors">
+                                            <button onclick="prepararReagendar('{{ cita.res_id }}', '{{ cita.res_tipo_servicio }}')" 
+                                                    class="text-brand-500 hover:text-brand-700 text-xs font-black uppercase tracking-tighter transition-colors">
                                                 Reagendar
                                             </button>
                                             <button onclick="confirmarCancelacion('{{ cita.res_id }}')" 
-                                                    class="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-xs font-black uppercase tracking-tighter transition-colors">
+                                                    class="text-red-500 hover:text-red-700 text-xs font-black uppercase tracking-tighter transition-colors">
                                                 Cancelar
                                             </button>
                                         </div>
                                     {% else %}
-                                        <span class="text-slate-400 text-[10px] font-bold uppercase italic opacity-60">
+                                        <span class="text-slate-400 text-[10px] font-bold uppercase tracking-widest italic opacity-60">
                                             {{ cita.res_estado }}
                                         </span>
                                     {% endif %}
@@ -161,13 +187,10 @@
                         </tbody>
                     </table>
                 </div>
+
             {% else %}
                 <div class="text-center py-16 px-6 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 fade-up">
-                    <div class="mb-4 text-slate-300 dark:text-slate-700 flex justify-center">
-                        <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <p class="text-slate-500 dark:text-slate-400 font-medium italic text-lg">No encontramos citas activas para <br><span class="text-brand-600 dark:text-brand-400 font-black not-italic">{{ email_buscado }}</span></p>
-                    <p class="mt-2 text-slate-400 dark:text-slate-600 text-xs font-bold uppercase tracking-widest">Intenta con otro correo electrónico</p>
+                    <p class="text-slate-500 dark:text-slate-400 font-medium italic">No encontramos citas para <span class="font-black not-italic text-brand-600">{{ email_buscado }}</span></p>
                 </div>
             {% endif %} 
         {% endif %}
@@ -176,28 +199,19 @@
     <template id="template-reagendar">
         <div class="flex flex-col gap-5 text-left p-1 pt-4">
             <div class="group">
-                <label class="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.15em] mb-2 block group-focus-within:text-brand-500 transition-colors">Nueva Fecha</label>
-                <input type="date" id="swal-new-date" 
-                       class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 font-bold transition-all shadow-sm">
+                <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Nueva Fecha</label>
+                <input type="date" id="swal-new-date" class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:bg-slate-800 dark:text-white outline-none font-bold">
             </div>
             <div class="group">
-                <label class="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.15em] mb-2 block group-focus-within:text-brand-500 transition-colors">Hora Disponible</label>
-                <select id="swal-new-hour" 
-                        class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 font-bold transition-all shadow-sm cursor-pointer appearance-none">
+                <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Hora Disponible</label>
+                <select id="swal-new-hour" class="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:bg-slate-800 dark:text-white outline-none font-bold">
                     <option value="">Cargando horarios...</option>
                 </select>
-            </div>
-            <div class="bg-amber-50 dark:bg-amber-500/5 p-4 rounded-xl border border-amber-100 dark:border-amber-500/10">
-                <p class="text-[10px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-tight flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Nota importante
-                </p>
-                <p class="text-[11px] text-amber-600/80 dark:text-amber-400/60 mt-1 font-medium italic">Solo se muestran los turnos que no han sido reservados por otros clientes.</p>
             </div>
         </div>
     </template>
 
-    <footer class="mt-auto py-10 text-slate-400 dark:text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">
+    <footer class="mt-auto py-10 text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em]">
         AgendApp &copy; 2025
     </footer>
 

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, make_response,current_app,send_from_directory
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, make_response,current_app,send_from_directory, redirect
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
@@ -22,7 +22,9 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from flask_mail import Message
 import threading
-
+from pathlib import Path
+import mercadopago
+from dotenv import load_dotenv
 
 
 
@@ -51,6 +53,7 @@ admin_bp = Blueprint('admin', __name__)
 #-----15  funciones promoccionales y de fidelización
 #-----16  reseñas y testimonios
 #-----16  Historial de comisiones y pagos
+#---- 17  integración con MercadoPago
 #
 
 
@@ -75,24 +78,24 @@ def mis_citas():
     if email:
         cliente = Cliente.query.filter_by(cli_email=email).first()
         if cliente:
-            # Primero traemos todas las citas
+            # Traemos las reservas del cliente
             citas = Reserva.query.filter_by(cli_id=cliente.cli_id)\
                                  .order_by(Reserva.res_fecha.desc())\
                                  .all()
             
-            # --- LÓGICA DE ORDENAMIENTO PERSONALIZADO ---
-            # Definimos el peso de cada estado
-            prioridad = {
-                'pendiente': 1,
-                'realizada': 2,
-                'confirmada': 2,
-                'cancelada': 3
-            }
-            
-            # Ordenamos la lista 'citas' usando el diccionario de prioridad
-            # Si un estado no está en el diccionario, le asignamos 4 por defecto
+            for cita in citas:
+                # Buscamos el servicio en la BD para obtener su ID y Precio real
+                servicio_db = Servicio.query.filter_by(ser_nombre=cita.res_tipo_servicio).first()
+                if servicio_db:
+                    cita.ser_id = servicio_db.ser_id
+                    cita.precio_display = servicio_db.ser_precio
+                else:
+                    cita.ser_id = None
+                    cita.precio_display = 0
+
+            # Ordenamiento por prioridad
+            prioridad = {'pendiente': 1, 'realizada': 2, 'confirmada': 2, 'cancelada': 3}
             citas.sort(key=lambda x: prioridad.get(x.res_estado.strip().lower(), 4))
-            # --------------------------------------------
 
     return render_template('cliente_citas.html', 
                            citas_cliente=citas, 
@@ -3459,9 +3462,6 @@ def ver_resenas():
 #-----16  Historial de comisiones y pagos
 
 
-import os
-from pathlib import Path
-from flask import send_from_directory, render_template, current_app
 
 @admin_bp.route('/historial-comisiones')
 @login_required
@@ -3502,3 +3502,102 @@ def ver_pdf_comision(filename):
     
     # send_from_directory se encarga de servir el archivo
     return send_from_directory(str(directory), filename)
+
+
+
+#---- 17  integración con MercadoPago
+
+# Asegúrate de importar tus modelos
+# from app.models import Servicio, Cliente, Reserva, db 
+
+load_dotenv()
+
+def generar_link_pago(valor_servicio, nombre_servicio, reserva_id=None):
+    """Función auxiliar para interactuar con la API de Mercado Pago"""
+    token = os.getenv("MP_ACCESS_TOKEN", "").strip()
+    sdk = mercadopago.SDK(token)
+
+    # Importante: host_url captura el dominio de Ngrok o el Real
+    # Cambia esta línea en generar_link_pago:
+    host_url = request.host_url.rstrip('/').replace('http://', 'https://')
+    
+    preference_data = {
+    "items": [
+        {
+            "title": "Prueba AgendApp",
+            "quantity": 1,
+            "unit_price": 2000, # Valor fijo para probar
+            "currency_id": "COP"
+        }
+    ],
+    "back_urls": {
+        "success": f"{host_url}/admin/pago-exitoso",
+        "failure": f"{host_url}/admin/pago-fallido",
+        "pending": f"{host_url}/admin/pago-pendiente"
+    },
+    "binary_mode": True
+    # QUITAMOS auto_return por ahora para evitar el error 400 que tenías antes
+}
+
+    try:
+        result = sdk.preference().create(preference_data)
+        if result["status"] >= 400:
+            # ESTO ES VITAL: Si falla, imprimimos el porqué en la consola
+            print(f"--- ERROR DE MERCADO PAGO ---")
+            print(result["response"]) 
+            return None
+        return result["response"]["init_point"]
+    except Exception as e:
+        print(f"--- EXCEPCIÓN SDK MP: {e} ---")
+        return None
+
+# --- RUTAS DE PAGO ---
+
+@admin_bp.route('/generar-pago-servicio/<int:ser_id>')
+def generar_pago_servicio(ser_id):
+    """Ruta pública para que el cliente genere su link de pago"""
+    servicio = Servicio.query.get_or_404(ser_id)
+    
+    # Intentamos obtener el email de la URL para regresar a la misma vista si falla
+    email_cliente = request.args.get('email', '')
+
+    try:
+        link = generar_link_pago(
+            valor_servicio=float(servicio.ser_precio), 
+            nombre_servicio=servicio.ser_nombre,
+            reserva_id=f"SERV-{servicio.ser_id}"
+        )
+        
+        if link:
+            return redirect(link)
+        
+        flash("La pasarela de pago rechazó la transacción. Verifica el precio o el token.", "error")
+        return redirect(url_for('admin.mis_citas', email=email_cliente))
+            
+    except Exception as e:
+        print(f"Error procesando pago: {e}")
+        flash("Error interno al conectar con Mercado Pago.", "error")
+        return redirect(url_for('admin.mis_citas', email=email_cliente))
+
+@admin_bp.route('/pago-exitoso')
+def pago_exitoso():
+    payment_id = request.args.get('payment_id')
+    reserva_ref = request.args.get('external_reference') # Recibimos "SERV-ID"
+
+    if reserva_ref and reserva_ref.startswith("SERV-"):
+        try:
+            # Extraemos el ID (ej: de "SERV-1" sacamos 1)
+            reserva_id = int(reserva_ref.split('-')[1])
+            
+            # Buscamos la reserva en tu MySQL (Asegúrate que el modelo se llame Reserva)
+            reserva = Reserva.query.get(reserva_id)
+            if reserva:
+                reserva.res_estado_pago = 'pagado'
+                db.session.commit()
+                flash("¡Pago registrado exitosamente!", "success")
+        except Exception as e:
+            print(f"Error actualizando DB: {e}")
+            db.session.rollback()
+
+    # Redirigimos a mis-citas para que el cliente vea su check verde
+    return redirect(url_for('admin.mis_citas'))
