@@ -189,6 +189,8 @@ class Reserva(db.Model):
     # AGREGA ESTA LÍNEA PARA LA RELACIÓN:
     servicio = db.relationship('Servicio', backref='reservas')
     
+    res_pasarela = db.Column(db.String(50), nullable=True)
+    
     
     
 class Resena(db.Model):

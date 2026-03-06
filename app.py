@@ -4,12 +4,14 @@ from dotenv import load_dotenv
 from flask_login import LoginManager
 from flask_mail import Mail
 from models.models import db, Empresa, Usuario, Servicio
+from flask_migrate import Migrate
 
 # 1. Cargar configuración
 load_dotenv()
 app = Flask(__name__)
 mail = Mail() # Ahora sí funcionará porque lo importamos arriba
 
+migrate = Migrate(app, db)
 
 @app.template_filter('fecha_es')
 def fecha_es(value):

@@ -72,6 +72,8 @@ admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/mis-citas')
 def mis_citas():
+    
+    config_pago = ConfiguracionPago.query.first()
     email = request.args.get('email')
     citas = []
 
@@ -98,7 +100,8 @@ def mis_citas():
             citas.sort(key=lambda x: prioridad.get(x.res_estado.strip().lower(), 4))
 
     return render_template('cliente_citas.html', 
-                           citas_cliente=citas, 
+                           citas_cliente=citas,
+                           config_pago=config_pago, 
                            email_buscado=email)
     
     
@@ -3618,7 +3621,8 @@ def pago_exitoso():
             
             if reserva:
                 print(f"--- ACTUALIZANDO RESERVA {res_id_final} A PAGADA ---")
-                reserva.res_estado = 'Pagada' # O 'PAGADA POR MP'
+                reserva.res_estado = 'Realizada' # O 'PAGADA POR MP'
+                reserva.res_pasarela = 'Mercado Pago'
                 db.session.commit()
                 flash("¡Pago confirmado y cita actualizada!", "success")
             else:

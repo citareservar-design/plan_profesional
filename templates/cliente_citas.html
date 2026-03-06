@@ -87,6 +87,9 @@
                             <p class="text-slate-500 dark:text-slate-400 font-bold text-sm">{{ cita.res_hora.strftime('%I:%M %p') }}</p>
                         </div>
 
+{# VALIDACIÓN GLOBAL: ¿Mercado Pago está activo en la BD? #}
+{% if config_pago and config_pago.mp_activo %}
+
 <div class="mb-5 py-4 border-t border-b border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div class="flex flex-col">
         <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total a pagar</span>
@@ -96,14 +99,14 @@
     </div>
     
     <div class="w-full sm:w-auto">
-        {# 1. Si la cita ya está pagada #}
-        {% if cita.res_estado == 'Pagada' or cita.res_estado == 'Pagada (MP)' %}
+        {# 1. Si la cita ya está pagada (Ajustado a tus estados) #}
+        {% if cita.res_estado in ['Pagada', 'Pagada (MP)', 'Realizada', 'Completada'] %}
             <div class="flex items-center justify-center sm:justify-end bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-4 py-2 sm:py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 w-full sm:w-auto">
                 <i class="fa-solid fa-circle-check text-sm sm:text-xs"></i>
                 Cita Pagada
             </div>
 
-        {# 2. Si tiene un tipo de servicio, mostramos el botón de pago #}
+        {# 2. Si tiene servicio y MP está activo, mostramos el botón #}
         {% elif cita.res_tipo_servicio %}
             <a id="btn-pagar-{{ cita.res_id }}" 
                onclick="mostrarCarga('{{ cita.res_id }}')"
@@ -111,15 +114,11 @@
                class="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white px-6 py-3 sm:px-4 sm:py-2.5 rounded-xl font-black text-[11px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-sky-500/20 flex items-center justify-center gap-3 group w-full sm:w-auto">
                 
                 <i id="icon-mp-{{ cita.res_id }}" class="fa-brands fa-mercado-pago text-2xl sm:text-xl"></i>
-                
                 <span id="text-{{ cita.res_id }}">Pagar Cita</span>
-                
                 <div id="spinner-{{ cita.res_id }}" class="hidden animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full"></div>
-                
                 <i id="arrow-{{ cita.res_id }}" class="fa-solid fa-chevron-right text-[8px] group-hover:translate-x-1 transition-transform hidden sm:block"></i>
             </a>
 
-        {# 3. Si no hay servicio definido #}
         {% else %}
             <div class="text-[10px] sm:text-[9px] text-slate-400 italic font-medium uppercase tracking-tighter flex items-center justify-center sm:justify-start">
                 <i class="fa-solid fa-triangle-exclamation mr-1 text-amber-500"></i> 
@@ -128,6 +127,8 @@
         {% endif %}
     </div>
 </div>
+
+{% endif %} {# FIN DE LA VALIDACIÓN DE MP_ACTIVO #}
 
 <script>
 if (typeof mostrarCarga !== 'function') {
