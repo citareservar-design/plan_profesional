@@ -54,7 +54,7 @@ admin_bp = Blueprint('admin', __name__)
 #-----16  reseñas y testimonios
 #-----16  Historial de comisiones y pagos
 #---- 17  integración con MercadoPago
-#
+# ----18 Portal colaboradores: Configuración y permisos
 
 
 
@@ -3749,3 +3749,74 @@ def generar_pago_reserva(res_id):
     
     flash("Error al generar el link de pago.", "error")
     return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))
+
+
+
+
+# ----18  Portal colaboradores: Configuración y permisos
+
+
+@admin_bp.route('/configurar-portal')
+@login_required
+def configurar_portal():
+    # Aquí puedes luego añadir la lógica para subir la imagen
+    from models.models import Empresa
+    empresa = Empresa.query.get(current_user.emp_id)
+    return render_template('admin/configurar_portal.html', empresa=empresa)
+
+
+@admin_bp.route('/guardar-fondo-portal', methods=['POST'])
+@login_required
+def guardar_fondo_portal():
+    if 'fondo' not in request.files:
+        flash('No se seleccionó ningún archivo', 'error')
+        return redirect(url_for('admin.configurar_portal'))
+    
+    file = request.files['fondo']
+    if file.filename == '':
+        flash('El archivo no tiene nombre', 'error')
+        return redirect(url_for('admin.configurar_portal'))
+
+    # Validación JPG
+    extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+    if extension not in ['jpg', 'jpeg']:
+        flash('Error: Solo se permiten imágenes en formato .JPG', 'error')
+        return redirect(url_for('admin.configurar_portal'))
+
+    try:
+        # 1. Obtenemos la empresa de la base de datos
+        from models.models import Empresa
+        empresa = Empresa.query.get(current_user.emp_id)
+
+        # 2. LEER RUTA DESDE LA BASE DE DATOS (Sin rutas quemadas)
+        # Tomamos el valor actual de la columna emp_ruta_recursos
+        base_path = empresa.emp_ruta_recursos
+
+        if not base_path:
+            flash('Error: La ruta de recursos no está configurada en la base de datos para esta empresa.', 'error')
+            return redirect(url_for('admin.configurar_portal'))
+
+        # 3. Construir la ruta final: base_path + portalcolaboradores
+        # os.path.join maneja las barras \ o / según sea Windows o Linux
+        upload_folder = os.path.join(base_path, "portalcolaboradores")
+
+        # 4. Crear la carpeta si no existe físicamente
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder, exist_ok=True)
+
+        # 5. Nombre basado en el NIT
+        filename = f"{empresa.emp_nit}.jpg"
+        file_full_path = os.path.join(upload_folder, filename)
+
+        # 6. Guardar el archivo
+        file.save(file_full_path)
+        
+        db.session.commit()
+        flash(f'✅ Fondo actualizado en la ruta configurada: {upload_folder}', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR: {str(e)}")
+        flash(f'Error al procesar la imagen: {str(e)}', 'error')
+
+    return redirect(url_for('admin.configurar_portal'))

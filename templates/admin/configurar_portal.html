@@ -1,0 +1,113 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-black text-white uppercase italic mb-8 tracking-tighter">
+            Personalizar <span class="text-pink-500">Portal Colaboradores</span>
+        </h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            
+            <div class="space-y-6">
+                <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8">
+                    <h3 class="text-xl font-bold text-white mb-2">Imagen de Fondo</h3>
+                    <p class="text-slate-400 text-sm mb-6">Sube una imagen de alta calidad (Recomendado: 1920x1080px) para el fondo del login.</p>
+                    
+                    <form action="{{ url_for('admin.guardar_fondo_portal') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                        <div class="relative group border-2 border-dashed border-slate-700 hover:border-pink-500/50 rounded-3xl p-10 transition-all bg-slate-950/30">
+                            <input type="file" name="fondo" id="inputFondo" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="text-center" id="uploadPlaceholder">
+                                <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-600 mb-4 group-hover:text-pink-500 transition-colors"></i>
+                                <p class="text-white font-bold">Haz clic o arrastra una imagen</p>
+                                <p class="text-slate-500 text-xs mt-2">JPG, PNG o WEBP (Máx. 5MB)</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button type="submit" class="flex-1 bg-pink-600 hover:bg-pink-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-pink-600/20 uppercase text-xs tracking-widest">
+                                Guardar Cambios
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-sky-500/5 border border-sky-500/10 rounded-3xl p-6">
+                    <div class="flex gap-4">
+                        <i class="fa-solid fa-circle-info text-sky-400 mt-1"></i>
+                <div class="bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-3xl p-6">
+                    <div class="flex gap-4">
+                        <div>
+                            <p class="text-white font-bold text-sm uppercase tracking-tight">¿Aún no tienes tu Portal activo?</p>
+                            <p class="text-slate-400 text-xs leading-relaxed mt-1">
+                                Si no tienes acceso al <span class="text-amber-500 font-bold">Portal de Colaboradores</span>, pregunta por el área comercial de <span class="text-white font-black italic">AgendApp</span> para que te asesoremos en la activación de este módulo profesional.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sticky top-6">
+                <p class="text-slate-500 font-black text-[10px] uppercase tracking-[0.3em] mb-4 ml-4">Vista Previa en Tiempo Real</p>
+                
+                <div class="relative aspect-[9/12] lg:aspect-video rounded-[3rem] overflow-hidden border-8 border-slate-800 shadow-2xl bg-black">
+                    
+                    <div class="absolute inset-0 z-0">
+                        <img id="previewImage" src="{{ url_for('static', filename='img/default_portal_bg.jpg') }}" 
+                             class="w-full h-full object-cover scale-105 transition-all duration-700" 
+                             style="filter: brightness(0.3) blur(2px);">
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-black/40"></div>
+                    </div>
+
+                    <div class="relative z-10 h-full w-full flex items-center justify-center p-6">
+                        <div class="bg-white/[0.03] backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/10 w-full max-w-[280px] text-center transform scale-90 sm:scale-100">
+                            <div class="inline-flex items-center justify-center w-10 h-10 bg-sky-500/10 rounded-2xl border border-sky-500/20 mb-4">
+                                <i class="fa-solid fa-fingerprint text-sky-400 text-sm"></i>
+                            </div>
+                            <h1 class="text-sky-400 font-black text-[8px] uppercase tracking-[0.4em] mb-1">Portal Colaboradores</h1>
+                            <h2 class="text-xl font-extrabold text-white tracking-tight">{{ empresa.emp_razon_social | title }}</h2>
+                            
+                            <div class="mt-6 space-y-4">
+                                <div class="h-10 bg-white/5 rounded-2xl border border-white/5 w-full"></div>
+                                <div class="h-10 bg-sky-600 rounded-2xl w-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('inputFondo').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const preview = document.getElementById('previewImage');
+                preview.src = event.target.result;
+                // Pequeño efecto de carga
+                preview.classList.add('opacity-0');
+                setTimeout(() => preview.classList.remove('opacity-0'), 100);
+            }
+            reader.readAsDataURL(file);
+            
+            // Cambiar texto del placeholder
+            document.getElementById('uploadPlaceholder').querySelector('p').innerText = "Imagen seleccionada: " + file.name;
+        }
+    });
+</script>
+
+<style>
+    /* Estilo para simular la profundidad del mockup */
+    .sticky { position: -webkit-sticky; position: sticky; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
