@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
 from io import BytesIO
-from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional,Resena,ConfiguracionPago
+from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional,Resena,ConfiguracionPago,MediosPago
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -55,6 +55,7 @@ admin_bp = Blueprint('admin', __name__)
 #-----16  Historial de comisiones y pagos
 #---- 17  integración con MercadoPago
 # ----18 Portal colaboradores: Configuración y permisos
+#-----19 medios de pago y facturación
 
 
 
@@ -3820,3 +3821,81 @@ def guardar_fondo_portal():
         flash(f'Error al procesar la imagen: {str(e)}', 'error')
 
     return redirect(url_for('admin.configurar_portal'))
+
+
+from flask import send_from_directory, abort
+
+@admin_bp.route('/display-portal-bg/<emp_id>')
+@login_required
+def servir_fondo_admin(emp_id):
+    from models.models import Empresa
+    empresa = Empresa.query.get(emp_id)
+    
+    if empresa and empresa.emp_ruta_recursos:
+        # Construimos la ruta a la carpeta portalcolaboradores
+        folder = os.path.join(empresa.emp_ruta_recursos, "portalcolaboradores")
+        filename = f"{empresa.emp_nit}.jpg"
+        
+        if os.path.exists(os.path.join(folder, filename)):
+            return send_from_directory(folder, filename)
+    
+    # Si no existe, puedes devolver una imagen por defecto o error 404
+    abort(404)
+    
+
+
+#-----19 medios de pago y facturación
+
+
+@admin_bp.route('/gestion-medios-pago')
+@login_required
+def gestion_medios_pago():
+    # Solo traemos los medios de pago que pertenecen a la empresa del usuario logueado
+    medios = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
+    return render_template('admin/gestion_medios_pago.html', medios=medios)
+
+@admin_bp.route('/guardar-medio-pago', methods=['POST'])
+@login_required
+def guardar_medio_pago():
+    nombre = request.form.get('nombre')
+    v_comision = float(request.form.get('valor_comision') or 0)
+    v_fijo = float(request.form.get('valor_fijo') or 0)
+    p_iva = float(request.form.get('porcentaje_iva') or 0) # Nuevo campo
+
+    try:
+        from models.models import MediosPago
+        nuevo_medio = MediosPago(
+            emp_id=current_user.emp_id,
+            nombre=nombre,
+            valor_comision=v_comision,
+            valor_fijo=v_fijo,
+            porcentaje_iva=p_iva, # Guardamos el IVA por separado
+            activo=True
+        )
+        db.session.add(nuevo_medio)
+        db.session.commit()
+        flash('Medio configurado con éxito', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'error')
+
+    return redirect(url_for('admin.gestion_medios_pago'))
+
+# 3. RUTA PARA ELIMINAR UN MEDIO
+@admin_bp.route('/eliminar-medio-pago/<int:id>', methods=['POST'])
+@login_required
+def eliminar_medio_pago(id):
+    medio = MediosPago.query.filter_by(id=id, emp_id=current_user.emp_id).first()
+    
+    if medio:
+        try:
+            db.session.delete(medio)
+            db.session.commit()
+            flash('Medio de pago eliminado', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('No se pudo eliminar el medio de pago', 'error')
+    else:
+        flash('Medio de pago no encontrado', 'error')
+
+    return redirect(url_for('admin.gestion_medios_pago'))

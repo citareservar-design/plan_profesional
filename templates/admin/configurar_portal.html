@@ -3,9 +3,9 @@
 {% block content %}
 <div class="">
     <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-black text-white uppercase italic mb-8 tracking-tighter">
-            Personalizar <span class="text-pink-500">Portal Colaboradores</span>
-        </h1>
+<h1 class="text-3xl font-black text-white uppercase italic mb-8 tracking-tighter">
+    Personalizar <span class="text-sky-500">Portal Colaboradores</span>
+</h1>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
             
@@ -25,7 +25,7 @@
                         </div>
 
                         <div class="flex gap-3">
-                            <button type="submit" class="flex-1 bg-pink-600 hover:bg-pink-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-pink-600/20 uppercase text-xs tracking-widest">
+                            <button type="submit" class="flex-1 bg-sky-600 hover:bg-pink-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-sky-600/20 uppercase text-xs tracking-widest">
                                 Guardar Cambios
                             </button>
                         </div>
@@ -55,9 +55,11 @@
                 <div class="relative aspect-[9/12] lg:aspect-video rounded-[3rem] overflow-hidden border-8 border-slate-800 shadow-2xl bg-black">
                     
                     <div class="absolute inset-0 z-0">
-                        <img id="previewImage" src="{{ url_for('static', filename='img/default_portal_bg.jpg') }}" 
-                             class="w-full h-full object-cover scale-105 transition-all duration-700" 
-                             style="filter: brightness(0.3) blur(2px);">
+                    <img id="previewImage" 
+                        src="{{ url_for('admin.servir_fondo_admin', emp_id=empresa.emp_id) }}" 
+                        class="w-full h-full object-cover scale-105 transition-all duration-700" 
+                        style="filter: brightness(0.3) blur(2px);"
+                        onerror="this.src='{{ url_for('static', filename='img/default_portal_bg.jpg') }}';">
                         <div class="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-black/40"></div>
                     </div>
 

@@ -287,3 +287,18 @@ class ConfiguracionPago(db.Model):
 
     def __repr__(self):
         return f'<ConfiguracionPago {"Activa" if self.mp_activo else "Inactiva"}>'
+    
+    
+    
+
+class MediosPago(db.Model):
+    __tablename__ = 'MEDIOS_PAGO'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    emp_id = db.Column(db.String(2), db.ForeignKey('EMPRESAS.emp_id'), nullable=False)
+    nombre = db.Column(db.String(50), nullable=False)
+    valor_comision = db.Column(db.Numeric(10, 2), default=0.00)
+    valor_fijo = db.Column(db.Numeric(10, 2), default=0.00)
+    # AGREGA ESTA LÍNEA AQUÍ ABAJO:
+    porcentaje_iva = db.Column(db.Numeric(10, 2), default=0.00) 
+    activo = db.Column(db.Boolean, default=True)

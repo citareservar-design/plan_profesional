@@ -1,0 +1,93 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex items-center gap-4 mb-8">
+            <h1 class="text-3xl font-black text-white uppercase italic tracking-tighter">
+                Gestión de <span class="text-sky-500">Medios de Pago</span>
+            </h1>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 sticky top-6 shadow-2xl">
+                    <h2 class="text-xl font-bold text-white mb-6 uppercase tracking-tight italic">Configurar Medio</h2>
+                    
+                    <form action="{{ url_for('admin.guardar_medio_pago') }}" method="POST" class="space-y-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 tracking-widest">Nombre del Medio</label>
+                            <input type="text" name="nombre" placeholder="Ej: Datáfono Bold" required 
+                                   class="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-orange-500/50 transition-all">
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 tracking-widest">Comisión Base (%)</label>
+                                <input type="number" step="0.01" name="valor_comision" placeholder="6.49" 
+                                       class="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-orange-500/50 transition-all font-mono text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 tracking-widest">Costo Fijo ($)</label>
+                                    <input type="number" step="1" name="valor_fijo" placeholder="800"
+                                           class="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-orange-500/50 transition-all font-mono text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 tracking-widest">IVA(%)</label>
+                                    <input type="number" step="0.01" name="porcentaje_iva" placeholder="19"
+                                           class="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-orange-500/50 transition-all font-mono text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-[9px] text-slate-500 px-2 italic">Nota: El IVA se aplicará sobre la comisión y el costo fijo.</p>
+
+                        <button type="submit" class="w-full bg-sky-600 hover:bg-Sky-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-sky-600/20 uppercase text-xs tracking-[0.2em]">
+                            Guardar Medio
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-white/5 bg-white/[0.02]">
+                                <th class="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Medio</th>
+                                <th class="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Desglose de Costos</th>
+                                <th class="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            {% for medio in medios %}
+                            <tr class="group hover:bg-white/[0.02] transition-colors">
+                                <td class="px-8 py-6 font-bold text-white">{{ medio.nombre }}</td>
+                                <td class="px-8 py-6 text-center">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <div class="flex items-center gap-2 text-[11px] font-mono">
+                                            <span class="text-orange-400">{{ medio.valor_comision }}% com.</span>
+                                            <span class="text-slate-600">+</span>
+                                            <span class="text-orange-400">${{ medio.valor_fijo }} fijo</span>
+                                        </div>
+                                        <div class="px-3 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] text-blue-400 font-black uppercase">
+                                            + {{ medio.porcentaje_iva }}% IVA sobre costos
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <form action="{{ url_for('admin.eliminar_medio_pago', id=medio.id) }}" method="POST">
+                                        <button class="text-rose-500 hover:scale-110 transition-transform"><i class="fa-solid fa-trash-can"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
