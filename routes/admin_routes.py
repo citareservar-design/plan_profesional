@@ -1560,7 +1560,6 @@ def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_fina
         print("❌ Error: Faltan datos de contacto (Email cliente o SMTP empresa).")
         return False
         
-    # Importante: Todo lo que use Flask (render_template, url_for) debe ir dentro del context
     with current_app.app_context():
         try:
             from models.models import Empleado
@@ -1568,7 +1567,7 @@ def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_fina
             empleado_obj = Empleado.query.get(reserva.empl_id) if reserva.empl_id else None
             nombre_profesional = empleado_obj.empl_nombre if empleado_obj else "Nuestro Profesional"
 
-            # 2. Generar el PDF del recibo (usa el template estándar de PDF)
+            # 2. Generar el PDF del recibo
             html_pdf = render_template('admin/pdf_recibo.html', 
                                        r=reserva, 
                                        c=cliente, 
@@ -1580,14 +1579,17 @@ def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_fina
             output = io.BytesIO()
             pisa.CreatePDF(io.BytesIO(html_pdf.encode("UTF-8")), dest=output, encoding='UTF-8')
             
-            # 3. Renderizar el cuerpo del correo (Aquí elige entre el normal o el de Mercado Pago)
+            # 3. Renderizar el cuerpo del correo 
+            # CAMBIO AQUÍ: Nombres de variables iguales al HTML
             cuerpo_html = render_template(template_name, 
-                                         cliente=cliente, 
-                                         empresa=empresa, 
-                                         reserva=reserva, 
-                                         link_resena=link_resena, 
-                                         p_final=precio_final,
-                                         nombre_atendio=nombre_profesional)
+                                          cliente=cliente, 
+                                          empresa=empresa, 
+                                          reserva=reserva,
+                                          descuento_porc=descuento_porc,
+                                          link_resena=link_resena, 
+                                          precio_base=precio_base,   # <-- Antes era p_original
+                                          precio_final=precio_final, # <-- Antes era p_final
+                                          nombre_atendio=nombre_profesional)
 
             # 4. Configurar el mensaje MIME
             msg = MIMEMultipart()
@@ -3610,63 +3612,48 @@ def pago_exitoso():
 
     if reserva_ref and collection_status == 'approved':
         try:
-            # Extraer ID de la reserva (ej: RES-1 -> 1)
             res_id_final = int(reserva_ref.split('-')[1]) if "-" in reserva_ref else int(reserva_ref)
-            
-            # Importamos los modelos necesarios
             from models.models import Reserva, Cliente, Empresa, Servicio
             
             reserva = Reserva.query.get(res_id_final)
             
             if reserva:
-                # 1. Actualizar estado en la Base de Datos
+                # --- BLOQUEO DE DUPLICADOS ---
+                # Si la reserva ya aparece como 'Realizada', no enviamos el correo otra vez
+                if reserva.res_estado == 'Realizada':
+                    print(f"ℹ️ El pago de la reserva {res_id_final} ya había sido procesado. Omitiendo duplicado.")
+                    return redirect(url_for('admin.mis_citas'))
+                # -----------------------------
+
+                # 1. Actualizar estado (Esto "sella" la reserva para la siguiente petición)
                 reserva.res_estado = 'Realizada'
                 reserva.res_pasarela = 'Mercado Pago'
-                db.session.commit()
+                db.session.commit() 
 
-                # 2. Obtener objetos para el correo
+                # 2. Lógica de Precios
                 cliente = Cliente.query.get(reserva.cli_id)
                 empresa = Empresa.query.get(reserva.emp_id)
-                
-                # --- LÓGICA DE PRECIO ---
-                # Buscamos el servicio para obtener el precio base real (ser_precio)
                 servicio = Servicio.query.filter_by(ser_nombre=reserva.res_tipo_servicio, emp_id=reserva.emp_id).first()
                 
                 precio_base = float(servicio.ser_precio if servicio else 0)
-                descuento_fijo = float(reserva.res_descuento_valor or 0)
-                
-                # Cálculo final: Precio Servicio - Descuento Manual
-                precio_final = precio_base - descuento_fijo
-                # -----------------------
+                porcentaje_desc = float(reserva.res_descuento_valor or 0)
+                precio_final = precio_base - (precio_base * (porcentaje_desc / 100)) if porcentaje_desc > 0 else precio_base
 
-                # 3. GENERAR LINK DE RESEÑA (CORREGIDO)
+                # 3. Link de Reseña
                 try:
-                    # Apuntamos a 'admin.dejar_resena' porque ahí está definido tu def
-                    # Pasamos emp_id (requerido en la ruta) y res_id/empl_id como parámetros
-                    link = url_for('admin.dejar_resena', 
-                                   emp_id=reserva.emp_id, 
-                                   res_id=reserva.res_id, 
-                                   empl_id=reserva.empl_id,
-                                   _external=True)
-                except Exception as e:
-                    print(f"⚠️ Error generando url de reseña: {e}")
-                    link = "#"
+                    link = url_for('admin.dejar_resena', emp_id=reserva.emp_id, res_id=reserva.res_id, 
+                                   empl_id=reserva.empl_id, _external=True)
+                except: link = "#"
 
-                # 4. Enviar el correo usando el template de Mercado Pago
+                # 4. Enviar el correo (Solo llegará aquí la primera vez)
                 enviar_recibo_por_correo(
-                    reserva=reserva, 
-                    cliente=cliente, 
-                    empresa=empresa, 
-                    precio_base=precio_base, 
-                    precio_final=precio_final, 
-                    descuento_porc=0, 
-                    link_resena=link, 
+                    reserva=reserva, cliente=cliente, empresa=empresa, 
+                    precio_base=precio_base, precio_final=precio_final, 
+                    descuento_porc=porcentaje_desc, link_resena=link, 
                     template_name='emails/pagado_mercado.html'
                 )
 
                 flash("¡Pago confirmado y recibo enviado!", "success")
-            else:
-                print(f"❌ No se encontró la reserva {res_id_final}")
             
         except Exception as e:
             print(f"❌ Error crítico en pago_exitoso: {e}")

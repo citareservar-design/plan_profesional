@@ -23,65 +23,82 @@
                         <td style="padding: 40px 30px; text-align: center;">
                             <p style="font-size: 18px; color: #1e293b; margin-bottom: 10px;">Hola <strong>{{ cliente.cli_nombre }}</strong>,</p>
                             <p style="font-size: 16px; color: #64748b; line-height: 1.6;">
-                                Hemos recibido correctamente tu pago a través de <strong>Mercado Pago</strong>. En <strong>{{ empresa.emp_razon_social }}</strong> estamos encantados de que hayas elegido nuestros servicios y queremos agradecerte por tu confianza.
+                                Hemos recibido correctamente tu pago a través de <strong>Mercado Pago</strong>. En <strong>{{ empresa.emp_razon_social }}</strong> agradecemos tu confianza.
                             </p>
 
                             <div style="background-color: #f8fafc; border-radius: 16px; padding: 25px; margin: 30px 0; text-align: left; border: 1px solid #e2e8f0;">
                                 <table width="100%">
                                     <tr>
-                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold; width: 40%;">Servicio:</td>
-                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">{{ reserva.res_tipo_servicio }}</td>
+                                        <td style="padding: 5px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold; width: 40%;">Servicio:</td>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #0f172a; font-weight: bold;">{{ reserva.res_tipo_servicio }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
-                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">{{ nombre_atendio }}</td>
+                                        <td style="padding: 5px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #0f172a; font-weight: bold;">{{ nombre_atendio }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Fecha y Hora:</td>
-                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">
+                                        <td style="padding: 5px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Fecha y Hora:</td>
+                                        <td style="padding: 5px 0; font-size: 14px; color: #0f172a; font-weight: bold;">
                                             {{ reserva.res_fecha.strftime('%d/%m/%Y') }} a las {{ reserva.res_hora.strftime('%H:%M %p') }}
                                         </td>
                                     </tr>
+                                    
                                     <tr>
-                                        <td colspan="2" style="padding: 10px 0;"><hr style="border: 0; border-top: 1px solid #e2e8f0;"></td>
+                                        <td colspan="2" style="padding: 15px 0;"><hr style="border: 0; border-top: 1px solid #e2e8f0;"></td>
+                                    </tr>
+
+                                    {# --- LÓGICA DE PRECIOS DINÁMICA --- #}
+                                    {% if descuento_porc > 0 %}
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Precio Original:</td>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-decoration: line-through;">${{ "{:,.0f}".format(precio_base) }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Monto Pagado:</td>
-                                        <td style="padding: 5px 0; font-size: 20px; color: #10b981; font-weight: 900;">${{ "{:,.0f}".format(p_final) }}</td>
+                                        <td style="padding: 5px 0; font-size: 11px; color: #f59e0b; text-transform: uppercase; font-weight: bold;">Descuento Aplicado:</td>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #f59e0b; font-weight: bold;">-{{ descuento_porc | int }}%</td>
+                                    </tr>
+                                    {% endif %}
+
+                                    <tr>
+                                        <td style="padding: 10px 0; font-size: 13px; color: #1e293b; text-transform: uppercase; font-weight: 900;">Total Pagado:</td>
+                                        <td style="padding: 10px 0; font-size: 22px; color: #10b981; font-weight: 900;">
+                                            ${{ "{:,.0f}".format(precio_final) }}
+                                        </td>
                                     </tr>
                                 </table>
                             </div>
 
                             {% if link_resena and link_resena != "#" %}
                             <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 16px;">
-                                <p style="font-size: 14px; color: #0ea5e9; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;">
+                                <p style="font-size: 13px; color: #0ea5e9; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;">
                                     ¿Qué tal fue tu experiencia con {{ nombre_atendio }}?
                                 </p>
                                 <a href="{{ link_resena }}" 
-                                style="background-color: #0ea5e9; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4); font-size: 14px;">
+                                   style="background-color: #0ea5e9; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4); font-size: 14px;">
                                     CALIFICAR SERVICIO ⭐
                                 </a>
                             </div>
                             {% endif %}
 
-                            <p style="font-size: 13px; color: #94a3b8;">
-                                Adjunto encontrarás tu comprobante detallado en PDF.
+                            <p style="font-size: 12px; color: #94a3b8;">
+                                Tu comprobante legal se adjunta en formato PDF a este correo.
                             </p>
                         </td>
                     </tr>
 
                     <tr>
                         <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
-                            <p style="margin: 0; font-size: 15px; color: #1e293b; font-weight: bold;">
-                                ¡Gracias por confiar en {{ empresa.emp_razon_social }}!
+                            <p style="margin: 0; font-size: 14px; color: #1e293b; font-weight: bold;">
+                                {{ empresa.emp_razon_social }}
                             </p>
                             <p style="margin: 5px 0 0; font-size: 12px; color: #94a3b8;">
-                                Si tienes dudas, contáctanos al {{ empresa.emp_telefono }}.
+                                ¿Dudas? Contáctanos al {{ empresa.emp_telefono }}
                             </p>
                         </td>
                     </tr>
                 </table>
-                <p style="margin: 20px 0; font-size: 12px; color: #94a3b8; text-align: center;">
+                
+                <p style="margin: 20px 0; font-size: 11px; color: #94a3b8; text-align: center;">
                     Potenciado por <a href="https://agendapp.co" style="color: #6366f1; text-decoration: none; font-weight: bold;">Agendapp.co</a>
                 </p>
             </td>
