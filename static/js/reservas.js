@@ -194,114 +194,114 @@ const toggleLoading = (show) => {
 
 
 // Usar window. asegura que Alpine pueda ver la función desde el HTML
-window.initSortableCol = function(el) {
-    if (!el) return;
+// window.initSortableCol = function(el) {
+//     if (!el) return;
 
-    new Sortable(el, {
-        group: 'reservas',
-        draggable: '.tarjeta-reserva',
-        filter: 'select, button, input, .no-drag',
-        preventOnFilter: false, 
-        animation: 150,
-        ghostClass: 'opacity-50',
-        forceFallback: true, 
+//     new Sortable(el, {
+//         group: 'reservas',
+//         draggable: '.tarjeta-reserva',
+//         filter: 'select, button, input, .no-drag',
+//         preventOnFilter: false, 
+//         animation: 150,
+//         ghostClass: 'opacity-50',
+//         forceFallback: true, 
         
-    onStart: function(evt) {
-            const estado = evt.item.getAttribute('data-estado');
-            if (estado === 'Completada') {
-                evt.preventDefault(); // Detiene el arrastre de inmediato
-                return false;
-            }
-        },
+//     onStart: function(evt) {
+//             const estado = evt.item.getAttribute('data-estado');
+//             if (estado === 'Completada') {
+//                 evt.preventDefault(); // Detiene el arrastre de inmediato
+//                 return false;
+//             }
+//         },
 
-        onEnd: async function (evt) {
-            console.log("✅ TARJETA SOLTADA");
-            document.body.classList.remove('dragging');
+//         onEnd: async function (evt) {
+//             console.log("✅ TARJETA SOLTADA");
+//             document.body.classList.remove('dragging');
             
-            const tarjeta = evt.item;
-            const estado = tarjeta.getAttribute('data-estado');
+//             const tarjeta = evt.item;
+//             const estado = tarjeta.getAttribute('data-estado');
 
-            if (estado === 'Completada') {
-                Swal.fire('Cita Finalizada', 'Esta reserva ya está completada y no puede moverse.', 'info');
-                window.location.reload();
-                return;
-            }
+//             if (estado === 'Completada') {
+//                 Swal.fire('Cita Finalizada', 'Esta reserva ya está completada y no puede moverse.', 'info');
+//                 window.location.reload();
+//                 return;
+//             }
 
-            const empresa = tarjeta.getAttribute('data-empresa') || "Nuestro Establecimiento";
-            const direccion = tarjeta.getAttribute('data-direccion') || "nuestra ubicación";
-            const res_id = tarjeta.getAttribute('data-id');
-            const nuevaFecha = evt.to.getAttribute('data-fecha');
+//             const empresa = tarjeta.getAttribute('data-empresa') || "Nuestro Establecimiento";
+//             const direccion = tarjeta.getAttribute('data-direccion') || "nuestra ubicación";
+//             const res_id = tarjeta.getAttribute('data-id');
+//             const nuevaFecha = evt.to.getAttribute('data-fecha');
             
-            const nombre = tarjeta.getAttribute('data-nombre');
-            const telefono = tarjeta.getAttribute('data-tel');
-            const horaRaw = tarjeta.getAttribute('data-hora') || "00:00";
+//             const nombre = tarjeta.getAttribute('data-nombre');
+//             const telefono = tarjeta.getAttribute('data-tel');
+//             const horaRaw = tarjeta.getAttribute('data-hora') || "00:00";
 
-            // --- CONVERSIÓN A FORMATO 12 HORAS (19:00 -> 7:00 PM) ---
-            const [h, m] = horaRaw.split(':');
-            const horaAmigable = new Date(0, 0, 0, h, m).toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit', 
-                hour12: true 
-            });
+//             // --- CONVERSIÓN A FORMATO 12 HORAS (19:00 -> 7:00 PM) ---
+//             const [h, m] = horaRaw.split(':');
+//             const horaAmigable = new Date(0, 0, 0, h, m).toLocaleTimeString('en-US', { 
+//                 hour: 'numeric', 
+//                 minute: '2-digit', 
+//                 hour12: true 
+//             });
 
-            const selectEmp = tarjeta.querySelector('select[name="empleado_id"]');
-            const emplId = selectEmp ? selectEmp.value : tarjeta.getAttribute('data-empl-id');
+//             const selectEmp = tarjeta.querySelector('select[name="empleado_id"]');
+//             const emplId = selectEmp ? selectEmp.value : tarjeta.getAttribute('data-empl-id');
 
-            if (!res_id || !nuevaFecha || nuevaFecha === 'futuro') {
-                if(nuevaFecha === 'futuro') {
-                    Swal.fire({ title: 'Nota', text: 'Para fechas lejanas usa el botón editar', icon: 'info' });
-                }
-                window.location.reload();
-                return;
-            }
+//             if (!res_id || !nuevaFecha || nuevaFecha === 'futuro') {
+//                 if(nuevaFecha === 'futuro') {
+//                     Swal.fire({ title: 'Nota', text: 'Para fechas lejanas usa el botón editar', icon: 'info' });
+//                 }
+//                 window.location.reload();
+//                 return;
+//             }
 
-            if (typeof toggleLoading === 'function') toggleLoading(true);
+//             if (typeof toggleLoading === 'function') toggleLoading(true);
 
-            try {
-                const response = await fetch('/admin/mover_reserva', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: res_id, fecha: nuevaFecha, empl_id: emplId })
-                });
+//             try {
+//                 const response = await fetch('/admin/mover_reserva', {
+//                     method: 'POST',
+//                     headers: { 'Content-Type': 'application/json' },
+//                     body: JSON.stringify({ id: res_id, fecha: nuevaFecha, empl_id: emplId })
+//                 });
                 
-                const data = await response.json();
+//                 const data = await response.json();
 
-                if (data.status === 'success') {
-                    if (navigator.vibrate) navigator.vibrate(50);
-                    if (typeof toggleLoading === 'function') toggleLoading(false);
+//                 if (data.status === 'success') {
+//                     if (navigator.vibrate) navigator.vibrate(50);
+//                     if (typeof toggleLoading === 'function') toggleLoading(false);
 
-                    await Swal.fire({
-                        title: '¡Cita Movida!',
-                        html: `¿Quieres avisar a <b>${nombre}</b> del cambio?`,
-                        icon: 'success',
-                        showCancelButton: true,
-                        confirmButtonColor: '#25D366',
-                        confirmButtonText: 'SÍ, ENVIAR WHATSAPP',
-                        cancelButtonText: 'NO, SOLO CERRAR',
-                        background: '#0f172a',
-                        color: '#fff'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            let fraseFecha = calcularFraseFecha(nuevaFecha);
+//                     await Swal.fire({
+//                         title: '¡Cita Movida!',
+//                         html: `¿Quieres avisar a <b>${nombre}</b> del cambio?`,
+//                         icon: 'success',
+//                         showCancelButton: true,
+//                         confirmButtonColor: '#25D366',
+//                         confirmButtonText: 'SÍ, ENVIAR WHATSAPP',
+//                         cancelButtonText: 'NO, SOLO CERRAR',
+//                         background: '#0f172a',
+//                         color: '#fff'
+//                     }).then((result) => {
+//                         if (result.isConfirmed) {
+//                             let fraseFecha = calcularFraseFecha(nuevaFecha);
                             
-                            // MENSAJE CON FORMATO 12H Y DATOS DINÁMICOS
-                            const msg = `*¡Hola, ${nombre}!* 👋\n\nTe informamos que tu cita en *${empresa}* ha sido modificada para *${fraseFecha}* a las *${horaAmigable}*.\n\n📍 *Dirección:* ${direccion}\n\n⚠️ *Nota:* Por favor presentarse *15 minutos antes* de su cita. Si no puede asistir, infórmenos por aquí.`;
+//                             // MENSAJE CON FORMATO 12H Y DATOS DINÁMICOS
+//                             const msg = `*¡Hola, ${nombre}!* 👋\n\nTe informamos que tu cita en *${empresa}* ha sido modificada para *${fraseFecha}* a las *${horaAmigable}*.\n\n📍 *Dirección:* ${direccion}\n\n⚠️ *Nota:* Por favor presentarse *15 minutos antes* de su cita. Si no puede asistir, infórmenos por aquí.`;
                             
-                            window.open(`https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(msg)}`, '_blank');
-                        }
-                    });
+//                             window.open(`https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(msg)}`, '_blank');
+//                         }
+//                     });
 
-                    window.location.reload();
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch (error) {
-                if (typeof toggleLoading === 'function') toggleLoading(false);
-                Swal.fire('Error', error.message, 'error').then(() => window.location.reload());
-            }
-        }
-    });
-};
+//                     window.location.reload();
+//                 } else {
+//                     throw new Error(data.message);
+//                 }
+//             } catch (error) {
+//                 if (typeof toggleLoading === 'function') toggleLoading(false);
+//                 Swal.fire('Error', error.message, 'error').then(() => window.location.reload());
+//             }
+//         }
+//     });
+// };
 
 
 
