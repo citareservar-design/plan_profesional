@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from services.appointment_service import cancelar_cita_por_id 
 from io import BytesIO
-from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional,Resena
+from models.models import db, Usuario, Reserva, Cliente, Empleado, Empresa, Servicio, ConfigHorario, DiasBloqueados, Permiso, PlantillaWhatsApp,AvisoPromocional,Resena,ConfiguracionPago
 from flask_login import login_required, current_user, login_user, logout_user
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -3601,3 +3601,56 @@ def pago_exitoso():
 
     # Redirigimos a mis-citas para que el cliente vea su check verde
     return redirect(url_for('admin.mis_citas'))
+
+
+@admin_bp.route('/configurar-pagos')
+@login_required
+def configurar_pagos():
+    # Buscamos el registro en la base de datos
+    config = ConfiguracionPago.query.first()
+    
+    # Si no existe (primera vez), pasamos un objeto vacío para evitar errores
+    if not config:
+        config = ConfiguracionPago(public_key="", access_token="", mp_activo=False)
+    
+    # IMPORTANTE: El nombre a la izquierda del '=' es como se usa en el HTML
+    return render_template('admin/configurar_pagos.html', config=config)
+    
+    
+    
+@admin_bp.route('/configurar-pagos/guardar', methods=['POST'])
+@login_required
+def guardar_configuracion_mp():
+    # 1. Obtener datos del formulario
+    pk = request.form.get('public_key')
+    at = request.form.get('access_token')
+    # El checkbox devuelve 'on' si está marcado, o None si no
+    activo = 'mp_activo' in request.form 
+
+    # 2. Consultar usando el nombre EXACTO de la clase
+    config = ConfiguracionPago.query.first() # <-- ConfiguraciónPago con C y P mayúscula
+
+    if not config:
+        # Si no existe, creamos la instancia de la clase
+        config = ConfiguracionPago(
+            public_key=pk,
+            access_token=at,
+            mp_activo=activo
+        )
+        db.session.add(config)
+    else:
+        # Si ya existe, actualizamos los campos
+        config.public_key = pk
+        config.access_token = at
+        config.mp_activo = activo
+
+    # 3. Guardar cambios
+    try:
+        db.session.commit()
+        flash("Configuración actualizada con éxito", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al guardar: {str(e)}", "error")
+        print(f"Error en DB: {e}")
+
+    return redirect(url_for('admin.configurar_pagos'))

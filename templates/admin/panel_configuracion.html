@@ -80,6 +80,27 @@
         </a>
         {% endif %}
 
+
+        {% if current_user.tiene_permiso('ver_pagos') %}
+        <a href="{{ url_for('admin.configurar_pagos') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-blue-500/50 transition-all hover:shadow-2xl hover:shadow-blue-500/10 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all"></div>
+            
+            <div class="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-hand-holding-dollar text-2xl text-blue-400"></i>
+            </div>
+
+            <div class="flex justify-between items-start">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider">Mercado Pago</h3>
+                <span class="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                    PASARELA
+                </span>
+            </div>
+
+            <p class="text-slate-400 text-sm mt-2">Visualiza el estado de tu conexión y tokens de pago.</p>
+
+        </a>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

@@ -270,3 +270,18 @@ class AvisoPromocional(db.Model):
 
     def __repr__(self):
         return f'<AvisoPromocional {self.titulo}>'
+    
+
+
+class ConfiguracionPago(db.Model):
+    __tablename__ = 'CONFIGURACION_PAGO'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    public_key = db.Column(db.String(255), nullable=True)
+    access_token = db.Column(db.String(255), nullable=True)
+    
+    # Este es el campo para el Switch (Activar/Desactivar)
+    mp_activo = db.Column(db.Boolean, default=False)
+
+    def __repr__(self):
+        return f'<ConfiguracionPago {"Activa" if self.mp_activo else "Inactiva"}>'

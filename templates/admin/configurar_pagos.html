@@ -1,0 +1,189 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="p-6 max-w-4xl mx-auto">
+<div class="flex items-center gap-4 mb-8">
+        <a href="{{ url_for('admin.panel_configuracion') }}" class="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center hover:bg-sky-500/20 border border-slate-700 hover:border-sky-500/50 transition-all group">
+            <i class="fa-solid fa-arrow-left text-slate-400 group-hover:text-sky-500"></i>
+        </a>
+        
+        <div>
+            <h1 class="text-2xl font-black text-sky-500 uppercase tracking-tight">
+                Configuración de Mercado Pago
+            </h1>
+            <p class="text-slate-400 text-sm flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                Estado de la pasarela y simulación de comisiones.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+<div class="md:col-span-2 space-y-6">
+    <form action="{{ url_for('admin.guardar_configuracion_mp') }}" method="POST">
+        <div class="bg-slate-800/50 border border-slate-700 rounded-3xl p-6 shadow-xl">
+            
+            <div class="flex items-center justify-between mb-8 pb-6 border-b border-slate-700/50">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Configuración de Pasarela</h3>
+                    <p class="text-xs text-slate-400">Activa o desactiva los pagos en correos y citas.</p>
+                </div>
+                
+                <label class="relative inline-flex items-center cursor-pointer group">
+                    <input type="checkbox" name="mp_activo" class="sr-only peer" {% if config.mp_activo %}checked{% endif %}>
+                    <div class="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500 shadow-lg"></div>
+                    <span class="ml-3 text-sm font-bold text-slate-400 peer-checked:text-emerald-500 uppercase tracking-widest">
+                        {% if config.mp_activo %}Activo{% else %}Inactivo{% endif %}
+                    </span>
+                </label>
+            </div>
+
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-slate-400 text-[10px] uppercase font-black mb-2 ml-1 tracking-widest">Public Key (Producción/Test)</label>
+                    <div class="relative group">
+                        <i class="fa-solid fa-key absolute left-4 top-3.5 text-slate-500 group-hover:text-blue-400 transition-colors"></i>
+                        <input type="password" name="public_key" value="{{ config.public_key }}" 
+                               class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl py-3.5 pl-12 pr-12 text-slate-200 text-sm focus:border-blue-500/50 focus:outline-none transition-all" id="pk_input">
+                        <button type="button" onclick="toggleVisibility('pk_input')" class="absolute right-4 top-3.5 text-slate-500 hover:text-white">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 text-[10px] uppercase font-black mb-2 ml-1 tracking-widest">Access Token</label>
+                    <div class="relative group">
+                        <i class="fa-solid fa-shield-halved absolute left-4 top-3.5 text-slate-500 group-hover:text-blue-400 transition-colors"></i>
+                        <input type="password" name="access_token" value="{{ config.access_token }}" 
+                               class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl py-3.5 pl-12 pr-12 text-slate-200 text-sm focus:border-blue-500/50 focus:outline-none transition-all" id="at_input">
+                        <button type="button" onclick="toggleVisibility('at_input')" class="absolute right-4 top-3.5 text-slate-500 hover:text-white">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    Guardar Configuración
+                </button>
+            </div>
+
+            <div class="mt-6 p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+                <p class="text-[10px] text-slate-400 leading-relaxed text-center">
+                    <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i>
+                    Al desactivar el switch, los botones de pago desaparecerán de los correos automáticos y del historial de citas de los clientes.
+                </p>
+            </div>
+        </div>
+    </form>
+</div>
+
+        <div class="md:col-span-1">
+            <div class="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-indigo-500/20">
+                <h3 class="font-bold text-lg mb-2">Simulador de Recaudo</h3>
+                <p class="text-indigo-100 text-xs mb-6">Calcula cuánto recibes tras comisiones.</p>
+                
+                <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold mb-1 opacity-80 uppercase italic">Valor del Servicio</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-3.5 text-white/50 font-bold">$</span>
+                        <input type="text" id="input_monto_format" value="150.000" oninput="formatearYCalcular(this)"
+                            class="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-8 pr-4 text-white font-bold text-xl focus:outline-none placeholder:text-white/30">
+                    </div>
+                    <input type="hidden" id="input_monto" value="150000">
+                </div>
+
+                    <div class="pt-4 border-t border-white/10 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="opacity-70 italic text-[10px]">Comisión variable (3.29%)</span>
+                            <span id="res_variable" class="font-medium">-$0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="opacity-70 italic text-[10px]">Costo fijo</span>
+                            <span id="res_fijo" class="font-medium">-$800</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="opacity-70 italic text-[10px]">IVA sobre comisión</span>
+                            <span id="res_iva" class="font-medium">-$0</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-white/30 mt-4">
+                        <p class="text-[10px] uppercase font-bold opacity-80 mb-1">Recibirás neto aprox:</p>
+                        <div class="text-3xl font-black" id="res_neto">$0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-[10px] text-slate-500 mt-4 px-2 leading-tight italic">
+                * Cálculos basados en la tasa estándar de Mercado Pago Colombia. Sujeto a retenciones adicionales (ReteIVA/ReteFuente).
+            </p>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function toggleVisibility(id) {
+    const input = document.getElementById(id);
+    const icon = event.currentTarget.querySelector('i'); // Para cambiar el icono también
+
+    if (input.type === "password") {
+        input.type = "text";
+        // Cambia el icono a un ojo tachado si quieres
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = "password";
+        // Vuelve al icono normal
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+
+function formatearYCalcular(input) {
+    // 1. Quitar todo lo que no sea número
+    let valor = input.value.replace(/\D/g, "");
+    
+    // 2. Formatear con puntos de miles
+    if (valor) {
+        input.value = new Intl.NumberFormat('es-CO').format(valor);
+    } else {
+        input.value = "";
+    }
+
+    // 3. Guardar el valor numérico real en el input oculto para el cálculo
+    document.getElementById('input_monto').value = valor;
+
+    // 4. Ejecutar el cálculo de comisiones
+    calcularComision();
+}
+
+function calcularComision() {
+    // Leemos el valor del input oculto (que no tiene puntos)
+    const monto = parseFloat(document.getElementById('input_monto').value) || 0;
+    
+    // Cálculos (3.29% + $800 + IVA del 19% sobre la comisión)
+    const comision_variable = monto * 0.0329;
+    const costo_fijo = 800;
+    const iva_comision = (comision_variable + costo_fijo) * 0.19;
+    const total_descuento = comision_variable + costo_fijo + iva_comision;
+    const neto = monto - total_descuento;
+
+    // Mostrar resultados formateados
+    document.getElementById('res_variable').innerText = '-$' + Math.round(comision_variable).toLocaleString('es-CO');
+    document.getElementById('res_fijo').innerText = '-$800';
+    document.getElementById('res_iva').innerText = '-$' + Math.round(iva_comision).toLocaleString('es-CO');
+    document.getElementById('res_neto').innerText = '$' + Math.round(neto).toLocaleString('es-CO');
+}
+
+// Ejecutar al cargar para que aparezca el valor inicial de 150.000
+window.onload = calcularComision;
+</script>
+{% endblock %}
