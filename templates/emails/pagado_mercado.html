@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="90%" style="max-width: 600px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                    
+                    <tr>
+                        <td align="center" style="background-color: #10b981; padding: 40px 20px;">
+                            <div style="background-color: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 50%; display: table; margin-bottom: 20px;">
+                                <span style="display: table-cell; vertical-align: middle; color: white; font-size: 30px;">✓</span>
+                            </div>
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">¡Pago Confirmado!</h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 30px; text-align: center;">
+                            <p style="font-size: 18px; color: #1e293b; margin-bottom: 10px;">Hola <strong>{{ cliente.cli_nombre }}</strong>,</p>
+                            <p style="font-size: 16px; color: #64748b; line-height: 1.6;">
+                                Hemos recibido correctamente tu pago a través de <strong>Mercado Pago</strong>. En <strong>{{ empresa.emp_razon_social }}</strong> estamos encantados de que hayas elegido nuestros servicios y queremos agradecerte por tu confianza.
+                            </p>
+
+                            <div style="background-color: #f8fafc; border-radius: 16px; padding: 25px; margin: 30px 0; text-align: left; border: 1px solid #e2e8f0;">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold; width: 40%;">Servicio:</td>
+                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">{{ reserva.res_tipo_servicio }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Atendido por:</td>
+                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">{{ nombre_atendio }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Fecha y Hora:</td>
+                                        <td style="padding: 5px 0; font-size: 15px; color: #0f172a; font-weight: bold;">
+                                            {{ reserva.res_fecha.strftime('%d/%m/%Y') }} a las {{ reserva.res_hora.strftime('%H:%M %p') }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="padding: 10px 0;"><hr style="border: 0; border-top: 1px solid #e2e8f0;"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 5px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Monto Pagado:</td>
+                                        <td style="padding: 5px 0; font-size: 20px; color: #10b981; font-weight: 900;">${{ "{:,.0f}".format(p_final) }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            {% if link_resena and link_resena != "#" %}
+                            <div style="margin: 30px 0; padding: 20px; border: 2px dashed #e2e8f0; border-radius: 16px;">
+                                <p style="font-size: 14px; color: #0ea5e9; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px;">
+                                    ¿Qué tal fue tu experiencia con {{ nombre_atendio }}?
+                                </p>
+                                <a href="{{ link_resena }}" 
+                                style="background-color: #0ea5e9; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4); font-size: 14px;">
+                                    CALIFICAR SERVICIO ⭐
+                                </a>
+                            </div>
+                            {% endif %}
+
+                            <p style="font-size: 13px; color: #94a3b8;">
+                                Adjunto encontrarás tu comprobante detallado en PDF.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; font-size: 15px; color: #1e293b; font-weight: bold;">
+                                ¡Gracias por confiar en {{ empresa.emp_razon_social }}!
+                            </p>
+                            <p style="margin: 5px 0 0; font-size: 12px; color: #94a3b8;">
+                                Si tienes dudas, contáctanos al {{ empresa.emp_telefono }}.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <p style="margin: 20px 0; font-size: 12px; color: #94a3b8; text-align: center;">
+                    Potenciado por <a href="https://agendapp.co" style="color: #6366f1; text-decoration: none; font-weight: bold;">Agendapp.co</a>
+                </p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

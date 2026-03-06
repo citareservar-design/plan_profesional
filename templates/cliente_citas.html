@@ -92,43 +92,66 @@
 
 <div class="mb-5 py-4 border-t border-b border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
     <div class="flex flex-col">
-        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total a pagar</span>
-        <span class="text-slate-900 dark:text-white font-black text-2xl sm:text-lg">
-            ${{ "{:,.0f}".format(cita.precio_display) if cita.precio_display else '0' }}
-        </span>
+        <div class="flex items-center gap-2 mb-1">
+            <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-none">Total a Cobrar</p>
+            
+            {# LOGICA DE PORCENTAJE: Si el valor es por ejemplo 20, mostramos -20% #}
+            {% set porcentaje_desc = cita.res_descuento_valor | float if cita.res_descuento_valor else 0 %}
+            {% if porcentaje_desc > 0 %}
+                <span class="bg-amber-500/20 text-amber-500 text-[8px] px-1.5 py-0.5 rounded-md border border-amber-500/30 font-bold">
+                    -{{ porcentaje_desc | int }}% DESC.
+                </span>
+            {% endif %}
+        </div>
+
+        <div class="flex items-baseline gap-1">
+            <span class="text-emerald-500 text-sm font-bold">$</span>
+            <span class="text-slate-900 dark:text-white text-2xl font-black tracking-tighter">
+                {# CÁLCULO DE PORCENTAJE: Precio - (Precio * (Desc / 100)) #}
+                {% set precio_base = cita.precio_display | float if cita.precio_display else 0 %}
+                {% set monto_a_restar = precio_base * (porcentaje_desc / 100) %}
+                {% set precio_final = precio_base - monto_a_restar %}
+                
+                {{ "{:,.0f}".format(precio_final) }}
+            </span>
+            
+            {# Precio original tachado si hay descuento #}
+            {% if porcentaje_desc > 0 %}
+                <span class="text-slate-400 text-xs line-through ml-2">
+                    ${{ "{:,.0f}".format(precio_base) }}
+                </span>
+            {% endif %}
+        </div>
     </div>
     
-    <div class="w-full sm:w-auto">
-        {# 1. Si la cita ya está pagada (Ajustado a tus estados) #}
-        {% if cita.res_estado in ['Pagada', 'Pagada (MP)', 'Realizada', 'Completada'] %}
-            <div class="flex items-center justify-center sm:justify-end bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-4 py-2 sm:py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 w-full sm:w-auto">
-                <i class="fa-solid fa-circle-check text-sm sm:text-xs"></i>
-                Cita Pagada
-            </div>
+    <div class="w-full sm:w-auto flex items-center gap-3">
+        {# Botón de Recibo PDF (Igual que en tu ejemplo oscuro) #}
+        <a href="{{ url_for('admin.generar_recibo_cliente', res_id=cita.res_id) }}" 
+           target="_blank"
+           class="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 transition-colors hover:bg-emerald-500/20">
+            <i class="fa-solid fa-file-pdf text-emerald-500 text-lg"></i>
+        </a>
 
-        {# 2. Si tiene servicio y MP está activo, mostramos el botón #}
+        {# Botón de Pago Mercado Pago #}
+        {% if cita.res_estado in ['Pagada', 'Pagada (MP)', 'Realizada', 'Completada'] %}
+            <div class="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i>
+                Pagada
+            </div>
         {% elif cita.res_tipo_servicio %}
             <a id="btn-pagar-{{ cita.res_id }}" 
                onclick="mostrarCarga('{{ cita.res_id }}')"
                href="{{ url_for('admin.generar_pago_reserva', res_id=cita.res_id, email=email_buscado) }}" 
-               class="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white px-6 py-3 sm:px-4 sm:py-2.5 rounded-xl font-black text-[11px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-sky-500/20 flex items-center justify-center gap-3 group w-full sm:w-auto">
-                
-                <i id="icon-mp-{{ cita.res_id }}" class="fa-brands fa-mercado-pago text-2xl sm:text-xl"></i>
-                <span id="text-{{ cita.res_id }}">Pagar Cita</span>
+               class="bg-sky-500 hover:bg-sky-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-sky-500/20 flex items-center gap-3 group">
+                <i class="fa-brands fa-mercado-pago text-xl"></i>
+                <span>Pagar Cita</span>
                 <div id="spinner-{{ cita.res_id }}" class="hidden animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full"></div>
-                <i id="arrow-{{ cita.res_id }}" class="fa-solid fa-chevron-right text-[8px] group-hover:translate-x-1 transition-transform hidden sm:block"></i>
             </a>
-
-        {% else %}
-            <div class="text-[10px] sm:text-[9px] text-slate-400 italic font-medium uppercase tracking-tighter flex items-center justify-center sm:justify-start">
-                <i class="fa-solid fa-triangle-exclamation mr-1 text-amber-500"></i> 
-                Servicio no definido
-            </div>
         {% endif %}
     </div>
 </div>
 
-{% endif %} {# FIN DE LA VALIDACIÓN DE MP_ACTIVO #}
+{% endif %}
 
 <script>
 if (typeof mostrarCarga !== 'function') {

@@ -1550,68 +1550,71 @@ def acciones_masivas_reservas():
     
     
 
-def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc, link_resena):
+def enviar_recibo_por_correo(reserva, cliente, empresa, precio_base, precio_final, descuento_porc, link_resena, template_name='emails/email_cuerpo.html'):
     """
-    Versión corregida para hilos: 
-    Recibe 'link_resena' ya generado para evitar errores de contexto de Flask.
+    Envía el recibo por correo. 
+    Usa 'template_name' para decidir qué cuerpo de mensaje enviar.
     """
+    # Verificación de datos básicos
     if not cliente.cli_email or not empresa.emp_cuenta_smtp: 
-        print("Faltan datos de contacto para enviar el correo.")
+        print("❌ Error: Faltan datos de contacto (Email cliente o SMTP empresa).")
         return False
         
-    try:
-        from models.models import Empleado
-        # Buscamos el empleado para personalizar el saludo
-        empleado_obj = Empleado.query.get(reserva.empl_id) if reserva.empl_id else None
-        nombre_profesional = empleado_obj.empl_nombre if empleado_obj else "Nuestro Profesional"
+    # Importante: Todo lo que use Flask (render_template, url_for) debe ir dentro del context
+    with current_app.app_context():
+        try:
+            from models.models import Empleado
+            # 1. Obtener nombre del profesional
+            empleado_obj = Empleado.query.get(reserva.empl_id) if reserva.empl_id else None
+            nombre_profesional = empleado_obj.empl_nombre if empleado_obj else "Nuestro Profesional"
 
-        # 1. Generar el PDF
-        html_pdf = render_template('admin/pdf_recibo.html', 
-                                   r=reserva, 
-                                   c=cliente, 
-                                   empresa=empresa,
-                                   p_original=precio_base, 
-                                   p_final=precio_final, 
-                                   p_desc=descuento_porc)
-        
-        output = io.BytesIO()
-        pisa.CreatePDF(io.BytesIO(html_pdf.encode("UTF-8")), dest=output, encoding='UTF-8')
-        
-        # 2. Renderizar el cuerpo del correo (Usa el link_resena que recibimos por parámetro)
-        cuerpo_html = render_template('emails/email_cuerpo.html', 
-                                     cliente=cliente, 
-                                     empresa=empresa, 
-                                     reserva=reserva, 
-                                     link_resena=link_resena, 
-                                     nombre_atendio=nombre_profesional)
+            # 2. Generar el PDF del recibo (usa el template estándar de PDF)
+            html_pdf = render_template('admin/pdf_recibo.html', 
+                                       r=reserva, 
+                                       c=cliente, 
+                                       empresa=empresa,
+                                       p_original=precio_base, 
+                                       p_final=precio_final, 
+                                       p_desc=descuento_porc)
+            
+            output = io.BytesIO()
+            pisa.CreatePDF(io.BytesIO(html_pdf.encode("UTF-8")), dest=output, encoding='UTF-8')
+            
+            # 3. Renderizar el cuerpo del correo (Aquí elige entre el normal o el de Mercado Pago)
+            cuerpo_html = render_template(template_name, 
+                                         cliente=cliente, 
+                                         empresa=empresa, 
+                                         reserva=reserva, 
+                                         link_resena=link_resena, 
+                                         p_final=precio_final,
+                                         nombre_atendio=nombre_profesional)
 
-        # 3. Configurar el mensaje MIME
-        msg = MIMEMultipart()
-        msg['From'] = empresa.emp_cuenta_smtp
-        msg['To'] = cliente.cli_email
-        msg['Subject'] = f"Tu Recibo - {empresa.emp_razon_social}"
-        msg.attach(MIMEText(cuerpo_html, 'html'))
-        
-        # Adjuntar PDF
-        pdf_content = output.getvalue()
-        part = MIMEApplication(pdf_content, Name=f"Recibo_{reserva.res_id}.pdf")
-        part['Content-Disposition'] = f'attachment; filename="Recibo_{reserva.res_id}.pdf"'
-        msg.attach(part)
+            # 4. Configurar el mensaje MIME
+            msg = MIMEMultipart()
+            msg['From'] = empresa.emp_cuenta_smtp
+            msg['To'] = cliente.cli_email
+            msg['Subject'] = f"Confirmación de tu Servicio - {empresa.emp_razon_social}"
+            msg.attach(MIMEText(cuerpo_html, 'html'))
+            
+            # Adjuntar el PDF generado
+            pdf_content = output.getvalue()
+            part = MIMEApplication(pdf_content, Name=f"Recibo_{reserva.res_id}.pdf")
+            part['Content-Disposition'] = f'attachment; filename="Recibo_{reserva.res_id}.pdf"'
+            msg.attach(part)
 
-        # 4. Conexión y envío SMTP
-        servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
-        servidor.starttls()
-        servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
-        servidor.send_message(msg)
-        servidor.quit()
-        
-        print(f"✅ Recibo enviado a {cliente.cli_email}")
-        return True
+            # 5. Conexión SMTP y envío
+            servidor = smtplib.SMTP(empresa.emp_servidor_smtp, int(empresa.emp_puerto_smtp))
+            servidor.starttls()
+            servidor.login(empresa.emp_cuenta_smtp, empresa.emp_clave_cuenta_smtp)
+            servidor.send_message(msg)
+            servidor.quit()
+            
+            print(f"✅ Correo enviado exitosamente a {cliente.cli_email} usando {template_name}")
+            return True
 
-    except Exception as e:
-        print(f"❌ Error enviando correo: {e}")
-        return False
-    
+        except Exception as e:
+            print(f"❌ Error crítico en enviar_recibo_por_correo: {e}")
+            return False
     
     
 
@@ -3598,41 +3601,76 @@ def generar_pago_servicio(ser_id):
     flash("No se pudo iniciar la pasarela de pago. Contacte al administrador.", "error")
     return redirect(url_for('admin.mis_citas', email=email_cliente))
 
+
+
 @admin_bp.route('/pago-exitoso')
 def pago_exitoso():
-    # Mercado Pago envía varios parámetros por la URL
     reserva_ref = request.args.get('external_reference')
-    collection_status = request.args.get('collection_status') # Debería ser 'approved'
+    collection_status = request.args.get('collection_status')
 
-    print(f"--- DEBUG: LLEGÓ A PAGO EXITOSO ---")
-    print(f"--- REFERENCIA RECIBIDA: {reserva_ref} ---")
-    print(f"--- ESTADO RECIBIDO: {collection_status} ---")
-
-    if reserva_ref:
+    if reserva_ref and collection_status == 'approved':
         try:
-            # Si enviaste "SERV-5", esto quita el "SERV-" y deja el 5
-            # Si enviaste solo el número, quita el split y usa int(reserva_ref)
-            if "-" in reserva_ref:
-                res_id_final = int(reserva_ref.split('-')[1])
-            else:
-                res_id_final = int(reserva_ref)
-
+            # Extraer ID de la reserva (ej: RES-1 -> 1)
+            res_id_final = int(reserva_ref.split('-')[1]) if "-" in reserva_ref else int(reserva_ref)
+            
+            # Importamos los modelos necesarios
+            from models.models import Reserva, Cliente, Empresa, Servicio
+            
             reserva = Reserva.query.get(res_id_final)
             
             if reserva:
-                print(f"--- ACTUALIZANDO RESERVA {res_id_final} A PAGADA ---")
-                reserva.res_estado = 'Realizada' # O 'PAGADA POR MP'
+                # 1. Actualizar estado en la Base de Datos
+                reserva.res_estado = 'Realizada'
                 reserva.res_pasarela = 'Mercado Pago'
                 db.session.commit()
-                flash("¡Pago confirmado y cita actualizada!", "success")
-            else:
-                print(f"--- ERROR: NO SE ENCONTRÓ LA RESERVA {res_id_final} EN LA BD ---")
 
+                # 2. Obtener objetos para el correo
+                cliente = Cliente.query.get(reserva.cli_id)
+                empresa = Empresa.query.get(reserva.emp_id)
+                
+                # --- LÓGICA DE PRECIO ---
+                # Buscamos el servicio para obtener el precio base real (ser_precio)
+                servicio = Servicio.query.filter_by(ser_nombre=reserva.res_tipo_servicio, emp_id=reserva.emp_id).first()
+                
+                precio_base = float(servicio.ser_precio if servicio else 0)
+                descuento_fijo = float(reserva.res_descuento_valor or 0)
+                
+                # Cálculo final: Precio Servicio - Descuento Manual
+                precio_final = precio_base - descuento_fijo
+                # -----------------------
+
+                # 3. GENERAR LINK DE RESEÑA (CORREGIDO)
+                try:
+                    # Apuntamos a 'admin.dejar_resena' porque ahí está definido tu def
+                    # Pasamos emp_id (requerido en la ruta) y res_id/empl_id como parámetros
+                    link = url_for('admin.dejar_resena', 
+                                   emp_id=reserva.emp_id, 
+                                   res_id=reserva.res_id, 
+                                   empl_id=reserva.empl_id,
+                                   _external=True)
+                except Exception as e:
+                    print(f"⚠️ Error generando url de reseña: {e}")
+                    link = "#"
+
+                # 4. Enviar el correo usando el template de Mercado Pago
+                enviar_recibo_por_correo(
+                    reserva=reserva, 
+                    cliente=cliente, 
+                    empresa=empresa, 
+                    precio_base=precio_base, 
+                    precio_final=precio_final, 
+                    descuento_porc=0, 
+                    link_resena=link, 
+                    template_name='emails/pagado_mercado.html'
+                )
+
+                flash("¡Pago confirmado y recibo enviado!", "success")
+            else:
+                print(f"❌ No se encontró la reserva {res_id_final}")
+            
         except Exception as e:
-            print(f"--- ERROR CRÍTICO EN DB: {e} ---")
+            print(f"❌ Error crítico en pago_exitoso: {e}")
             db.session.rollback()
-    else:
-        print("--- ERROR: NO SE RECIBIÓ EXTERNAL_REFERENCE ---")
 
     return redirect(url_for('admin.mis_citas'))
 
@@ -3681,30 +3719,41 @@ def guardar_configuracion_mp():
 
 @admin_bp.route('/generar-pago-reserva/<int:res_id>')
 def generar_pago_reserva(res_id):
-    # 1. Buscamos la reserva por su ID
+    # 1. Buscamos la reserva
     reserva = Reserva.query.get_or_404(res_id)
     
-    # 2. Obtenemos el nombre del servicio que guardaste en la reserva
     nombre_servicio_reserva = reserva.res_tipo_servicio
     
     if not nombre_servicio_reserva:
         flash("La reserva no tiene un tipo de servicio asignado.", "warning")
         return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))
 
-    # 3. Buscamos en la tabla SERVICIOS el que coincida con ese nombre
-    # Usamos .filter_by para buscar por el nombre exacto
+    # 3. Buscamos el servicio para obtener el precio base
     from models.models import Servicio
-    servicio = Servicio.query.filter_by(ser_nombre=nombre_servicio_reserva).first()
+    servicio = Servicio.query.filter_by(ser_nombre=nombre_servicio_reserva, emp_id=reserva.emp_id).first()
 
     if not servicio:
-        print(f"DEBUG: No se encontró un servicio llamado '{nombre_servicio_reserva}' en la tabla SERVICIOS")
         flash(f"No se encontró el precio para: {nombre_servicio_reserva}", "warning")
         return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))
 
-    # 4. Si lo encontramos, usamos su precio para Mercado Pago
+    # --- NUEVA LÓGICA DE DESCUENTO POR PORCENTAJE ---
+    precio_base = float(servicio.ser_precio)
+    # Tomamos el descuento (ej: 20)
+    porcentaje_desc = float(reserva.res_descuento_valor or 0)
+    
+    if porcentaje_desc > 0:
+        # Calculamos cuánto dinero representa ese porcentaje
+        monto_descuento = precio_base * (porcentaje_desc / 100)
+        # Lo restamos del total
+        precio_final_cobro = precio_base - monto_descuento
+    else:
+        precio_final_cobro = precio_base
+    # -----------------------------------------------
+
+    # 4. Enviamos el PRECIO FINAL (ya con descuento) a Mercado Pago
     link = generar_link_pago(
-        valor_servicio=servicio.ser_precio, 
-        nombre_servicio=servicio.ser_nombre,
+        valor_servicio=precio_final_cobro, 
+        nombre_servicio=f"{servicio.ser_nombre} (-{int(porcentaje_desc)}%)" if porcentaje_desc > 0 else servicio.ser_nombre,
         reserva_id=f"RES-{res_id}"
     )
     
