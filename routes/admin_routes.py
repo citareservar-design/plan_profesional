@@ -3507,150 +3507,205 @@ def ver_pdf_comision(filename):
 
 #---- 17  integración con MercadoPago
 
-# Asegúrate de importar tus modelos
-# from app.models import Servicio, Cliente, Reserva, db 
-
-load_dotenv()
-
 def generar_link_pago(valor_servicio, nombre_servicio, reserva_id=None):
-    """Función auxiliar para interactuar con la API de Mercado Pago"""
-    token = os.getenv("MP_ACCESS_TOKEN", "").strip()
-    sdk = mercadopago.SDK(token)
-
-    # Importante: host_url captura el dominio de Ngrok o el Real
-    # Cambia esta línea en generar_link_pago:
-    host_url = request.host_url.rstrip('/').replace('http://', 'https://')
+    """Obtiene el token de la BD y genera el link de Mercado Pago"""
     
-    preference_data = {
-    "items": [
-        {
-            "title": "Prueba AgendApp",
-            "quantity": 1,
-            "unit_price": 2000, # Valor fijo para probar
-            "currency_id": "COP"
-        }
-    ],
-    "back_urls": {
-        "success": f"{host_url}/admin/pago-exitoso",
-        "failure": f"{host_url}/admin/pago-fallido",
-        "pending": f"{host_url}/admin/pago-pendiente"
-    },
-    "binary_mode": True
-    # QUITAMOS auto_return por ahora para evitar el error 400 que tenías antes
-}
-
-    try:
-        result = sdk.preference().create(preference_data)
-        if result["status"] >= 400:
-            # ESTO ES VITAL: Si falla, imprimimos el porqué en la consola
-            print(f"--- ERROR DE MERCADO PAGO ---")
-            print(result["response"]) 
-            return None
-        return result["response"]["init_point"]
-    except Exception as e:
-        print(f"--- EXCEPCIÓN SDK MP: {e} ---")
+    # Buscar configuración en la BD
+    config = ConfiguracionPago.query.first()
+    
+    # Validar que esté activo y tenga token
+    if not config or not config.mp_activo or not config.access_token:
+        print("DEBUG: Mercado Pago está desactivado o no tiene Access Token en la BD")
         return None
 
-# --- RUTAS DE PAGO ---
+    try:
+        # 1. TRATAMIENTO DEL PRECIO (Solución al error del valor duplicado/aumentado)
+        # Convertimos a string primero para limpiar cualquier formato extraño
+        valor_limpio = str(valor_servicio).strip()
+        
+        # Si el valor tiene coma y punto (ej: 1.500,00), quitamos el punto y cambiamos coma por punto
+        if ',' in valor_limpio and '.' in valor_limpio:
+            valor_limpio = valor_limpio.replace('.', '').replace(',', '.')
+        # Si el valor tiene coma de miles (ej: 2,000), la quitamos
+        elif ',' in valor_limpio:
+            valor_limpio = valor_limpio.replace(',', '')
+            
+        # Convertimos a float y luego a int si no tiene decimales significativos 
+        # para que Mercado Pago reciba el número exacto
+        precio_final = float(valor_limpio)
+        
+        # Log de seguridad para que veas en consola qué está pasando
+        print(f"--- DEBUG PAGO: Original: {valor_servicio} | Procesado: {precio_final} ---")
+
+        # 2. INICIALIZAR SDK
+        sdk = mercadopago.SDK(config.access_token.strip())
+        host_url = request.host_url.rstrip('/').replace('http://', 'https://')
+        
+        preference_data = {
+            "items": [
+                {
+                    "title": f"Servicio: {nombre_servicio}",
+                    "quantity": 1,
+                    "unit_price": precio_final,
+                    "currency_id": "COP"
+                }
+            ],
+            "back_urls": {
+                "success": f"{host_url}/admin/pago-exitoso",
+                "failure": f"{host_url}/admin/pago-fallido",
+                "pending": f"{host_url}/admin/pago-pendiente"
+            },
+            "external_reference": str(reserva_id), # <--- ESTO ES VITAL
+            "auto_return": "approved", # <--- REGRESA AUTOMÁTICAMENTE AL SER EXITOSO
+            "binary_mode": True
+        }
+
+        result = sdk.preference().create(preference_data)
+        
+        if result["status"] >= 400:
+            print(f"ERROR MP {result['status']}: {result['response'].get('message', 'Sin mensaje')}")
+            return None
+            
+        return result["response"]["init_point"]
+
+    except Exception as e:
+        print(f"EXCEPCIÓN SDK MERCADO PAGO: {e}")
+        return None
+
+# ==========================================
+# 2. RUTAS DE PROCESAMIENTO DE PAGO
+# ==========================================
 
 @admin_bp.route('/generar-pago-servicio/<int:ser_id>')
 def generar_pago_servicio(ser_id):
-    """Ruta pública para que el cliente genere su link de pago"""
+    """Ruta que dispara la creación del link"""
     servicio = Servicio.query.get_or_404(ser_id)
-    
-    # Intentamos obtener el email de la URL para regresar a la misma vista si falla
     email_cliente = request.args.get('email', '')
 
-    try:
-        link = generar_link_pago(
-            valor_servicio=float(servicio.ser_precio), 
-            nombre_servicio=servicio.ser_nombre,
-            reserva_id=f"SERV-{servicio.ser_id}"
-        )
-        
-        if link:
-            return redirect(link)
-        
-        flash("La pasarela de pago rechazó la transacción. Verifica el precio o el token.", "error")
-        return redirect(url_for('admin.mis_citas', email=email_cliente))
-            
-    except Exception as e:
-        print(f"Error procesando pago: {e}")
-        flash("Error interno al conectar con Mercado Pago.", "error")
-        return redirect(url_for('admin.mis_citas', email=email_cliente))
+    # Generamos el link. Usamos SERV-ID como referencia
+    link = generar_link_pago(
+        valor_servicio=servicio.ser_precio, 
+        nombre_servicio=servicio.ser_nombre,
+        reserva_id=f"SERV-{ser_id}" 
+    )
+    
+    if link:
+        return redirect(link)
+    
+    flash("No se pudo iniciar la pasarela de pago. Contacte al administrador.", "error")
+    return redirect(url_for('admin.mis_citas', email=email_cliente))
 
 @admin_bp.route('/pago-exitoso')
 def pago_exitoso():
-    payment_id = request.args.get('payment_id')
-    reserva_ref = request.args.get('external_reference') # Recibimos "SERV-ID"
+    # Mercado Pago envía varios parámetros por la URL
+    reserva_ref = request.args.get('external_reference')
+    collection_status = request.args.get('collection_status') # Debería ser 'approved'
 
-    if reserva_ref and reserva_ref.startswith("SERV-"):
+    print(f"--- DEBUG: LLEGÓ A PAGO EXITOSO ---")
+    print(f"--- REFERENCIA RECIBIDA: {reserva_ref} ---")
+    print(f"--- ESTADO RECIBIDO: {collection_status} ---")
+
+    if reserva_ref:
         try:
-            # Extraemos el ID (ej: de "SERV-1" sacamos 1)
-            reserva_id = int(reserva_ref.split('-')[1])
-            
-            # Buscamos la reserva en tu MySQL (Asegúrate que el modelo se llame Reserva)
-            reserva = Reserva.query.get(reserva_id)
-            if reserva:
-                reserva.res_estado_pago = 'pagado'
-                db.session.commit()
-                flash("¡Pago registrado exitosamente!", "success")
-        except Exception as e:
-            print(f"Error actualizando DB: {e}")
-            db.session.rollback()
+            # Si enviaste "SERV-5", esto quita el "SERV-" y deja el 5
+            # Si enviaste solo el número, quita el split y usa int(reserva_ref)
+            if "-" in reserva_ref:
+                res_id_final = int(reserva_ref.split('-')[1])
+            else:
+                res_id_final = int(reserva_ref)
 
-    # Redirigimos a mis-citas para que el cliente vea su check verde
+            reserva = Reserva.query.get(res_id_final)
+            
+            if reserva:
+                print(f"--- ACTUALIZANDO RESERVA {res_id_final} A PAGADA ---")
+                reserva.res_estado = 'Pagada' # O 'PAGADA POR MP'
+                db.session.commit()
+                flash("¡Pago confirmado y cita actualizada!", "success")
+            else:
+                print(f"--- ERROR: NO SE ENCONTRÓ LA RESERVA {res_id_final} EN LA BD ---")
+
+        except Exception as e:
+            print(f"--- ERROR CRÍTICO EN DB: {e} ---")
+            db.session.rollback()
+    else:
+        print("--- ERROR: NO SE RECIBIÓ EXTERNAL_REFERENCE ---")
+
     return redirect(url_for('admin.mis_citas'))
 
+# ==========================================
+# 3. RUTAS DE CONFIGURACIÓN (VISTA Y GUARDADO)
+# ==========================================
 
 @admin_bp.route('/configurar-pagos')
 @login_required
 def configurar_pagos():
-    # Buscamos el registro en la base de datos
     config = ConfiguracionPago.query.first()
-    
-    # Si no existe (primera vez), pasamos un objeto vacío para evitar errores
     if not config:
         config = ConfiguracionPago(public_key="", access_token="", mp_activo=False)
-    
-    # IMPORTANTE: El nombre a la izquierda del '=' es como se usa en el HTML
     return render_template('admin/configurar_pagos.html', config=config)
-    
-    
-    
+
+
+
+
 @admin_bp.route('/configurar-pagos/guardar', methods=['POST'])
 @login_required
 def guardar_configuracion_mp():
-    # 1. Obtener datos del formulario
     pk = request.form.get('public_key')
     at = request.form.get('access_token')
-    # El checkbox devuelve 'on' si está marcado, o None si no
     activo = 'mp_activo' in request.form 
 
-    # 2. Consultar usando el nombre EXACTO de la clase
-    config = ConfiguracionPago.query.first() # <-- ConfiguraciónPago con C y P mayúscula
+    config = ConfiguracionPago.query.first()
 
     if not config:
-        # Si no existe, creamos la instancia de la clase
-        config = ConfiguracionPago(
-            public_key=pk,
-            access_token=at,
-            mp_activo=activo
-        )
+        config = ConfiguracionPago(public_key=pk, access_token=at, mp_activo=activo)
         db.session.add(config)
     else:
-        # Si ya existe, actualizamos los campos
         config.public_key = pk
         config.access_token = at
         config.mp_activo = activo
 
-    # 3. Guardar cambios
     try:
         db.session.commit()
-        flash("Configuración actualizada con éxito", "success")
+        flash("Configuración de pagos actualizada.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error al guardar: {str(e)}", "error")
-        print(f"Error en DB: {e}")
 
     return redirect(url_for('admin.configurar_pagos'))
+
+
+
+@admin_bp.route('/generar-pago-reserva/<int:res_id>')
+def generar_pago_reserva(res_id):
+    # 1. Buscamos la reserva por su ID
+    reserva = Reserva.query.get_or_404(res_id)
+    
+    # 2. Obtenemos el nombre del servicio que guardaste en la reserva
+    nombre_servicio_reserva = reserva.res_tipo_servicio
+    
+    if not nombre_servicio_reserva:
+        flash("La reserva no tiene un tipo de servicio asignado.", "warning")
+        return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))
+
+    # 3. Buscamos en la tabla SERVICIOS el que coincida con ese nombre
+    # Usamos .filter_by para buscar por el nombre exacto
+    from models.models import Servicio
+    servicio = Servicio.query.filter_by(ser_nombre=nombre_servicio_reserva).first()
+
+    if not servicio:
+        print(f"DEBUG: No se encontró un servicio llamado '{nombre_servicio_reserva}' en la tabla SERVICIOS")
+        flash(f"No se encontró el precio para: {nombre_servicio_reserva}", "warning")
+        return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))
+
+    # 4. Si lo encontramos, usamos su precio para Mercado Pago
+    link = generar_link_pago(
+        valor_servicio=servicio.ser_precio, 
+        nombre_servicio=servicio.ser_nombre,
+        reserva_id=f"RES-{res_id}"
+    )
+    
+    if link:
+        return redirect(link)
+    
+    flash("Error al generar el link de pago.", "error")
+    return redirect(url_for('admin.mis_citas', email=request.args.get('email', '')))

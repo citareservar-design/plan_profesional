@@ -87,23 +87,82 @@
                             <p class="text-slate-500 dark:text-slate-400 font-bold text-sm">{{ cita.res_hora.strftime('%I:%M %p') }}</p>
                         </div>
 
-                        <div class="mb-5 py-3 border-t border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
-                            <div class="flex flex-col">
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total a pagar</span>
-                                <span class="text-slate-900 dark:text-white font-black text-lg">${{ "{:,.0f}".format(cita.precio_display) if cita.precio_display else '0' }}</span>
-                            </div>
-                            
-                            {% if cita.res_estado_pago == 'pagado' %}
-                                <span class="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-lg font-black text-[10px] uppercase tracking-widest">Saldado ✅</span>
-                            {% elif cita.ser_id %}
-                                <a href="{{ url_for('admin.generar_pago_servicio', ser_id=cita.ser_id, email=email_buscado) }}" 
-                                   class="px-5 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-blue-500/30 active:scale-95 transition-transform">
-                                    Pagar ahora
-                                </a>
-                            {% else %}
-                                <span class="text-[9px] text-slate-400 italic">No disponible</span>
-                            {% endif %}
-                        </div>
+<div class="mb-5 py-4 border-t border-b border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex flex-col">
+        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total a pagar</span>
+        <span class="text-slate-900 dark:text-white font-black text-2xl sm:text-lg">
+            ${{ "{:,.0f}".format(cita.precio_display) if cita.precio_display else '0' }}
+        </span>
+    </div>
+    
+    <div class="w-full sm:w-auto">
+        {# 1. Si la cita ya está pagada #}
+        {% if cita.res_estado == 'Pagada' or cita.res_estado == 'Pagada (MP)' %}
+            <div class="flex items-center justify-center sm:justify-end bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-4 py-2 sm:py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 w-full sm:w-auto">
+                <i class="fa-solid fa-circle-check text-sm sm:text-xs"></i>
+                Cita Pagada
+            </div>
+
+        {# 2. Si tiene un tipo de servicio, mostramos el botón de pago #}
+        {% elif cita.res_tipo_servicio %}
+            <a id="btn-pagar-{{ cita.res_id }}" 
+               onclick="mostrarCarga('{{ cita.res_id }}')"
+               href="{{ url_for('admin.generar_pago_reserva', res_id=cita.res_id, email=email_buscado) }}" 
+               class="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white px-6 py-3 sm:px-4 sm:py-2.5 rounded-xl font-black text-[11px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-sky-500/20 flex items-center justify-center gap-3 group w-full sm:w-auto">
+                
+                <i id="icon-mp-{{ cita.res_id }}" class="fa-brands fa-mercado-pago text-2xl sm:text-xl"></i>
+                
+                <span id="text-{{ cita.res_id }}">Pagar Cita</span>
+                
+                <div id="spinner-{{ cita.res_id }}" class="hidden animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                
+                <i id="arrow-{{ cita.res_id }}" class="fa-solid fa-chevron-right text-[8px] group-hover:translate-x-1 transition-transform hidden sm:block"></i>
+            </a>
+
+        {# 3. Si no hay servicio definido #}
+        {% else %}
+            <div class="text-[10px] sm:text-[9px] text-slate-400 italic font-medium uppercase tracking-tighter flex items-center justify-center sm:justify-start">
+                <i class="fa-solid fa-triangle-exclamation mr-1 text-amber-500"></i> 
+                Servicio no definido
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+if (typeof mostrarCarga !== 'function') {
+    function mostrarCarga(id) {
+        const btn = document.getElementById('btn-pagar-' + id);
+        const text = document.getElementById('text-' + id);
+        const spinner = document.getElementById('spinner-' + id);
+        const icon = document.getElementById('icon-mp-' + id);
+        const arrow = document.getElementById('arrow-' + id);
+
+        if (btn) {
+            // Evitar múltiples clics
+            btn.classList.add('pointer-events-none', 'opacity-80');
+            
+            // Cambiar estados visuales
+            if (text) text.innerText = 'Procesando...';
+            if (spinner) spinner.classList.remove('hidden');
+            if (icon) icon.classList.add('hidden');
+            if (arrow) arrow.classList.add('hidden');
+        }
+        return true;
+    }
+}
+</script>
+
+<style>
+/* Asegurar que el spinner rote suavemente */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+</style>
 
                         <div class="flex gap-2 w-full">
                             {% if cita.res_estado.strip().lower() == 'pendiente' %}
