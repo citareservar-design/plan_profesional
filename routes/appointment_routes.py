@@ -1,11 +1,59 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from datetime import datetime, timedelta, time
-from models.models import  Empresa,  Servicio, DiasBloqueados,ConfigHorario, Reserva, Empleado,db
+from models.models import  Empresa,  Servicio, DiasBloqueados,ConfigHorario, Reserva, Empleado,db,Cliente
 from services.appointment_service import  obtener_horas_disponibles, enviar_correo_confirmacion
 import pytz
 
 
 appointment_bp = Blueprint('appointment', __name__)
+
+
+# confirmacion de cita (la que recibe el click del cliente en el correo)
+
+
+@appointment_bp.route('/action') # Quitamos /appointment porque el blueprint ya suele tenerlo
+def appointment_action():
+    action = request.args.get('action')
+    email = request.args.get('email')
+
+    if not email or not action:
+        return "Faltan parámetros", 400
+
+    # 1. Buscamos la última reserva
+    reserva = Reserva.query.join(Cliente).filter(
+        Cliente.cli_email == email,
+        Reserva.res_estado.in_(['pendiente', 'Pendiente', 'Confirmada'])
+    ).order_by(Reserva.res_fecha.desc(), Reserva.res_hora.desc()).first()
+
+    if not reserva:
+        return "No se encontró una cita reciente para este correo.", 404
+
+    # 2. Procesamos la acción
+    if action == 'confirmar':
+        reserva.res_estado = 'Confirmada'
+        titulo_msj = "¡Cita Confirmada!"
+        cuerpo_msj = f"Gracias por confirmar. Te esperamos el {reserva.res_fecha} a las {reserva.res_hora}."
+    
+    elif action == 'cancelar':
+        reserva.res_estado = 'Cancelada'
+        titulo_msj = "Cita Cancelada"
+        cuerpo_msj = "Tu cita ha sido cancelada exitosamente. ¡Esperamos verte pronto!"
+    
+    else:
+        return "Acción no válida", 400
+
+    # 3. Guardamos los cambios
+    try:
+        db.session.commit()
+        return render_template('confirmacion_resultado.html', 
+                               titulo=titulo_msj, 
+                               mensaje=cuerpo_msj)
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error en DB: {e}") 
+        return "Hubo un problema al procesar tu solicitud.", 500
+
+
 
 # --- 1. RUTA PÚBLICA PRINCIPAL (Formulario para Móvil) ---
 @appointment_bp.route('/')
