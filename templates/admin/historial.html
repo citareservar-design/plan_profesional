@@ -213,61 +213,62 @@
                         <th class="px-8 py-6 text-[10px] uppercase font-black text-slate-400 text-center tracking-widest">Acciones</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-white/5">
-                    <template x-for="item in items" :key="item.id">
-                        <tr class="hover:bg-white/[0.03] transition-all group">
-                            <td class="px-8 py-6">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-sky-500/5 flex items-center justify-center text-sky-500 font-black border border-white/5" x-text="item.cliente[0]"></div>
-                                    <p class="text-white font-black tracking-tight text-sm" x-text="item.cliente"></p>
-                                </div>
-                            </td>
-                            <td class="px-8 py-6">
-                                <p class="text-slate-200 font-black text-sm" x-text="item.servicio"></p>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-1 h-1 rounded-full bg-sky-500"></div>
-                                    <p class="text-[10px] text-sky-400/80 font-black uppercase tracking-tighter" x-text="item.empleado"></p>
-                                </div>
-                            </td>
-                            <td class="px-8 py-6">
-                                <div class="flex flex-col">
-                                    <p class="text-white font-bold text-sm" x-text="item.fecha_display"></p>
-                                    <p class="text-slate-500 font-black text-[10px] uppercase" x-text="item.hora"></p>
-                                </div>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <span :class="{
-                                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20': item.estado.toLowerCase() === 'realizada',
-                                    'bg-indigo-500/10 text-indigo-400 border-indigo-500/20': item.estado.toLowerCase() === 'completada',
-                                    'bg-rose-500/10 text-rose-400 border-rose-500/20': item.estado.toLowerCase() === 'cancelada',
-                                    'bg-amber-500/10 text-amber-400 border-amber-500/20': item.estado.toLowerCase() === 'pendiente',
-                                    'bg-sky-500/10 text-sky-400 border-sky-500/20': item.estado.toLowerCase() === 'confirmada'
-                                }" class="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border inline-block min-w-[100px]" x-text="item.estado"></span>
-                            </td>
-                            <td class="px-8 py-6">
-                                <div class="flex flex-col items-end">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[10px] text-slate-500 line-through" x-show="item.descuento_p > 0" x-text="'$' + Number(item.precio_base).toLocaleString()"></span>
-                                        <span class="text-white font-black text-sm" x-text="'$' + Number(item.total).toLocaleString()"></span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5 mt-1">
-                                        <span class="text-[9px] px-2 py-0.5 rounded-lg bg-white/5 text-slate-400 font-bold border border-white/5" x-text="item.pago"></span>
-                                        <template x-if="item.descuento_p > 0">
-                                            <span class="text-[9px] px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-500 font-bold border border-rose-500/20" x-text="'-' + item.descuento_p + '%'"></span>
-                                        </template>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <a :href="'/admin/generar-ticket/' + item.id" target="_blank" 
-                                   class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10"
-                                   title="Descargar Comprobante PDF">
-                                    <i class="fa-solid fa-file-pdf"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
+<tbody class="divide-y divide-white/5">
+    <template x-for="item in items" :key="item.id">
+        <tr class="hover:bg-white/[0.03] transition-all group">
+            <td class="px-8 py-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-sky-500/5 flex items-center justify-center text-sky-500 font-black border border-white/5" 
+                         x-text="item.cliente ? item.cliente[0].toUpperCase() : '?'"></div>
+                    <p class="text-white font-black tracking-tight text-sm" x-text="item.cliente"></p>
+                </div>
+            </td>
+            <td class="px-8 py-6">
+                <p class="text-slate-200 font-black text-sm" x-text="item.servicio"></p>
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1 h-1 rounded-full bg-sky-500"></div>
+                    <p class="text-[10px] text-sky-400/80 font-black uppercase tracking-tighter" 
+                       x-text="item.empleado + ' (' + item.porc_empl + '%)'"></p>
+                </div>
+            </td>
+            <td class="px-8 py-6">
+                <div class="flex flex-col">
+                    <p class="text-white font-bold text-sm" x-text="item.fecha"></p>
+                    <p class="text-slate-500 font-black text-[10px] uppercase" x-text="item.hora"></p>
+                </div>
+            </td>
+            <td class="px-8 py-6 text-center">
+                <span :class="{
+                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20': item.estado.toLowerCase() === 'realizada' || item.estado.toLowerCase() === 'completada',
+                    'bg-rose-500/10 text-rose-400 border-rose-500/20': item.estado.toLowerCase() === 'cancelada',
+                    'bg-amber-500/10 text-amber-400 border-amber-500/20': item.estado.toLowerCase() === 'pendiente',
+                    'bg-sky-500/10 text-sky-400 border-sky-500/20': item.estado.toLowerCase() === 'confirmada'
+                }" class="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border inline-block min-w-[100px]" x-text="item.estado"></span>
+            </td>
+            <td class="px-8 py-6">
+                <div class="flex flex-col items-end">
+                    <div class="flex items-center gap-2">
+<span class="text-white font-black text-sm" 
+      x-text="'$' + Number(item.neto_local).toLocaleString('es-CO', { 
+          minimumFractionDigits: 0, 
+          maximumFractionDigits: 0 
+      })">
+</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-1">
+                        <span class="text-[9px] px-2 py-0.5 rounded-lg bg-white/5 text-slate-400 font-bold border border-white/5" x-text="item.pago_metodo"></span>
+                    </div>
+                </div>
+            </td>
+            <td class="px-8 py-6 text-center">
+                <a :href="'/admin/generar-ticket/' + item.id" target="_blank" 
+                   class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10">
+                    <i class="fa-solid fa-file-pdf"></i>
+                </a>
+            </td>
+        </tr>
+    </template>
+</tbody>
             </table>
         </div>
         

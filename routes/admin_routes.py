@@ -3189,18 +3189,15 @@ def gestion_historial():
     from models.models import db, Empleado, Servicio, MediosPago
 
     try:
-        # 1. Captura de filtros
+        # Captura de filtros
         busqueda = request.args.get('busqueda', '').strip()
         f_inicio = request.args.get('fecha_inicio', '').strip()
         f_fin = request.args.get('fecha_fin', '').strip()
-        
         empleados_ids = request.args.getlist('empleados') 
-        servicios_ids = request.args.getlist('servicios') # Estos son IDs (1, 2, etc.)
+        servicios_ids = request.args.getlist('servicios')
         estados = request.args.getlist('estados')
         pasarelas = request.args.getlist('pasarelas')
 
-        # 2. SIEMPRE sacamos la lista de nombres de servicios seleccionados
-        # Esto es vital porque tus reservas tienen el ser_id vacío
         nombres_servicios_seleccionados = []
         if servicios_ids:
             servs = Servicio.query.filter(Servicio.ser_id.in_(servicios_ids)).all()
@@ -3211,13 +3208,13 @@ def gestion_historial():
         medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
         reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
 
-        # 3. Query Base (Sacamos el bloque del IF para que siempre cargue datos)
         query_sql = """
             SELECT 
                 r.res_id as id, 
                 COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
                 COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
                 COALESCE(e.empl_nombre, 'No asignado') as empleado, 
+                COALESCE(e.empl_porcentaje, 0) as porc_empleado,
                 r.res_fecha as fecha, r.res_hora as hora, r.res_estado as estado,
                 r.res_pasarela as pasarela,
                 COALESCE(r.res_descuento_valor, 0) as descuento_p,
@@ -3230,74 +3227,59 @@ def gestion_historial():
         """
         
         params = {'emp_id': current_user.emp_id}
-
-        # --- FILTROS DINÁMICOS ---
-        if busqueda:
-            query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
-        if f_inicio:
-            query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
-        if f_fin:
-            query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
-        if estados:
-            query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
-        if empleados_ids:
-            query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
-        if pasarelas:
-            query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
-
-        # CORRECCIÓN PARA SERVICIOS: Filtrar por ID o por Nombre
+        if busqueda: query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
+        if f_inicio: query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
+        if f_fin: query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
+        if estados: query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
+        if empleados_ids: query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
+        if pasarelas: query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
         if servicios_ids:
-            query_sql += """ 
-                AND (r.ser_id IN :ser_ids OR r.res_tipo_servicio IN :ser_nombres) 
-            """
-            params['ser_ids'] = tuple(servicios_ids)
-            params['ser_nombres'] = tuple(nombres_servicios_seleccionados) if nombres_servicios_seleccionados else ('',)
+            query_sql += " AND (r.ser_id IN :ser_ids OR r.res_tipo_servicio IN :ser_nombres)"
+            params['ser_ids'] = tuple(servicios_ids); params['ser_nombres'] = tuple(nombres_servicios_seleccionados) if nombres_servicios_seleccionados else ('',)
 
         query_sql += " ORDER BY r.res_fecha DESC, r.res_hora DESC"
-        
-        if not tiene_filtros:
-            query_sql += " LIMIT 10"
+        if not tiene_filtros: query_sql += " LIMIT 50"
 
         resultado_db = db.session.execute(text(query_sql), params)
         resultados = []
         
+        total_neto_acumulado = 0
+        total_comisiones_acumulado = 0
+
         for fila in resultado_db:
             p_base = float(fila.precio_base)
             porcentaje_desc = float(fila.descuento_p)
             
-            # 1. Valor que paga el cliente (Base - Descuento)
-            valor_descuento = p_base * (porcentaje_desc / 100)
-            precio_con_desc = p_base - valor_descuento
+            precio_con_desc = p_base * (1 - (porcentaje_desc / 100))
             
-            # 2. Comisión del empleado (Se calcula sobre lo que pagó el cliente)
-            porc_empl = float(fila.porc_empleado)
-            pago_empleado = precio_con_desc * (porc_empl / 100)
-            
-            # 3. Cálculo de lo que le queda al LOCAL (restando pasarelas)
-            monto_final_local = precio_con_desc 
+            # Cálculo Pasarela
+            costo_pasarela = 0
             pas_key = (fila.pasarela or "Efectivo").lower().strip()
-            
             if pas_key in reglas_pago:
                 reg = reglas_pago[pas_key]
                 v_com = precio_con_desc * (float(reg.valor_comision) / 100)
                 v_fijo = float(reg.valor_fijo or 0)
                 v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
-                # El Neto Local es lo que queda tras pagarle a la pasarela
-                monto_final_local = precio_con_desc - v_com - v_fijo - v_iva
+                costo_pasarela = v_com + v_fijo + v_iva
+            
+            monto_final_local = precio_con_desc - costo_pasarela
+            
+            # Comisión Empleado
+            porc_empl = float(fila.porc_empleado)
+            pago_empleado = monto_final_local * (porc_empl / 100)
 
-            # --- LA CORRECCIÓN DE LOS TOTALES ---
-            gran_total_neto += monto_final_local
-            gran_total_comisiones += pago_empleado # Suma acumulada de cada fila
+            total_neto_acumulado += monto_final_local
+            total_comisiones_acumulado += pago_empleado
 
             resultados.append({
+                'id': fila.id,
                 'fecha': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else '--',
                 'hora': str(fila.hora)[:5],
                 'cliente': fila.cliente,
                 'servicio': fila.servicio,
+                'estado': fila.estado,
                 'empleado': fila.empleado,
                 'precio_base': p_base,
-                'descuento_valor': valor_descuento,
-                'porcentaje_desc': porcentaje_desc,
                 'pago_empleado': pago_empleado,
                 'porc_empl': porc_empl,
                 'pago_metodo': (fila.pasarela or "Efectivo").title(),
@@ -3306,6 +3288,8 @@ def gestion_historial():
 
         return render_template('admin/historial.html', 
                                reservas_json=json.dumps(resultados),
+                               total_neto=total_neto_acumulado,
+                               total_comisiones=total_comisiones_acumulado,
                                empleados=Empleado.query.filter_by(emp_id=current_user.emp_id).all(),
                                servicios=Servicio.query.filter_by(emp_id=current_user.emp_id).all(),
                                medios_pago=medios_db,
@@ -3314,7 +3298,6 @@ def gestion_historial():
     except Exception as e:
         db.session.rollback()
         return f"Error en historial: {str(e)}", 500
- 
  
 
 
