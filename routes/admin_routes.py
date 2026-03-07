@@ -2585,6 +2585,10 @@ def descargar_reporte_cierre():
 
 # --- FUNCIÓN 1: GENERAR EL PDF BINARIO PARA EL DUEÑO ---
 def generar_reporte_general_binario(lista_empleados, current_user):
+    # 1. Preparar reglas de medios de pago
+    medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
+    reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
+
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
@@ -2595,113 +2599,154 @@ def generar_reporte_general_binario(lista_empleados, current_user):
     p.drawString(50, y, "REPORTE DETALLADO DE CIERRE DE CAJA")
     y -= 20
     p.setFont("Helvetica", 10)
-    p.drawString(50, y, f"Fecha de Cierre: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    p.setFillColorRGB(0.3, 0.3, 0.3)
+    p.drawString(50, y, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Empresa ID: {current_user.emp_id}")
     y -= 30
 
-    total_bruto_general = 0
-    total_pagos_empleados = 0
+    total_neto_general = 0      # Caja real tras pasarelas
+    total_pagos_empleados = 0   # Suma de comisiones pagadas
+    total_bruto_antes_todo = 0  # Estadística de precios de lista
 
     for emp in lista_empleados:
-        reservas = Reserva.query.filter_by(empl_id=emp.empl_id, res_estado='Realizada').all()
+        # Filtrar reservas (Realizada y Completada para reporte de cierre)
+        reservas = Reserva.query.filter(
+            Reserva.empl_id == emp.empl_id, 
+            Reserva.res_estado.in_(['Realizada', 'Completada']),
+            Reserva.emp_id == current_user.emp_id
+        ).all()
+        
         if not reservas:
             continue
 
+        # Control de espacio para nuevo bloque de empleado
         if y < 150:
             p.showPage()
             y = 750
 
         # --- BLOQUE DE COLABORADOR ---
-        p.setFillColorRGB(0.95, 0.95, 0.95)
-        p.rect(50, y-15, 512, 20, fill=1)
+        p.setFillColorRGB(0.92, 0.95, 0.98) # Azul suave
+        p.rect(45, y-15, 520, 20, fill=1, stroke=0)
         p.setFillColorRGB(0, 0, 0)
-        p.setFont("Helvetica-Bold", 11)
-        p.drawString(60, y-10, f"COLABORADOR: {emp.empl_nombre.upper()}")
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(55, y-10, f"COLABORADOR: {emp.empl_nombre.upper()} ({int(emp.empl_porcentaje or 40)}%)")
         y -= 35
 
         # Encabezados de tabla
-        p.setFont("Helvetica-Bold", 8)
+        p.setFont("Helvetica-Bold", 7)
         columnas = [
-            (55, "FECHA/HORA"), (140, "SERVICIO"), (250, "BASE"), 
-            (300, "DESC %"), (350, "FINAL"), (400, "COMISIÓN"), (470, "AL LOCAL")
+            (50, "FECHA"), (90, "SERVICIO"), (180, "M. PAGO"), 
+            (240, "BASE"), (290, "DESC %"), (330, "DED. PASAR"), 
+            (400, "VALOR NETO"), (480, "PAGO EMPL")
         ]
         for pos, texto in columnas:
             p.drawString(pos, y, texto)
         
         y -= 5
-        p.line(50, y, 562, y)
+        p.setStrokeColorRGB(0.7, 0.7, 0.7)
+        p.line(45, y, 565, y)
         y -= 12
 
-        subtotal_bruto_emp = 0
+        subtotal_neto_emp = 0
         subtotal_pago_emp = 0
-        porcentaje_comision = float(emp.empl_porcentaje or 40)
+        porcentaje_emp = float(emp.empl_porcentaje or 40)
 
-        p.setFont("Helvetica", 8)
+        p.setFont("Helvetica", 7)
         for res in reservas:
             ser = Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
             if ser:
+                # 1. Descuento al cliente
                 precio_base = float(ser.ser_precio)
                 porc_desc = float(res.res_descuento_valor or 0)
-                precio_final = precio_base - (precio_base * (porc_desc / 100))
-                comision_servicio = precio_final * (porcentaje_comision / 100)
-                local_servicio = precio_final - comision_servicio
+                precio_tras_desc = precio_base * (1 - (porc_desc / 100))
+                
+                # 2. Deducción de Pasarela Electrónica
+                deduccion_p = 0
+                pas_key = (res.res_pasarela or "Efectivo").lower().strip()
+                if pas_key in reglas_pago:
+                    reg = reglas_pago[pas_key]
+                    v_com = precio_tras_desc * (float(reg.valor_comision) / 100)
+                    v_fijo = float(reg.valor_fijo or 0)
+                    v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
+                    deduccion_p = v_com + v_fijo + v_iva
 
-                p.drawString(55, y, f"{res.res_fecha.strftime('%d/%m')} {res.res_hora.strftime('%H:%M')}")
-                p.drawString(140, y, res.res_tipo_servicio[:20])
-                p.drawString(250, y, f"${precio_base:,.0f}")
-                p.drawString(300, y, f"{int(porc_desc)}%")
-                p.drawString(350, y, f"${precio_final:,.0f}")
-                p.drawString(400, y, f"${comision_servicio:,.0f}")
-                p.drawString(470, y, f"${local_servicio:,.0f}")
+                # 3. Cálculo de la fila
+                neto_real_fila = precio_tras_desc - deduccion_p
+                pago_al_empleado = neto_real_fila * (porcentaje_emp / 100)
 
-                subtotal_bruto_emp += precio_final
-                subtotal_pago_emp += comision_servicio
+                # Dibujar fila alineada
+                p.drawString(50, y, res.res_fecha.strftime('%d/%m'))
+                p.drawString(90, y, res.res_tipo_servicio[:18])
+                p.drawString(180, y, (res.res_pasarela or "Efectivo")[:10])
+                p.drawRightString(270, y, f"${precio_base:,.0f}")
+                p.drawRightString(315, y, f"{int(porc_desc)}%")
+                p.drawRightString(385, y, f"-${deduccion_p:,.0f}")
+                p.drawRightString(460, y, f"${neto_real_fila:,.0f}")
+                p.drawRightString(545, y, f"${pago_al_empleado:,.0f}")
+
+                subtotal_neto_emp += neto_real_fila
+                subtotal_pago_emp += pago_al_empleado
+                total_bruto_antes_todo += precio_base
                 y -= 12
 
                 if y < 60:
                     p.showPage()
                     y = 750
-                    p.setFont("Helvetica", 8)
+                    p.setFont("Helvetica", 7)
 
         # Totales por colaborador
         y -= 5
-        p.line(340, y+10, 562, y+10)
-        p.setFont("Helvetica-Bold", 9)
-        p.drawString(240, y, "TOTALES:")
-        p.drawString(350, y, f"${subtotal_bruto_emp:,.0f}")
-        p.drawString(400, y, f"${subtotal_pago_emp:,.0f}")
-        p.drawString(470, y, f"${(subtotal_bruto_emp - subtotal_pago_emp):,.0f}")
+        p.setStrokeColorRGB(0.8, 0.8, 0.8)
+        p.line(380, y+10, 565, y+10)
+        p.setFont("Helvetica-Bold", 8)
+        p.drawString(300, y, f"SUBTOTAL {emp.empl_nombre[:10].upper()}:")
+        p.drawRightString(460, y, f"${subtotal_neto_emp:,.0f}")
+        p.drawRightString(545, y, f"${subtotal_pago_emp:,.0f}")
         
-        total_bruto_general += subtotal_bruto_emp
+        total_neto_general += subtotal_neto_emp
         total_pagos_empleados += subtotal_pago_emp
-        y -= 35
+        y -= 30
 
-    # --- RESUMEN FINAL ---
+    # --- CUADRO RESUMEN FINAL ---
     if y < 160: p.showPage(); y = 750
-    y -= 10
-    p.setStrokeColorRGB(0.5, 0.5, 0.5)
-    p.roundRect(50, y-70, 512, 85, 10, fill=0)
-    y -= 15
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(70, y, f"PRODUCCIÓN TOTAL BRUTA GENERAL:   ${total_bruto_general:,.0f}")
     y -= 20
+    p.setFillColorRGB(0.97, 0.97, 0.97)
+    p.roundRect(50, y-80, 512, 95, 10, fill=1)
+    
+    p.setFillColorRGB(0, 0, 0)
+    y -= 15
+    p.setFont("Helvetica", 10)
+    p.drawString(70, y, "PRODUCCIÓN BRUTA (PRECIOS LISTA):")
+    p.drawRightString(540, y, f"${total_bruto_antes_todo:,.0f}")
+    
+    y -= 18
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(70, y, "NETO REAL EN CAJA (TRAS DEDUCCIONES):")
+    p.drawRightString(540, y, f"${total_neto_general:,.0f}")
+    
+    y -= 18
     p.setFillColorRGB(0.7, 0, 0)
-    p.drawString(70, y, f"TOTAL EGRESOS (PAGOS EMPLEADOS):  -${total_pagos_empleados:,.0f}")
+    p.drawString(70, y, "TOTAL EGRESOS (PAGOS A COLABORADORES):")
+    p.drawRightString(540, y, f"-${total_pagos_empleados:,.0f}")
+    
     y -= 25
     p.setFillColorRGB(0, 0.4, 0.2)
-    p.setFont("Helvetica-Bold", 15)
-    p.drawString(70, y, f"UTILIDAD NETA TOTAL LOCAL:        ${(total_bruto_general - total_pagos_empleados):,.0f}")
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(70, y, "UTILIDAD NETA TOTAL LOCAL:")
+    p.drawRightString(540, y, f"${(total_neto_general - total_pagos_empleados):,.0f}")
 
     # Pie de página
-    p.setStrokeColorRGB(0.8, 0.8, 0.8)
-    p.line(50, 50, 562, 50)
-    p.setFont("Helvetica-Oblique", 9)
-    p.setFillColorRGB(0.4, 0.4, 0.4)
-    p.drawCentredString(width/2, 35, "Impreso por AgendApp - Reserva fácil e inteligente")
+    p.setFont("Helvetica-Oblique", 8)
+    p.setFillColorRGB(0.5, 0.5, 0.5)
+    p.drawCentredString(width/2, 40, "Este reporte descuenta costos de pasarela e IVA de transacciones antes de calcular utilidad.")
 
     p.showPage()
     p.save()
     buffer.seek(0)
     return buffer
+
+
+
+
 
 # --- FUNCIÓN 2: ENVIAR CORREO AL DUEÑO ---
 def enviar_correo_reporte_general(empresa, pdf_binario, nombre_archivo):
@@ -2752,22 +2797,20 @@ def enviar_correo_comision_empleado(empresa, empleado, pdf_binario, nombre_archi
 @admin_bp.route('/reporte-comisiones')
 @login_required
 def reporte_comisiones():
-    # Asegúrate de traer los datos más frescos de la DB
     lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id, empl_activo=1).all()
     reporte = []
     total_negocio_neto = 0
     fecha_actual = datetime.now()
 
     for emp in lista_empleados:
-        # 1. CAPTURAR EL PORCENTAJE ACTUAL (Convertir a float explícitamente)
-        # Si cambias el porcentaje en la tabla EMPLEADOS, aquí se reflejará de inmediato
         porcentaje_comision = float(emp.empl_porcentaje if emp.empl_porcentaje is not None else 40)
         
-        # 2. FILTRAR RESERVAS (Añadimos 'Completada' por si acaso)
+        # 1. FILTRAR ÚNICAMENTE LAS 'Realizada'
+        # Al quitar 'Completada', las reservas que ya cerraste no aparecerán aquí
         reservas_por_pagar = Reserva.query.filter(
             Reserva.empl_id == emp.empl_id,
-            Reserva.res_estado.in_(['Realizada', 'Completada']),
-            Reserva.emp_id == current_user.emp_id # Filtro de seguridad por empresa
+            Reserva.res_estado == 'Realizada', # Solo lo pendiente por liquidar
+            Reserva.emp_id == current_user.emp_id
         ).all()
 
         total_generado_empleado = 0
@@ -2775,33 +2818,28 @@ def reporte_comisiones():
         servicios_resumen_wpp = "" 
         
         for res in reservas_por_pagar:
-            # Buscamos el precio del servicio
             servicio = Servicio.query.filter(
                 Servicio.ser_nombre.ilike(res.res_tipo_servicio),
                 Servicio.emp_id == current_user.emp_id
             ).first()
             
-            # Si por alguna razón no existe el servicio en la tabla SERVICIOS, 
-            # podrías poner un precio por defecto o saltar
             precio_base = float(servicio.ser_precio) if servicio else 0
             
-            # --- LÓGICA DE DESCUENTO ---
             porcentaje_desc = float(res.res_descuento_valor or 0)
             valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
             precio_final = precio_base - valor_descuento_dinero
             
+            # Solo sumamos si NO es completada (aunque el filtro de arriba ya las limpia)
             total_generado_empleado += precio_final
             
-            # Guardamos detalle para el reporte
-            servicios_resumen_wpp += f"• {res.res_tipo_servicio} (${precio_final:,.0f})\n"
+            servicios_resumen_wpp += f"• {res.res_tipo_servicio} (${int(precio_final):,})\n"
             lista_detallada_servicios.append({
                 'fecha': res.res_fecha.strftime('%d/%m') if res.res_fecha else '--',
                 'nombre': res.res_tipo_servicio,
-                'precio': precio_final
+                'precio': int(precio_final) # Quitamos decimales desde aquí
             })
 
-        # 3. CÁLCULO FINAL DE COMISIÓN (Aquí es donde ocurre la magia)
-        # Se calcula sobre el TOTAL generado por el empleado tras descuentos
+        # 2. CÁLCULO FINAL (Si no hay reservas 'Realizada', esto dará 0 automáticamente)
         pago_profesional = total_generado_empleado * (porcentaje_comision / 100)
         ganancia_local = total_generado_empleado - pago_profesional
         
@@ -2812,10 +2850,10 @@ def reporte_comisiones():
             'nombre': emp.empl_nombre,
             'telefono': emp.empl_telefono,
             'cargo': emp.empl_cargo,
-            'porcentaje': porcentaje_comision, # Enviamos el porcentaje usado
+            'porcentaje': porcentaje_comision,
             'cantidad_citas': len(reservas_por_pagar),
-            'bruto': total_generado_empleado,
-            'pago_empleado': pago_profesional, # Este valor cambiará si el % cambia
+            'bruto': int(total_generado_empleado), # Forzamos entero
+            'pago_empleado': int(pago_profesional), # Forzamos entero
             'servicios_detalle': lista_detallada_servicios,
             'servicios_wpp': servicios_resumen_wpp
         })
@@ -2823,7 +2861,7 @@ def reporte_comisiones():
     return render_template('admin/comisiones.html', 
                            reporte=reporte, 
                            hoy=fecha_actual, 
-                           total_negocio=total_negocio_neto)
+                           total_negocio=int(total_negocio_neto))
     
     
 
@@ -2832,6 +2870,10 @@ def generar_pdf_binario(emp, reservas, current_user):
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
+    # 1. Cargar reglas de medios de pago (Esto es vital para calcular el neto real)
+    medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
+    reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
+
     # --- CONFIGURACIÓN DE PÁGINA Y CABECERA ---
     y = 750
     p.setFont("Helvetica-Bold", 16)
@@ -2848,33 +2890,35 @@ def generar_pdf_binario(emp, reservas, current_user):
     p.setStrokeColorRGB(0.8, 0.8, 0.8)
     p.line(50, y, 560, y)
 
-    # --- CABECERA DE TABLA (Igual al reporte de descarga) ---
+    # --- CABECERA DE TABLA ---
     y -= 25
     p.setFillColorRGB(0, 0, 0)
-    p.setFont("Helvetica-Bold", 9)
+    p.setFont("Helvetica-Bold", 8)
     
-    # Definición de columnas
-    col_fecha = 50
-    col_ser = 110
-    col_valor = 280
-    col_desc = 360
-    col_v_desc = 430
-    col_total = 500
+    # Definición de columnas (Ajustadas para incluir deducción de pasarela)
+    col_fecha = 40
+    col_ser = 85
+    col_pago = 210
+    col_valor = 285
+    col_desc = 345
+    col_comis_p = 400 # Deducción pasarela
+    col_neto = 490
 
     p.drawString(col_fecha, y, "FECHA")
     p.drawString(col_ser, y, "SERVICIO")
+    p.drawString(col_pago, y, "M. PAGO")
     p.drawString(col_valor, y, "VALOR")
     p.drawString(col_desc, y, "DESC %")
-    p.drawString(col_v_desc, y, "V. DESC")
-    p.drawString(col_total, y, "TOTAL")
+    p.drawString(col_comis_p, y, "DED. PASAR")
+    p.drawString(col_neto, y, "NETO")
     
     y -= 8
-    p.line(50, y, 560, y)
+    p.line(40, y, 570, y)
     y -= 15
 
     # --- PROCESAMIENTO DE DATOS ---
-    total_bruto = 0
-    p.setFont("Courier", 9)
+    total_neto_acumulado = 0
+    p.setFont("Courier", 8)
     
     for res in reservas:
         ser = Servicio.query.filter_by(
@@ -2883,25 +2927,42 @@ def generar_pdf_binario(emp, reservas, current_user):
         ).first()
         
         if ser:
+            # A. Cálculo de Descuento
             precio_base = float(ser.ser_precio)
             porcentaje_desc = float(res.res_descuento_valor or 0)
             valor_descuento_dinero = precio_base * (porcentaje_desc / 100)
-            precio_final = precio_base - valor_descuento_dinero
-            total_bruto += precio_final
+            precio_tras_desc = precio_base - valor_descuento_dinero
+            
+            # B. Cálculo de Pasarela (Lo que le faltaba a este def)
+            deduccion_pasarela = 0
+            nombre_pago = (res.res_pasarela or "Efectivo").strip()
+            pas_key = nombre_pago.lower()
+            
+            if pas_key in reglas_pago:
+                reg = reglas_pago[pas_key]
+                v_com = precio_tras_desc * (float(reg.valor_comision) / 100)
+                v_fijo = float(reg.valor_fijo or 0)
+                v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
+                deduccion_pasarela = v_com + v_fijo + v_iva
+            
+            # C. Neto Real
+            neto_fila = precio_tras_desc - deduccion_pasarela
+            total_neto_acumulado += neto_fila
 
             # Control de salto de página
             if y < 80:
                 p.showPage()
                 y = 750
-                p.setFont("Courier", 9)
+                p.setFont("Courier", 8)
 
-            # Dibujar Fila
+            # Dibujar Fila (Usando RightString para alinear números)
             p.drawString(col_fecha, y, res.res_fecha.strftime('%d/%m'))
-            p.drawString(col_ser, y, res.res_tipo_servicio[:22])
-            p.drawString(col_valor, y, f"{precio_base:,.0f}")
-            p.drawString(col_desc, y, f"{int(porcentaje_desc)}%")
-            p.drawString(col_v_desc, y, f"{valor_descuento_dinero:,.0f}")
-            p.drawString(col_total, y, f"{precio_final:,.0f}")
+            p.drawString(col_ser, y, res.res_tipo_servicio[:18])
+            p.drawString(col_pago, y, nombre_pago[:12])
+            p.drawRightString(col_valor + 30, y, f"{precio_base:,.0f}")
+            p.drawString(col_desc + 5, y, f"{int(porcentaje_desc)}%")
+            p.drawRightString(col_comis_p + 45, y, f"-{deduccion_pasarela:,.0f}")
+            p.drawRightString(col_neto + 40, y, f"{neto_fila:,.0f}")
             
             y -= 15
 
@@ -2910,27 +2971,31 @@ def generar_pdf_binario(emp, reservas, current_user):
         p.showPage()
         y = 750
 
-    y -= 20
+    y -= 30
     p.setStrokeColorRGB(0.5, 0.5, 0.5)
-    p.line(350, y+10, 560, y+10)
+    p.line(350, y+15, 560, y+15)
     
-    porcentaje = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
-    pago_empleado = total_bruto * (porcentaje / 100)
+    porcentaje_emp = float(emp.empl_porcentaje if emp.empl_porcentaje else 40)
+    pago_empleado = total_neto_acumulado * (porcentaje_emp / 100)
 
-    p.setFont("Helvetica-Bold", 11)
-    p.drawString(350, y, "SUBTOTAL:")
-    p.drawRightString(555, y, f"${total_bruto:,.0f}")
+    p.setFont("Helvetica-Bold", 10)
+    p.setFillColorRGB(0, 0, 0)
+    p.drawString(350, y, "NETO TOTAL GENERADO:")
+    p.drawRightString(555, y, f"${total_neto_acumulado:,.0f}")
     
     y -= 20
-    p.setFont("Helvetica-Bold", 13)
+    p.setFont("Helvetica-Bold", 12)
     p.setFillColorRGB(0, 0.4, 0.2) 
-    p.drawString(350, y, f"TOTAL PAGO ({int(porcentaje)}%):")
+    p.drawString(350, y, f"PAGO PROFESIONAL ({int(porcentaje_emp)}%):")
     p.drawRightString(555, y, f"${pago_empleado:,.0f}")
 
     # --- PIE DE PÁGINA ---
-    p.setFont("Helvetica-Oblique", 8)
-    p.setFillColorRGB(0.5, 0.5, 0.5)
-    p.drawCentredString(width/2, 40, "AgendApp - Comprobante oficial de servicios")
+    y -= 50
+    p.setFont("Helvetica-Oblique", 7)
+    p.setFillColorRGB(0.6, 0.6, 0.6)
+    p.drawString(50, y, "* Nota: Liquidación sobre base neta (Base - Descuentos - Comisiones de pago).")
+    
+    p.drawCentredString(width/2, 30, "AgendApp - Comprobante de servicios")
 
     p.showPage()
     p.save()
