@@ -44,6 +44,26 @@
         </a>
         {% endif %}
 
+
+         {% if current_user.tiene_permiso('ver_medios_pago') %}
+        <a href="{{ url_for('admin.gestion_medios_pago') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-orange-500/50 transition-all hover:shadow-2xl hover:shadow-orange-500/10 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl group-hover:bg-orange-500/10 transition-all"></div>
+            
+            <div class="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-credit-card text-2xl text-orange-400"></i>
+            </div>
+
+            <div class="flex justify-between items-start">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider">Medios de Pago</h3>
+            </div>
+
+            <p class="text-slate-400 text-sm mt-2 line-clamp-2">
+                Configura comisiones y retenciones por cada método de pago.
+            </p>
+        </a>
+        {% endif %}
+
+
         {% if current_user.tiene_permiso('ver_usuarios') %}
         <a href="{{ url_for('admin.gestion_usuarios') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-sky-500/50 transition-all hover:shadow-2xl hover:shadow-sky-500/10">
             <div class="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -65,23 +85,7 @@
         {% endif %}
 
 
-        {% if current_user.tiene_permiso('ver_medios_pago') %}
-        <a href="{{ url_for('admin.gestion_medios_pago') }}" class="group bg-slate-800/50 p-6 rounded-3xl border border-slate-700 hover:border-orange-500/50 transition-all hover:shadow-2xl hover:shadow-orange-500/10 relative overflow-hidden">
-            <div class="absolute -right-4 -top-4 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl group-hover:bg-orange-500/10 transition-all"></div>
-            
-            <div class="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <i class="fa-solid fa-credit-card text-2xl text-orange-400"></i>
-            </div>
 
-            <div class="flex justify-between items-start">
-                <h3 class="text-lg font-bold text-white uppercase tracking-wider">Medios de Pago</h3>
-            </div>
-
-            <p class="text-slate-400 text-sm mt-2 line-clamp-2">
-                Configura comisiones y retenciones por cada método de pago.
-            </p>
-        </a>
-        {% endif %}
 
 
         {% if current_user.tiene_permiso('ver_plantillas') %}

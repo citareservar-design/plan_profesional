@@ -1786,20 +1786,32 @@ def reservas():
         .filter(Reserva.res_fecha <= fecha_limite_sup)\
         .order_by(Reserva.res_fecha.asc(), Reserva.res_hora.asc()).all()
     
+# ... (código anterior igual)
+
     reservas_data = []
     
+    # --- CORRECCIÓN AQUÍ: Definir medios ANTES del bucle for ---
+    # Lo ponemos aquí arriba para que siempre tenga un valor, incluso si no hay reservas
+    medios = MediosPago.query.filter_by(emp_id=current_user.emp_id, activo=True).all()
+
     for r in todas_las_reservas:
+        # 1. Normalizar estado
         r.estado_normalizado = r.res_estado.lower().strip() if r.res_estado else ""
         
-        # Obtenemos servicio del diccionario en memoria (O(1) de velocidad)
+        # 2. Buscar el objeto servicio (por nombre o por ID)
         servicio_obj = dict_servicios.get(r.res_tipo_servicio) or dict_servicios_id.get(r.ser_id)
         
-        precio_base = float(servicio_obj.ser_precio) if servicio_obj else 0.0
-        r.precio_estimado = precio_base 
+        # --- CIRUGÍA DE PRECIOS: AQUÍ SE DEFINE EL VALOR ---
+        if servicio_obj:
+            precio_base = float(servicio_obj.ser_precio or 0.0)
+        else:
+            # Si no encuentra el servicio, intenta usar el precio que ya tenga la reserva guardado
+            precio_base = float(r.res_precio or 0.0)
         
+        r.precio_estimado = precio_base
+        
+        # 3. Lógica de descuentos
         porcentaje_desc = float(r.res_descuento_valor or 0.0)
-        
-        # Lógica de descuento
         if porcentaje_desc > 0:
             r.precio_final = precio_base * (1 - (porcentaje_desc / 100))
             r.tiene_descuento = True
@@ -1807,15 +1819,18 @@ def reservas():
         else:
             r.precio_final = precio_base
             r.tiene_descuento = False
+        # --- FIN DE CIRUGÍA DE PRECIOS ---
 
-        # Asignación de empleados aptos desde el mapa pre-cargado
+        # 4. Asignación de empleados aptos
         if servicio_obj and servicio_obj.ser_id in mapa_aptos:
             empleados_aptos = mapa_aptos[servicio_obj.ser_id]
         else:
             empleados_aptos = lista_empleados_todos
 
+        # Guardamos todo en la lista para el HTML
         reservas_data.append((r, r.cliente, empleados_aptos))
-        medios = MediosPago.query.filter_by(emp_id=current_user.emp_id, activo=True).all()
+
+        # BORRAR la línea de 'medios' que estaba aquí adentro
 
     return render_template('admin/reservas.html', 
                            reservas_data=reservas_data, 
@@ -1823,7 +1838,6 @@ def reservas():
                            hoy=hoy, ayer=ayer, manana=manana,
                            lista_medios_pago=medios,
                            empresa=datos_empresa)
-    
 
 
 @admin_bp.route('/reserva/actualizar-pasarela/<int:id>', methods=['POST'])

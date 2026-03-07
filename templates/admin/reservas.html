@@ -373,9 +373,9 @@
 <div class="mb-3 relative group" @click.stop>
 
 
-{# --- INICIO DE LA CIRUGÍA: SECCIÓN DE MEDIO DE PAGO PREMIUM --- #}
+{# --- SECCIÓN DE MEDIO DE PAGO CON EFECTO DE BRILLO ALERTA --- #}
 <div class="mb-4 relative group" 
-     x-data="{ cargando: false }" 
+     x-data="{ cargando: false, tieneMetodo: {{ 'true' if r.res_pasarela else 'false' }} }" 
      @click.stop>
     
     <form action="{{ url_for('admin.actualizar_pasarela_reserva', id=r.res_id) }}" 
@@ -383,9 +383,13 @@
           @submit="cargando = true">
         
         <div class="flex justify-between items-center ml-1 mb-1.5">
-            <label class="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] flex items-center gap-2">
-                <i class="fa-solid fa-wallet text-[9px] transition-colors" :class="cargando ? 'animate-bounce text-sky-500' : 'text-slate-600'"></i>
+            <label class="text-[10px] font-black uppercase tracking-[0.1em] flex items-center gap-2 transition-colors"
+                   :class="!tieneMetodo ? 'text-amber-400' : 'text-slate-500'">
+                <i class="fa-solid fa-wallet text-[9px]" :class="cargando ? 'animate-bounce text-sky-500' : (!tieneMetodo ? 'text-amber-400' : 'text-slate-600')"></i>
                 Método de Pago
+                <template x-if="!tieneMetodo">
+                    <span class="text-[7px] bg-amber-500/20 px-1.5 py-0.5 rounded-full animate-pulse">Requerido</span>
+                </template>
             </label>
             
             <template x-if="cargando">
@@ -393,15 +397,20 @@
             </template>
         </div>
         
-        <div class="relative overflow-hidden rounded-xl">
+        <div class="relative overflow-hidden rounded-xl transition-all duration-500"
+             {# ESTA ES LA CLAVE: Si no tiene método, aplica un anillo de luz pulsante #}
+             :class="!tieneMetodo && '{{ r.estado_normalizado }}' !== 'completada' ? 'ring-2 ring-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse' : ''">
+            
             <select name="res_pasarela" 
                 onchange="this.form.submit()" 
                 {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
-                class="w-full bg-slate-950/40 border border-white/5 text-slate-200 text-xs rounded-xl px-4 py-3 outline-none appearance-none transition-all duration-500
+                class="w-full bg-slate-950/40 border text-slate-200 text-xs rounded-xl px-4 py-3 outline-none appearance-none transition-all duration-500
                 {% if r.estado_normalizado in ['realizada', 'completada'] %} 
                     border-slate-800/50 text-slate-500 bg-slate-950/80 cursor-not-allowed italic
                 {% else %} 
                     focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 hover:bg-slate-800/60 cursor-pointer
+                    {# Si no tiene método, el borde se vuelve ámbar sutil para avisar #}
+                    :class="!tieneMetodo ? 'border-amber-500/50' : 'border-white/5'"
                     {% if r.res_pasarela %} border-sky-500/30 bg-sky-500/[0.03] {% endif %}
                 {% endif %}">
                 
@@ -421,18 +430,19 @@
                     <i class="fa-solid fa-lock text-[10px] text-slate-700"></i>
                 {% else %}
                     <i class="fa-solid fa-chevron-down text-[9px] transition-transform group-hover:translate-y-0.5 
-                       {% if r.res_pasarela %} text-sky-500 {% else %} text-slate-600 {% endif %}"></i>
+                       :class="!tieneMetodo ? 'text-amber-500' : (tieneMetodo ? 'text-sky-500' : 'text-slate-600')"></i>
                 {% endif %}
             </div>
 
-            {# Línea de acento Sky inferior sutil #}
+            {# Línea de acento inferior #}
             {% if r.res_pasarela and r.estado_normalizado not in ['realizada', 'completada'] %}
                 <div class="absolute bottom-0 left-0 h-[1.5px] w-full bg-gradient-to-r from-transparent via-sky-500/50 to-transparent"></div>
+            {% elif not r.res_pasarela and r.estado_normalizado not in ['realizada', 'completada'] %}
+                <div class="absolute bottom-0 left-0 h-[1.5px] w-full bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"></div>
             {% endif %}
         </div>
     </form>
 </div>
-{# --- FIN DE LA CIRUGÍA --- #}
 
 
 
@@ -491,23 +501,32 @@
 </div>
 
 
-<div @click.stop class="relative group">
+<div @click.stop class="relative group" 
+     x-data="{ metodoGuardado: '{{ r.res_pasarela or '' }}' }">
+    
     <form action="{{ url_for('admin.reserva_estado', id=r.res_id) }}" method="POST">
         <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 mb-1.5 block">
             Estado de la Cita
         </label>
         
         <div class="relative">
+            {# LÓGICA: Se bloquea si no hay método de pago o si ya está finalizada #}
             <select name="estado" onchange="this.form.submit()" 
-                {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
-                class="w-full bg-slate-900/50 border border-white/10 text-slate-200 text-xs rounded-xl px-4 py-2.5 outline-none appearance-none transition-all duration-300
-                {% if r.estado_normalizado == 'pendiente' %} border-sky-500/30 text-sky-400
-                {% elif r.estado_normalizado == 'confirmada' %} border-amber-500/30 text-amber-400
-                {% elif r.estado_normalizado == 'realizada' %} border-emerald-500/30 text-emerald-400
-                {% elif r.estado_normalizado == 'completada' %} border-slate-700/50 text-slate-500 bg-slate-950/50
-                {% endif %}
-                {% if r.estado_normalizado in ['realizada', 'completada'] %} cursor-not-allowed {% else %} cursor-pointer hover:border-white/20 hover:bg-slate-800 {% endif %}">
+                :disabled="!metodoGuardado || '{{ r.estado_normalizado }}' === 'realizada' || '{{ r.estado_normalizado }}' === 'completada'"
+                class="w-full bg-slate-900/50 border text-slate-200 text-xs rounded-xl px-4 py-2.5 outline-none appearance-none transition-all duration-300"
+                :class="{
+                    'border-white/5 opacity-40 cursor-not-allowed': !metodoGuardado,
+                    'border-sky-500/30 text-sky-400 hover:border-white/20 hover:bg-slate-800 cursor-pointer': metodoGuardado && '{{ r.estado_normalizado }}' === 'pendiente',
+                    'border-amber-500/30 text-amber-400 hover:border-white/20 hover:bg-slate-800 cursor-pointer': metodoGuardado && '{{ r.estado_normalizado }}' === 'confirmada',
+                    'border-emerald-500/30 text-emerald-400': '{{ r.estado_normalizado }}' === 'realizada',
+                    'border-slate-700/50 text-slate-500 bg-slate-950/50': '{{ r.estado_normalizado }}' === 'completada'
+                }">
                 
+                {# Opción informativa cuando está bloqueado #}
+                <template x-if="!metodoGuardado">
+                    <option value="">🚫 Definir pago primero</option>
+                </template>
+
                 <option value="Pendiente" {% if r.estado_normalizado == 'pendiente' %}selected{% endif %}>🔔 Pendiente</option>
                 <option value="Confirmada" {% if r.estado_normalizado == 'confirmada' %}selected{% endif %}>🤝 Confirmada</option>
                 <option value="Realizada" {% if r.estado_normalizado == 'realizada' %}selected{% endif %}>✨ Realizada</option>
@@ -518,18 +537,20 @@
                 {% endif %}
             </select>
 
-            {# Flecha personalizada (Solo se muestra si NO está bloqueado) #}
-            {% if r.estado_normalizado not in ['realizada', 'completada'] %}
-            <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
+            {# Flecha (Solo se muestra si está habilitado para cambios) #}
+            <div x-show="metodoGuardado && !['realizada', 'completada'].includes('{{ r.estado_normalizado }}')" 
+                 class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
+                <i class="fa-solid fa-chevron-down text-[10px]"></i>
             </div>
-            {% endif %}
+            
+            {# Candado visual si está bloqueado por falta de pago #}
+            <div x-show="!metodoGuardado" 
+                 class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-600">
+                <i class="fa-solid fa-lock text-[10px]"></i>
+            </div>
         </div>
     </form>
 </div>
-
 
 {# SECCIÓN DE TOTAL A PAGAR #}
 <div class="mt-4 pt-4 border-t border-white/5">
@@ -549,7 +570,7 @@
             <div class="flex items-baseline gap-1">
                 <span class="text-emerald-400 text-sm font-bold">$</span>
                 <span class="text-white text-2xl font-black font-mono tracking-tighter">
-                    {{ "{:,.0f}".format(r.precio_final) }}
+                    {{ "{:,.0f}".format(r.precio_final | default(0)) }}
                 </span>
                 
                 {# Si tiene descuento, mostramos el precio original pequeño y tachado #}
