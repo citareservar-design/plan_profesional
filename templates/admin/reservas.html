@@ -371,12 +371,92 @@
 
 
 <div class="mb-3 relative group" @click.stop>
+
+
+{# --- INICIO DE LA CIRUGÍA: SECCIÓN DE MEDIO DE PAGO PREMIUM --- #}
+<div class="mb-4 relative group" 
+     x-data="{ cargando: false }" 
+     @click.stop>
+    
+    <form action="{{ url_for('admin.actualizar_pasarela_reserva', id=r.res_id) }}" 
+          method="POST" 
+          @submit="cargando = true">
+        
+        <div class="flex justify-between items-center ml-1 mb-1.5">
+            <label class="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] flex items-center gap-2">
+                <i class="fa-solid fa-wallet text-[9px] transition-colors" :class="cargando ? 'animate-bounce text-sky-500' : 'text-slate-600'"></i>
+                Método de Pago
+            </label>
+            
+            <template x-if="cargando">
+                <span class="text-[8px] text-sky-400 font-bold animate-pulse uppercase tracking-tighter">Sincronizando...</span>
+            </template>
+        </div>
+        
+        <div class="relative overflow-hidden rounded-xl">
+            <select name="res_pasarela" 
+                onchange="this.form.submit()" 
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
+                class="w-full bg-slate-950/40 border border-white/5 text-slate-200 text-xs rounded-xl px-4 py-3 outline-none appearance-none transition-all duration-500
+                {% if r.estado_normalizado in ['realizada', 'completada'] %} 
+                    border-slate-800/50 text-slate-500 bg-slate-950/80 cursor-not-allowed italic
+                {% else %} 
+                    focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 hover:bg-slate-800/60 cursor-pointer
+                    {% if r.res_pasarela %} border-sky-500/30 bg-sky-500/[0.03] {% endif %}
+                {% endif %}">
+                
+                <option value="" class="bg-slate-900 text-slate-500">— Seleccionar método —</option>
+                
+                {% for medio in lista_medios_pago %}
+                    <option value="{{ medio.nombre }}" 
+                            class="bg-slate-900 text-white py-2"
+                            {% if r.res_pasarela == medio.nombre %}selected{% endif %}>
+                        {{ medio.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                {% if r.estado_normalizado in ['realizada', 'completada'] %}
+                    <i class="fa-solid fa-lock text-[10px] text-slate-700"></i>
+                {% else %}
+                    <i class="fa-solid fa-chevron-down text-[9px] transition-transform group-hover:translate-y-0.5 
+                       {% if r.res_pasarela %} text-sky-500 {% else %} text-slate-600 {% endif %}"></i>
+                {% endif %}
+            </div>
+
+            {# Línea de acento Sky inferior sutil #}
+            {% if r.res_pasarela and r.estado_normalizado not in ['realizada', 'completada'] %}
+                <div class="absolute bottom-0 left-0 h-[1.5px] w-full bg-gradient-to-r from-transparent via-sky-500/50 to-transparent"></div>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{# --- FIN DE LA CIRUGÍA --- #}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <form action="{{ url_for('admin.asignar_empleado', id=r.res_id) }}" method="POST">
         <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1 mb-1.5 block">
             Profesional Calificado
         </label>
         
         <div class="relative">
+
+            
             <select name="empleado_id" onchange="this.form.submit()" 
                 {% if r.estado_normalizado in ['realizada', 'completada'] %} disabled {% endif %}
                 class="w-full bg-slate-900/50 border border-white/10 text-slate-200 text-xs rounded-xl px-4 py-2.5 outline-none appearance-none transition-all duration-300

@@ -1769,12 +1769,37 @@ def reservas():
             empleados_aptos = lista_empleados_todos
 
         reservas_data.append((r, r.cliente, empleados_aptos))
+        medios = MediosPago.query.filter_by(emp_id=current_user.emp_id, activo=True).all()
 
     return render_template('admin/reservas.html', 
                            reservas_data=reservas_data, 
                            lista_empleados=lista_empleados_todos,
                            hoy=hoy, ayer=ayer, manana=manana,
+                           lista_medios_pago=medios,
                            empresa=datos_empresa)
+    
+
+
+@admin_bp.route('/reserva/actualizar-pasarela/<int:id>', methods=['POST'])
+@login_required
+def actualizar_pasarela_reserva(id):
+    # Importamos el modelo con el nombre exacto: Reserva
+    
+    # Buscamos la reserva por ID
+    reserva_obj = Reserva.query.get_or_404(id)
+    nuevo_medio = request.form.get('res_pasarela')
+    
+    try:
+        # Actualizamos el campo res_pasarela
+        reserva_obj.res_pasarela = nuevo_medio
+        db.session.commit()
+        # No ponemos flash para que la experiencia sea fluida (onchange)
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error al actualizar pasarela: {e}")
+        
+    # Redirigimos a la misma página donde estaba el usuario
+    return redirect(request.referrer or url_for('admin.gestion_reservas'))
     
     
     
