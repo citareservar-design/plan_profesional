@@ -86,8 +86,19 @@
 <div class="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10">
     <div class="flex flex-col">
         <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest">¿Mostrar en Agenda?</span>
-        <span id="estado_visibilidad" class="text-[10px] font-bold {% if empleados[0].empl_mostrar_en_reserva %} text-sky-500 {% else %} text-rose-500 {% endif %} uppercase">
-            {% if empleados[0].empl_mostrar_en_reserva %} Activado {% else %} Desactivado {% endif %}
+        <span id="estado_visibilidad" 
+              class="text-[10px] font-bold 
+              {% if empleados and empleados[0].empl_mostrar_en_reserva %} 
+                  text-sky-500 
+              {% else %} 
+                  text-rose-500 
+              {% endif %} 
+              uppercase">
+            {% if empleados %}
+                {{ 'Visible en Reservas' if empleados[0].empl_mostrar_en_reserva else 'Oculto en Reservas' }}
+            {% else %}
+                Sin empleados
+            {% endif %}
         </span>
     </div>
     
@@ -95,7 +106,10 @@
         <input type="checkbox" 
                id="toggle_mostrar_empleados" 
                class="sr-only peer" 
-               {% if empleados[0].empl_mostrar_en_reserva %} checked {% endif %}
+               {# CORRECCIÓN AQUÍ: Agregamos el chequeo de "if empleados" #}
+               {% if empleados and empleados[0].empl_mostrar_en_reserva %} checked {% endif %}
+               {# Si no hay empleados, el toggle se desactiva por defecto #}
+               {% if not empleados %} disabled {% endif %}
                onchange="actualizarVisibilidadGlobal(this.checked)">
         
         <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer 
