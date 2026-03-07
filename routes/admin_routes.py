@@ -268,18 +268,53 @@ def dashboard():
         valores_ventas.append(dict_ventas.get(fecha_str, 0))
 
 
-# 6. TOTAL HISTÓRICO (Cálculo por Porcentaje)
-    total_historico = db.session.query(
-        func.sum(
-            Servicio.ser_precio - (Servicio.ser_precio * (func.coalesce(Reserva.res_descuento_valor, 0) / 100))
-        )
-    ).select_from(Reserva).join(
-        Servicio, 
-        (Reserva.res_tipo_servicio == Servicio.ser_nombre) & (Servicio.emp_id == emp_id_actual)
+# 1. Traemos los medios de pago para saber sus reglas (comisiones, iva, etc.)
+
+    medios_reglas = {m.nombre: m for m in MediosPago.query.filter_by(emp_id=emp_id_actual).all()}
+
+    # 2. Tu consulta de reservas (asegúrate de traer Reserva y Servicio)
+    resultados = db.session.query(Reserva, Servicio).join(
+        Servicio, (Reserva.res_tipo_servicio == Servicio.ser_nombre) & (Servicio.emp_id == emp_id_actual)
     ).filter(
         Reserva.emp_id == emp_id_actual,
         Reserva.res_estado.in_(['Realizada', 'Completada'])
-    ).scalar() or 0
+    ).all()
+
+    ingresos_por_medio = {}
+    total_neto_acumulado = 0
+
+    for res, ser in resultados:
+        # --- TODO ESTO DEBE ESTAR DENTRO DEL FOR ---
+        desc_val = float(res.res_descuento_valor or 0)
+        precio_con_desc = float(ser.ser_precio) * (1 - (desc_val / 100))
+        
+        medio_original = res.res_pasarela or "Efectivo"
+        medio_key = medio_original.lower().strip() 
+        
+        monto_final = precio_con_desc 
+
+        # --- APLICAR COMISIONES (DENTRO DEL FOR) ---
+        if medio_key in medios_reglas:
+            m = medios_reglas[medio_key]
+            comision_var = precio_con_desc * (float(m.valor_comision) / 100)
+            comision_fija = float(m.valor_fijo or 0)
+            iva_sobre_comision = (comision_var + comision_fija) * (float(m.porcentaje_iva) / 100)
+            
+            monto_final = precio_con_desc - comision_var - comision_fija - iva_sobre_comision
+
+        # --- GUARDAR Y SUMAR (DENTRO DEL FOR) ---
+        # Usamos .get() para que SUME lo anterior con lo nuevo
+        ingresos_por_medio[medio_original] = ingresos_por_medio.get(medio_original, 0) + monto_final
+        total_neto_acumulado += monto_final
+        # --- AQUÍ TERMINA EL FOR ---
+
+    # Aquí ya puedes seguir con el resto (fuera del for)
+
+    
+    
+    
+    
+    
     
 # CONSULTA PARA GRÁFICO DE DONA (Estados Globales)
     stats_dona = db.session.query(
@@ -379,6 +414,11 @@ def dashboard():
     u_cliente = ultima_reserva.cliente.cli_nombre if (ultima_reserva and ultima_reserva.cliente) else "Sin nombre"
     u_servicio = ultima_reserva.res_tipo_servicio if ultima_reserva else "Sin servicio"
     
+    
+    
+    
+    
+    
 # 8. CÁLCULO DEL DÍA PICO Y CONTEO SEMANAL PARA GRÁFICA
     conteo_semanal = [0] * 7
     stats_semana = db.session.query(
@@ -416,6 +456,7 @@ def dashboard():
                            c_logradas=c_logradas_total,
                            c_pendiente=c_pendiente,
                            c_confirmada=c_confirmada,
+                           ingresos_por_medio=ingresos_por_medio,
                            c_realizada=c_realizada,
                            c_canceladas=c_canceladas,
                            c_completadas=c_completadas,
@@ -433,7 +474,7 @@ def dashboard():
                            top_servicios=top_servicios_data,
                            valores_ventas=valores_ventas,
                            ingresos_hoy=ingresos_hoy,
-                           total_ingresos=total_historico,
+                           total_ingresos=total_neto_acumulado,
                            citas_proximas=citas_proximas,
                             ultimo_id=u_id,
                             ultimo_cliente=u_cliente,
@@ -3653,7 +3694,7 @@ def pago_exitoso():
 
                 # 1. Actualizar estado (Esto "sella" la reserva para la siguiente petición)
                 reserva.res_estado = 'Realizada'
-                reserva.res_pasarela = 'Mercado Pago'
+                reserva.res_pasarela = 'mercado pago'
                 db.session.commit() 
 
                 # 2. Lógica de Precios
