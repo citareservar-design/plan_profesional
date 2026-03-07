@@ -1,75 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <style>
         @page { margin: 1cm; }
-        body { font-family: 'Helvetica', sans-serif; color: #1e293b; font-size: 9px; }
+        body { font-family: 'Helvetica', sans-serif; color: #1e293b; font-size: 9px; line-height: 1.4; }
+        
+        /* Encabezado */
         .header { text-align: left; border-bottom: 3px solid #0ea5e9; padding-bottom: 15px; margin-bottom: 20px; }
         .header h1 { color: #0ea5e9; margin: 0; font-size: 22px; text-transform: uppercase; }
-        
-        table { width: 100%; border-collapse: collapse; }
-        th { background-color: #0f172a; color: white; text-align: left; padding: 8px; text-transform: uppercase; }
-        td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+        .header p { margin: 5px 0 0 0; color: #64748b; font-size: 10px; }
+
+        /* Tabla Principal */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background-color: #0f172a; color: white; text-align: left; padding: 8px; text-transform: uppercase; font-size: 8px; }
+        td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
         tr:nth-child(even) { background-color: #f8fafc; }
 
-        .money { text-align: right; white-space: nowrap; font-family: monospace; }
-        .negativo { color: #e11d48; }
-        .comision { color: #2563eb; font-weight: bold; }
-
+        /* Estilos de Celda */
+        .money { text-align: right; white-space: nowrap; font-family: 'Courier', monospace; font-weight: bold; }
+        .negativo { color: #e11d48; } /* Rojo para descuentos */
+        .comision { color: #2563eb; } /* Azul para comisiones */
+        .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 7px; font-weight: bold; background: #e2e8f0; color: #475569; text-transform: uppercase; }
+        
+        /* Contenedor de Resumen */
         .summary-container { margin-top: 30px; width: 100%; }
-        .summary-card { 
+        .summary-table { 
             float: right; 
-            width: 250px; 
+            width: 280px; 
             background: #f1f5f9; 
-            padding: 15px; 
             border-radius: 10px;
             border: 1px solid #cbd5e1;
+            padding: 10px;
         }
-        .summary-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11px; }
-        .total-final { font-size: 14px; color: #0ea5e9; font-weight: black; border-top: 1px solid #cbd5e1; padding-top: 5px; margin-top: 5px; }
+        .summary-table td { border: none; padding: 4px 8px; font-size: 10px; }
+        .label-total { color: #64748b; font-weight: normal; }
         
-        .badge { padding: 2px 5px; border-radius: 4px; font-size: 8px; font-weight: bold; background: #e2e8f0; }
+        /* Fila de Utilidad Final */
+        .total-final { 
+            border-top: 2px solid #cbd5e1 !important; 
+            font-size: 13px !important; 
+            color: #0ea5e9 !important; 
+            padding-top: 10px !important;
+        }
+        
+        .footer { clear: both; margin-top: 50px; text-align: center; color: #94a3b8; font-size: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Reporte Financiero de Reservas</h1>
-        <p>Generado: <strong>{{ fecha_gen }}</strong> | Empresa: <strong>{{ current_user.emp_id }}</strong></p>
+        <p>Generado: <strong>{{ fecha_gen }}</strong> | ID Empresa: <strong>{{ current_user.emp_id }}</strong></p>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>Fecha/Hora</th>
-                <th>Cliente / Servicio</th>
-                <th>Profesional</th>
-                <th class="money">Base</th>
-                <th class="money">Desc.</th>
-                <th class="money">Comis. Empl.</th>
-                <th class="money">Neto Local</th>
+                <th width="12%">Fecha/Hora</th>
+                <th width="25%">Cliente / Servicio</th>
+                <th width="18%">Profesional</th>
+                <th class="money" width="11%">Base</th>
+                <th class="money" width="11%">Desc.</th>
+                <th class="money" width="11%">Comis. Empl.</th>
+                <th class="money" width="12%">Neto Local</th>
             </tr>
         </thead>
         <tbody>
             {% for r in reservas %}
             <tr>
-                <td>{{ r.fecha }}<br><span style="color: #64748b;">{{ r.hora }}</span></td>
+                <td>
+                    {{ r.fecha }}<br>
+                    <span style="color: #64748b;">{{ r.hora }}</span>
+                </td>
                 <td>
                     <strong>{{ r.cliente }}</strong><br>
                     <span class="badge">{{ r.servicio }}</span>
                 </td>
                 <td>
                     {{ r.empleado }}<br>
-                    <span style="color: #2563eb;">({{ r.porc_empl|int }}%)</span>
+                    <span style="color: #2563eb; font-size: 8px;">(Comisión: {{ r.porc_empl|int }}%)</span>
                 </td>
                 <td class="money">${{ "{:,.0f}".format(r.precio_base) }}</td>
                 <td class="money negativo">
                     -${{ "{:,.0f}".format(r.descuento_valor) }}<br>
-                    <small>({{ r.porcentaje_desc|int }}%)</small>
+                    <small style="font-weight: normal;">({{ r.porcentaje_desc|int }}%)</small>
                 </td>
-                <td class="money comision">${{ "{:,.0f}".format(r.pago_empleado) }}</td>
+                <td class="money comision">
+                    ${{ "{:,.0f}".format(r.pago_empleado) }}
+                </td>
                 <td class="money">
                     <strong>${{ "{:,.0f}".format(r.neto_local) }}</strong><br>
-                    <small style="color: #64748b;">{{ r.pago_metodo }}</small>
+                    <small style="color: #64748b; font-size: 7px; font-weight: normal;">{{ r.pago_metodo }}</small>
                 </td>
             </tr>
             {% endfor %}
@@ -77,23 +98,27 @@
     </table>
 
     <div class="summary-container">
-        <div class="summary-card">
-            <div style="margin-bottom: 10px; font-weight: bold; text-transform: uppercase; color: #64748b;">Resumen General</div>
-            <div class="summary-row">
-                <span>Total Comisiones Empl:</span>
-                <span class="money comision">${{ "{:,.0f}".format(total_comisiones) }}</span>
-            </div>
-            <div class="summary-row total-final">
-                <span>TOTAL NETO LOCAL:</span>
-                <span class="money">${{ "{:,.0f}".format(total_neto) }}</span>
-            </div>
-        </div>
+        <table class="summary-table">
+            <tr>
+                <td class="label-total">Neto en Caja/Bancos:</td>
+                <td class="money">${{ "{:,.0f}".format(total_neto) }}</td>
+            </tr>
+            <tr>
+                <td class="label-total">Total Comisiones Empleados:</td>
+                <td class="money negativo">-${{ "{:,.0f}".format(total_comisiones) }}</td>
+            </tr>
+            <tr class="total-final">
+                <td style="font-weight: bold; color: #0f172a;">UTILIDAD REAL LOCAL:</td>
+                <td class="money" style="color: #10b981; font-size: 14px;">
+                    ${{ "{:,.0f}".format(total_neto - total_comisiones) }}
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <div style="clear: both;"></div>
-    
-    <div style="margin-top: 50px; text-align: center; color: #94a3b8; font-size: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
-        Este reporte incluye deducciones por descuentos y comisiones de empleados sobre valores netos.
+    <div class="footer">
+        <p>Este documento es un resumen financiero. El "Neto Local" descuenta costos de pasarelas bancarias e impuestos transaccionales.<br>
+        <strong>AgendApp - Gestión Inteligente</strong></p>
     </div>
 </body>
 </html>

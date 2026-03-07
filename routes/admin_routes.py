@@ -3262,11 +3262,19 @@ def gestion_historial():
         resultados = []
         
         for fila in resultado_db:
-            # (Tu lógica de comisiones se mantiene igual...)
             p_base = float(fila.precio_base)
-            desc_p = float(fila.descuento_p)
-            precio_con_desc = p_base * (1 - (desc_p / 100))
-            monto_neto = precio_con_desc
+            porcentaje_desc = float(fila.descuento_p)
+            
+            # 1. Valor que paga el cliente (Base - Descuento)
+            valor_descuento = p_base * (porcentaje_desc / 100)
+            precio_con_desc = p_base - valor_descuento
+            
+            # 2. Comisión del empleado (Se calcula sobre lo que pagó el cliente)
+            porc_empl = float(fila.porc_empleado)
+            pago_empleado = precio_con_desc * (porc_empl / 100)
+            
+            # 3. Cálculo de lo que le queda al LOCAL (restando pasarelas)
+            monto_final_local = precio_con_desc 
             pas_key = (fila.pasarela or "Efectivo").lower().strip()
             
             if pas_key in reglas_pago:
@@ -3274,19 +3282,26 @@ def gestion_historial():
                 v_com = precio_con_desc * (float(reg.valor_comision) / 100)
                 v_fijo = float(reg.valor_fijo or 0)
                 v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
-                monto_neto = precio_con_desc - v_com - v_fijo - v_iva
+                # El Neto Local es lo que queda tras pagarle a la pasarela
+                monto_final_local = precio_con_desc - v_com - v_fijo - v_iva
+
+            # --- LA CORRECCIÓN DE LOS TOTALES ---
+            gran_total_neto += monto_final_local
+            gran_total_comisiones += pago_empleado # Suma acumulada de cada fila
 
             resultados.append({
-                'id': fila.id, 
-                'cliente': fila.cliente, 
-                'servicio': fila.servicio,
-                'empleado': fila.empleado, 
-                'fecha_display': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else 'S/F', 
+                'fecha': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else '--',
                 'hora': str(fila.hora)[:5],
-                'estado': fila.estado or "Pendiente",
-                'pago': (fila.pasarela or "Efectivo").title(),
-                'precio_base': int(p_base),
-                'total': int(monto_neto)
+                'cliente': fila.cliente,
+                'servicio': fila.servicio,
+                'empleado': fila.empleado,
+                'precio_base': p_base,
+                'descuento_valor': valor_descuento,
+                'porcentaje_desc': porcentaje_desc,
+                'pago_empleado': pago_empleado,
+                'porc_empl': porc_empl,
+                'pago_metodo': (fila.pasarela or "Efectivo").title(),
+                'neto_local': monto_final_local
             })
 
         return render_template('admin/historial.html', 
@@ -3436,7 +3451,7 @@ def exportar_pdf_historial():
     from models.models import db, Servicio, MediosPago
 
     try:
-        # --- 1. CAPTURA DE FILTROS ---
+        # --- 1. CAPTURA DE FILTROS (Sin cambios) ---
         busqueda = request.args.get('busqueda', '').strip()
         f_inicio = request.args.get('fecha_inicio', '').strip()
         f_fin = request.args.get('fecha_fin', '').strip()
@@ -3450,8 +3465,7 @@ def exportar_pdf_historial():
             servs = Servicio.query.filter(Servicio.ser_id.in_(servicios_ids)).all()
             nombres_servicios = [s.ser_nombre for s in servs]
 
-        # --- 2. CONSTRUCCIÓN DE LA QUERY SQL (Alineado correctamente) ---
-# --- 2. CONSTRUCCIÓN DE LA QUERY SQL ---
+        # --- 2. QUERY SQL ---
         query_sql = """
             SELECT 
                 r.res_id as id, 
@@ -3468,24 +3482,18 @@ def exportar_pdf_historial():
             LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
             LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
             WHERE r.emp_id = :emp_id
-            AND r.res_estado IN ('Realizada', 'Completada')  -- <--- ESTA ES LA LÍNEA CLAVE
+            AND r.res_estado IN ('Realizada', 'Completada')
         """
         
         params = {'emp_id': current_user.emp_id}
 
-        # --- APLICACIÓN DINÁMICA DE FILTROS (Indispensable para que funcione) ---
-        if busqueda:
-            query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
-        if f_inicio:
-            query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
-        if f_fin:
-            query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
-        if estados:
-            query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
-        if empleados_ids:
-            query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
-        if pasarelas:
-            query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
+        # Aplicación de filtros dinámicos...
+        if busqueda: query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
+        if f_inicio: query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
+        if f_fin: query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
+        if estados: query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
+        if empleados_ids: query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
+        if pasarelas: query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
         if servicios_ids:
             query_sql += " AND (r.ser_id IN :ser_ids OR r.res_tipo_servicio IN :ser_nombres)"
             params['ser_ids'] = tuple(servicios_ids)
@@ -3493,36 +3501,42 @@ def exportar_pdf_historial():
 
         query_sql += " ORDER BY r.res_fecha DESC, r.res_hora DESC"
 
-        # --- 3. PROCESAMIENTO ---
+        # --- 3. PROCESAMIENTO FINANCIERO CORREGIDO ---
         medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
         reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
-        
         resultado_db = db.session.execute(text(query_sql), params)
 
         resultados = []
-        gran_total_neto = 0
-        gran_total_comisiones = 0
+        gran_total_neto_caja = 0      # Lo que entró real tras descuentos y bancos
+        gran_total_comisiones = 0    # Lo que se debe pagar a empleados
+        total_deducciones_banco = 0  # Costos de pasarela
 
         for fila in resultado_db:
+            # A. Valor tras descuento al cliente
             p_base = float(fila.precio_base)
-            porcentaje_desc = float(fila.descuento_p)
+            v_desc = p_base * (float(fila.descuento_p) / 100)
+            precio_tras_descuento = p_base - v_desc
             
-            valor_descuento = p_base * (porcentaje_desc / 100)
-            precio_con_desc = p_base - valor_descuento
-            
-            porc_empl = float(fila.porc_empleado)
-            pago_empleado = precio_con_desc * (porc_empl / 100)
-            
-            monto_final_local = precio_con_desc 
+            # B. Calcular deducción de pasarela primero
+            costo_pasarela = 0
             pas_key = (fila.pasarela or "Efectivo").lower().strip()
             if pas_key in reglas_pago:
                 reg = reglas_pago[pas_key]
-                v_com = precio_con_desc * (float(reg.valor_comision) / 100)
-                v_fijo = float(reg.valor_fijo or 0)
-                v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
-                monto_final_local = precio_con_desc - v_com - v_fijo - v_iva
+                v_com_banco = precio_tras_descuento * (float(reg.valor_comision) / 100)
+                v_fijo_banco = float(reg.valor_fijo or 0)
+                v_iva_banco = (v_com_banco + v_fijo_banco) * (float(reg.porcentaje_iva) / 100)
+                costo_pasarela = v_com_banco + v_fijo_banco + v_iva_banco
 
-            gran_total_neto += monto_final_local
+            # C. NETO EN CAJA (Lo que quedó tras el banco)
+            monto_neto_caja = precio_tras_descuento - costo_pasarela
+            
+            # D. COMISIÓN EMPLEADO: Se calcula sobre el NETO (Tu requerimiento)
+            # Ejemplo: $143.175 * 40 / 100 = $57.270
+            porc_empl = float(fila.porc_empleado)
+            pago_empleado = monto_neto_caja * (porc_empl / 100)
+
+            # Acumuladores
+            gran_total_neto_caja += monto_neto_caja
             gran_total_comisiones += pago_empleado
 
             resultados.append({
@@ -3532,21 +3546,24 @@ def exportar_pdf_historial():
                 'servicio': fila.servicio,
                 'empleado': fila.empleado,
                 'precio_base': p_base,
-                'descuento_valor': valor_descuento,
-                'porcentaje_desc': porcentaje_desc,
-                'pago_empleado': pago_empleado,
+                'descuento_valor': v_desc,
+                'porcentaje_desc': fila.descuento_p,
+                'pago_empleado': pago_empleado, # Este valor ahora es proporcional al neto
                 'porc_empl': porc_empl,
                 'pago_metodo': (fila.pasarela or "Efectivo").title(),
-                'neto_local': monto_final_local
+                'neto_local': monto_neto_caja
             })
 
         # --- 4. RENDER Y PDF ---
         html = render_template('admin/reportes/pdf_historial.html', 
                                reservas=resultados, 
-                               total_neto=gran_total_neto,
+                               total_neto=gran_total_neto_caja,
                                total_comisiones=gran_total_comisiones,
+                               total_bancos=total_deducciones_banco, # Nuevo dato
+                               utilidad_final=(gran_total_neto_caja - gran_total_comisiones),
                                fecha_gen=datetime.now().strftime('%d/%m/%Y %H:%M'))
 
+        # Configuración pdfkit (tu código original...)
         if platform.system() == "Windows":
             path_wk = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
             config = pdfkit.configuration(wkhtmltopdf=path_wk)
@@ -3554,7 +3571,6 @@ def exportar_pdf_historial():
             config = pdfkit.configuration()
 
         pdf = pdfkit.from_string(html, False, configuration=config)
-
         response = make_response(pdf)
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = 'attachment; filename=reporte_reservas.pdf'
@@ -3563,7 +3579,6 @@ def exportar_pdf_historial():
     except Exception as e:
         db.session.rollback()
         return f"Error al generar reporte: {str(e)}", 500
-
 
 
 
