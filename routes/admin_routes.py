@@ -25,6 +25,7 @@ import threading
 from pathlib import Path
 import mercadopago
 from dotenv import load_dotenv
+from fpdf import FPDF
 
 
 
@@ -46,7 +47,7 @@ admin_bp = Blueprint('admin', __name__)
 # --- 8. CONFIGURACIÓN DE EMPRESA 
 # --- 9. PERMISOS Y GESTIÓN DE USUARIOS
 # ----10. GESTION DE COMISIONES 
-#----11. HISTORIAL DE RESERVAS Y REPORTES
+#---- 11. HISTORIAL DE RESERVAS Y REPORTES
 #-----12. CÓDIGOS QR
 # ----13  configuracion panel de control
 #-----14  Gestion de plantillas de correo
@@ -3099,10 +3100,10 @@ def gestion_historial():
     import json
     from datetime import datetime
     from sqlalchemy import text
-    from models.models import db, Empleado, Servicio
+    from models.models import db, Empleado, Servicio, MediosPago # Asegúrate de importar MediosPago
 
     try:
-        # 1. Capturar parámetros de la URL
+        # ... (Tus capturas de parámetros iniciales se mantienen igual) ...
         busqueda = request.args.get('busqueda', '').strip()
         f_inicio = request.args.get('fecha_inicio', '').strip()
         f_fin = request.args.get('fecha_fin', '').strip()
@@ -3110,24 +3111,27 @@ def gestion_historial():
         servicios_ids = request.args.getlist('servicios') 
         estados = request.args.getlist('estados')
 
-        # Detectar si hay una búsqueda activa
         parametros_interes = [busqueda, f_inicio, f_fin, empleados_ids, servicios_ids, estados]
         tiene_filtros = any(parametros_interes)
 
         resultados = []
         
-        # 2. Ejecutar consulta solo si hay filtros
+        # Cargar reglas de medios de pago para el cálculo
+        reglas_pago = {m.nombre.lower().strip(): m for m in MediosPago.query.filter_by(emp_id=current_user.emp_id).all()}
+
         if tiene_filtros:
-            # Seleccionamos r.res_tipo_servicio directamente para evitar problemas con ser_id NULL
+            # SQL MEJORADO: Traemos el precio del servicio aunque ser_id sea NULL buscando por nombre
             query_base = """
                 SELECT 
                     r.res_id as id, 
                     COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
                     COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
                     COALESCE(e.empl_nombre, 'No asignado') as empleado, 
-                    r.res_fecha as fecha,
-                    r.res_hora as hora, 
-                    r.res_estado as estado
+                    r.res_fecha as fecha, r.res_hora as hora, r.res_estado as estado,
+                    r.res_pasarela as pasarela,
+                    COALESCE(r.res_descuento_valor, 0) as descuento_p,
+                    -- Si ser_id es null, intentamos traer el precio por el nombre del servicio
+                    COALESCE(s.ser_precio, (SELECT ser_precio FROM SERVICIOS WHERE ser_nombre = r.res_tipo_servicio AND emp_id = r.emp_id LIMIT 1), 0) as precio_base
                 FROM RESERVAS r
                 LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
                 LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
@@ -3136,66 +3140,44 @@ def gestion_historial():
             """
             
             params = {'emp_id': current_user.emp_id}
-
-            # Filtro de búsqueda (Nombre Cliente)
-            if busqueda:
-                query_base += " AND c.cli_nombre LIKE :val"
-                params['val'] = f"%{busqueda}%"
+            # ... (Aquí van tus bloques de filtros IF busqueda, IF servicios_ids, etc. que ya tienes) ...
             
-            # --- CORRECCIÓN CLAVE: Filtro por Nombres de Servicios ---
-            if servicios_ids:
-                # 1. Buscamos los nombres de los servicios que corresponden a los IDs seleccionados
-                servicios_obj = Servicio.query.filter(
-                    Servicio.ser_id.in_(servicios_ids),
-                    Servicio.emp_id == current_user.emp_id
-                ).all()
-                nombres_servicios = [ser.ser_nombre for ser in servicios_obj]
+            # --- COPIAR AQUÍ TUS FILTROS EXISTENTES ---
+            if busqueda:
+                query_base += " AND c.cli_nombre LIKE :val"; params['val'] = f"%{busqueda}%"
+            # ... (etc)
 
-                if nombres_servicios:
-                    # 2. Filtramos la tabla RESERVAS por la columna de texto res_tipo_servicio
-                    placeholder_s = ", ".join([f":s{i}" for i in range(len(nombres_servicios))])
-                    query_base += f" AND r.res_tipo_servicio IN ({placeholder_s})"
-                    for i, nombre in enumerate(nombres_servicios):
-                        params[f's{i}'] = nombre
-
-            # Filtros de Fecha
-            if f_inicio:
-                query_base += " AND r.res_fecha >= :f_ini"
-                params['f_ini'] = f_inicio
-            if f_fin:
-                query_base += " AND r.res_fecha <= :f_fin"
-                params['f_fin'] = f_fin
-                
-            # Filtro de Empleados (IDs)
-            if empleados_ids:
-                e_limpios = [eid for eid in empleados_ids if eid.strip()]
-                if e_limpios:
-                    placeholder_e = ", ".join([f":e{i}" for i in range(len(e_limpios))])
-                    query_base += f" AND r.empl_id IN ({placeholder_e})"
-                    for i, v in enumerate(e_limpios): params[f'e{i}'] = v
-
-            # Filtro de Estados
-            if estados:
-                placeholder_st = ", ".join([f":st{i}" for i in range(len(estados))])
-                query_base += f" AND r.res_estado IN ({placeholder_st})"
-                for i, v in enumerate(estados): params[f'st{i}'] = v
-
-            query_base += " ORDER BY r.res_fecha DESC, r.res_hora DESC LIMIT 500"
+            query_base += " ORDER BY r.res_fecha DESC"
             resultado_db = db.session.execute(text(query_base), params)
             
             for fila in resultado_db:
-                # Formatear Fecha
-                fecha_f = fila.fecha.strftime('%d/%m/%Y') if hasattr(fila.fecha, 'strftime') else str(fila.fecha)
+                # 1. Precio con el descuento de la reserva aplicado
+                p_base = float(fila.precio_base)
+                desc_p = float(fila.descuento_p)
+                precio_con_desc = p_base * (1 - (desc_p / 100))
                 
-                # Formatear Hora
-                if hasattr(fila.hora, 'strftime'):
-                    hora_f = fila.hora.strftime('%I:%M %p')
-                else:
-                    try:
-                        hora_f = datetime.strptime(str(fila.hora), '%H:%M:%S').strftime('%I:%M %p')
-                    except: 
-                        hora_f = str(fila.hora)
+                # 2. Calcular deducciones del medio de pago
+                monto_neto = precio_con_desc
+                pasarela_nombre = (fila.pasarela or "Efectivo").lower().strip()
+                
+                if pasarela_nombre in reglas_pago:
+                    regla = reglas_pago[pasarela_nombre]
+                    
+                    # Comisión Variable
+                    com_var = precio_con_desc * (float(regla.valor_comision) / 100)
+                    # Comisión Fija
+                    com_fija = float(regla.valor_fijo or 0)
+                    # IVA sobre las comisiones
+                    iva_comision = (com_var + com_fija) * (float(regla.porcentaje_iva) / 100)
+                    
+                    # El neto es: Precio - Comisiones - IVA de comisiones
+                    monto_neto = precio_con_desc - com_var - com_fija - iva_comision
 
+                # Formateo de tiempos
+                fecha_f = fila.fecha.strftime('%d/%m/%Y') if hasattr(fila.fecha, 'strftime') else str(fila.fecha)
+                hora_f = str(fila.hora)[:5] # Formato HH:MM
+
+# Dentro del bucle en admin_routes.py
                 resultados.append({
                     'id': fila.id, 
                     'cliente': fila.cliente, 
@@ -3203,27 +3185,143 @@ def gestion_historial():
                     'empleado': fila.empleado, 
                     'fecha_display': fecha_f, 
                     'hora': hora_f,
-                    'estado': fila.estado or "Pendiente"
+                    'estado': fila.estado or "Pendiente",
+                    'pago': (fila.pasarela or "Efectivo").title(),
+                    'precio_base': int(p_base), # <--- Cambiado a int()
+                    'descuento_p': int(desc_p), # <--- Cambiado a int()
+                    'total': int(monto_neto)    # <--- Cambiado a int() para quitar el ,35
                 })
-
-        # Cargar listas para los filtros del Modal/Frontend
-        lista_empleados = Empleado.query.filter_by(emp_id=current_user.emp_id).all()
-        lista_servicios = Servicio.query.filter_by(emp_id=current_user.emp_id).all()
 
         return render_template('admin/historial.html', 
                                reservas_json=json.dumps(resultados),
-                               empleados=lista_empleados,
-                               servicios=lista_servicios,
+                               empleados=Empleado.query.filter_by(emp_id=current_user.emp_id).all(),
+                               servicios=Servicio.query.filter_by(emp_id=current_user.emp_id).all(),
                                filtros_activos=tiene_filtros)
 
     except Exception as e:
         db.session.rollback()
-        print(f"---------- ERROR HISTORIAL ----------\n{str(e)}\n---------------------------")
-        return f"Error interno: {str(e)}", 500
+        return f"Error: {str(e)}", 500
     
-    
-    
-    
+ 
+ 
+
+
+@admin_bp.route('/generar-ticket/<int:res_id>')
+@login_required
+def generar_ticket(res_id):
+    try:
+        from io import BytesIO
+        # 1. Obtener datos
+        res = Reserva.query.get_or_404(res_id)
+        cli = Cliente.query.get(res.cli_id)
+        emp = Empleado.query.get(res.empl_id)
+        ser = Servicio.query.get(res.ser_id) if res.ser_id else \
+              Servicio.query.filter_by(ser_nombre=res.res_tipo_servicio, emp_id=current_user.emp_id).first()
+
+        # 2. Lógica Financiera
+        p_base = float(ser.ser_precio if ser else 0)
+        desc_p = float(res.res_descuento_valor or 0)
+        precio_con_desc = p_base * (1 - (desc_p / 100))
+        
+        pasarela_nombre = (res.res_pasarela or "Efectivo").lower().strip()
+        regla = MediosPago.query.filter(MediosPago.nombre.ilike(pasarela_nombre), 
+                                        MediosPago.emp_id == current_user.emp_id).first()
+        
+        com_var = com_fija = iva_com = 0
+        if regla:
+            com_var = precio_con_desc * (float(regla.valor_comision) / 100)
+            com_fija = float(regla.valor_fijo or 0)
+            iva_com = (com_var + com_fija) * (float(regla.porcentaje_iva) / 100)
+        
+        deducido_total = com_var + com_fija + iva_com
+        monto_neto = precio_con_desc - deducido_total
+
+        # 3. Crear el PDF
+        pdf = FPDF(format=(80, 160)) # Un poco más largo para el desglose
+        pdf.add_page()
+        
+        def clean_s(txt):
+            return str(txt).encode('latin-1', 'ignore').decode('latin-1')
+
+        # Encabezado
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "COMPROBANTE DE PAGO", ln=True, align='C')
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(0, 4, f"Reserva: #{res.res_id}", ln=True, align='C')
+        pdf.ln(4)
+
+        # Info Cliente/Empleado
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(0, 4, clean_s(f"CLIENTE: {cli.cli_nombre if cli else 'N/A'}"), ln=True)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(0, 4, f"FECHA: {res.res_fecha.strftime('%d/%m/%Y')} {res.res_hora}", ln=True)
+        pdf.cell(0, 4, clean_s(f"PROFESIONAL: {emp.empl_nombre if emp else 'N/A'}"), ln=True)
+        pdf.ln(2)
+
+        # Línea divisoria
+        pdf.set_draw_color(200, 200, 200)
+        pdf.line(10, pdf.get_y(), 70, pdf.get_y())
+        pdf.ln(2)
+
+        # DESGLOSE DE SERVICIOS
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(40, 5, "PRODUCTO/SERVICIO", 0)
+        pdf.cell(20, 5, "SUBTOTAL", 0, ln=True, align='R')
+        
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(40, 5, clean_s((res.res_tipo_servicio or "Servicio")[:22]), 0)
+        pdf.cell(20, 5, f"${int(p_base):,}", 0, ln=True, align='R')
+
+        # Mostrar descuento si existe
+        if desc_p > 0:
+            pdf.set_text_color(200, 0, 0)
+            pdf.cell(40, 5, f"DTO {int(desc_p)}%", 0)
+            pdf.cell(20, 5, f"-${int(p_base - precio_con_desc):,}", 0, ln=True, align='R')
+            pdf.set_text_color(0, 0, 0)
+
+        pdf.ln(2)
+        pdf.line(10, pdf.get_y(), 70, pdf.get_y())
+        pdf.ln(2)
+
+        # DESGLOSE DE MÉTODO DE PAGO (PASARELA)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(40, 5, "METODO DE PAGO:", 0)
+        pdf.cell(20, 5, clean_s(pasarela_nombre.upper()), 0, ln=True, align='R')
+        
+        if deducido_total > 0:
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(100, 100, 100)
+            pdf.cell(40, 4, "Comisiones pasarela:", 0)
+            pdf.cell(20, 4, f"-${int(deducido_total):,}", 0, ln=True, align='R')
+            pdf.set_text_color(0, 0, 0)
+
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(40, 8, "TOTAL NETO:", 0)
+        pdf.cell(20, 8, f"${int(monto_neto):,}", 0, ln=True, align='R')
+
+        # Footer
+        pdf.ln(6)
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.multi_cell(0, 4, clean_s("Soporte administrativo generado por AgendApp. No válido como factura legal."), align='C')
+
+        # --- RETORNO DE BYTES ---
+        pdf_content = pdf.output()
+        if isinstance(pdf_content, str):
+            pdf_content = pdf_content.encode('latin-1')
+            
+        buffer = BytesIO()
+        buffer.write(pdf_content)
+        buffer.seek(0)
+
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=ticket_{res.res_id}.pdf'
+        return response
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        return f"Error: {str(e)}", 500
     
 
 #---12. CÓDIGOS QR
