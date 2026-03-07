@@ -26,6 +26,10 @@ from pathlib import Path
 import mercadopago
 from dotenv import load_dotenv
 from fpdf import FPDF
+import platform
+import pdfkit
+import json
+
 
 
 
@@ -3333,6 +3337,153 @@ def generar_ticket(res_id):
         print(f"ERROR: {e}")
         return f"Error: {str(e)}", 500
     
+
+
+
+
+
+@admin_bp.route('/historial/exportar/pdf')
+@login_required
+def exportar_pdf_historial():
+    import platform
+    import pdfkit
+    from datetime import datetime
+    from flask import render_template, make_response, request
+    from sqlalchemy import text
+    from models.models import db, Servicio, MediosPago
+
+    try:
+        # --- 1. CAPTURA DE FILTROS ---
+        busqueda = request.args.get('busqueda', '').strip()
+        f_inicio = request.args.get('fecha_inicio', '').strip()
+        f_fin = request.args.get('fecha_fin', '').strip()
+        empleados_ids = request.args.getlist('empleados') 
+        servicios_ids = request.args.getlist('servicios') 
+        estados = request.args.getlist('estados')
+        pasarelas = request.args.getlist('pasarelas')
+
+        nombres_servicios = []
+        if servicios_ids:
+            servs = Servicio.query.filter(Servicio.ser_id.in_(servicios_ids)).all()
+            nombres_servicios = [s.ser_nombre for s in servs]
+
+        # --- 2. CONSTRUCCIÓN DE LA QUERY SQL (Alineado correctamente) ---
+# --- 2. CONSTRUCCIÓN DE LA QUERY SQL ---
+        query_sql = """
+            SELECT 
+                r.res_id as id, 
+                COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
+                COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
+                COALESCE(e.empl_nombre, 'No asignado') as empleado, 
+                COALESCE(e.empl_porcentaje, 0) as porc_empleado,
+                r.res_fecha as fecha, r.res_hora as hora, r.res_estado as estado,
+                r.res_pasarela as pasarela,
+                COALESCE(r.res_descuento_valor, 0) as descuento_p,
+                COALESCE(s.ser_precio, (SELECT ser_precio FROM SERVICIOS WHERE ser_nombre = r.res_tipo_servicio AND emp_id = r.emp_id LIMIT 1), 0) as precio_base
+            FROM RESERVAS r
+            LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
+            LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
+            LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
+            WHERE r.emp_id = :emp_id
+            AND r.res_estado IN ('Realizada', 'Completada')  -- <--- ESTA ES LA LÍNEA CLAVE
+        """
+        
+        params = {'emp_id': current_user.emp_id}
+
+        # --- APLICACIÓN DINÁMICA DE FILTROS (Indispensable para que funcione) ---
+        if busqueda:
+            query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
+        if f_inicio:
+            query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
+        if f_fin:
+            query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
+        if estados:
+            query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
+        if empleados_ids:
+            query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
+        if pasarelas:
+            query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
+        if servicios_ids:
+            query_sql += " AND (r.ser_id IN :ser_ids OR r.res_tipo_servicio IN :ser_nombres)"
+            params['ser_ids'] = tuple(servicios_ids)
+            params['ser_nombres'] = tuple(nombres_servicios) if nombres_servicios else ('',)
+
+        query_sql += " ORDER BY r.res_fecha DESC, r.res_hora DESC"
+
+        # --- 3. PROCESAMIENTO ---
+        medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
+        reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
+        
+        resultado_db = db.session.execute(text(query_sql), params)
+
+        resultados = []
+        gran_total_neto = 0
+        gran_total_comisiones = 0
+
+        for fila in resultado_db:
+            p_base = float(fila.precio_base)
+            porcentaje_desc = float(fila.descuento_p)
+            
+            valor_descuento = p_base * (porcentaje_desc / 100)
+            precio_con_desc = p_base - valor_descuento
+            
+            porc_empl = float(fila.porc_empleado)
+            pago_empleado = precio_con_desc * (porc_empl / 100)
+            
+            monto_final_local = precio_con_desc 
+            pas_key = (fila.pasarela or "Efectivo").lower().strip()
+            if pas_key in reglas_pago:
+                reg = reglas_pago[pas_key]
+                v_com = precio_con_desc * (float(reg.valor_comision) / 100)
+                v_fijo = float(reg.valor_fijo or 0)
+                v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
+                monto_final_local = precio_con_desc - v_com - v_fijo - v_iva
+
+            gran_total_neto += monto_final_local
+            gran_total_comisiones += pago_empleado
+
+            resultados.append({
+                'fecha': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else '--',
+                'hora': str(fila.hora)[:5],
+                'cliente': fila.cliente,
+                'servicio': fila.servicio,
+                'empleado': fila.empleado,
+                'precio_base': p_base,
+                'descuento_valor': valor_descuento,
+                'porcentaje_desc': porcentaje_desc,
+                'pago_empleado': pago_empleado,
+                'porc_empl': porc_empl,
+                'pago_metodo': (fila.pasarela or "Efectivo").title(),
+                'neto_local': monto_final_local
+            })
+
+        # --- 4. RENDER Y PDF ---
+        html = render_template('admin/reportes/pdf_historial.html', 
+                               reservas=resultados, 
+                               total_neto=gran_total_neto,
+                               total_comisiones=gran_total_comisiones,
+                               fecha_gen=datetime.now().strftime('%d/%m/%Y %H:%M'))
+
+        if platform.system() == "Windows":
+            path_wk = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+            config = pdfkit.configuration(wkhtmltopdf=path_wk)
+        else:
+            config = pdfkit.configuration()
+
+        pdf = pdfkit.from_string(html, False, configuration=config)
+
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'attachment; filename=reporte_reservas.pdf'
+        return response
+
+    except Exception as e:
+        db.session.rollback()
+        return f"Error al generar reporte: {str(e)}", 500
+
+
+
+
 
 #---12. CÓDIGOS QR
     

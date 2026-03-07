@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { margin: 1cm; }
+        body { font-family: 'Helvetica', sans-serif; color: #1e293b; font-size: 9px; }
+        .header { text-align: left; border-bottom: 3px solid #0ea5e9; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { color: #0ea5e9; margin: 0; font-size: 22px; text-transform: uppercase; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: #0f172a; color: white; text-align: left; padding: 8px; text-transform: uppercase; }
+        td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+
+        .money { text-align: right; white-space: nowrap; font-family: monospace; }
+        .negativo { color: #e11d48; }
+        .comision { color: #2563eb; font-weight: bold; }
+
+        .summary-container { margin-top: 30px; width: 100%; }
+        .summary-card { 
+            float: right; 
+            width: 250px; 
+            background: #f1f5f9; 
+            padding: 15px; 
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+        }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11px; }
+        .total-final { font-size: 14px; color: #0ea5e9; font-weight: black; border-top: 1px solid #cbd5e1; padding-top: 5px; margin-top: 5px; }
+        
+        .badge { padding: 2px 5px; border-radius: 4px; font-size: 8px; font-weight: bold; background: #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Reporte Financiero de Reservas</h1>
+        <p>Generado: <strong>{{ fecha_gen }}</strong> | Empresa: <strong>{{ current_user.emp_id }}</strong></p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha/Hora</th>
+                <th>Cliente / Servicio</th>
+                <th>Profesional</th>
+                <th class="money">Base</th>
+                <th class="money">Desc.</th>
+                <th class="money">Comis. Empl.</th>
+                <th class="money">Neto Local</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reservas %}
+            <tr>
+                <td>{{ r.fecha }}<br><span style="color: #64748b;">{{ r.hora }}</span></td>
+                <td>
+                    <strong>{{ r.cliente }}</strong><br>
+                    <span class="badge">{{ r.servicio }}</span>
+                </td>
+                <td>
+                    {{ r.empleado }}<br>
+                    <span style="color: #2563eb;">({{ r.porc_empl|int }}%)</span>
+                </td>
+                <td class="money">${{ "{:,.0f}".format(r.precio_base) }}</td>
+                <td class="money negativo">
+                    -${{ "{:,.0f}".format(r.descuento_valor) }}<br>
+                    <small>({{ r.porcentaje_desc|int }}%)</small>
+                </td>
+                <td class="money comision">${{ "{:,.0f}".format(r.pago_empleado) }}</td>
+                <td class="money">
+                    <strong>${{ "{:,.0f}".format(r.neto_local) }}</strong><br>
+                    <small style="color: #64748b;">{{ r.pago_metodo }}</small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary-container">
+        <div class="summary-card">
+            <div style="margin-bottom: 10px; font-weight: bold; text-transform: uppercase; color: #64748b;">Resumen General</div>
+            <div class="summary-row">
+                <span>Total Comisiones Empl:</span>
+                <span class="money comision">${{ "{:,.0f}".format(total_comisiones) }}</span>
+            </div>
+            <div class="summary-row total-final">
+                <span>TOTAL NETO LOCAL:</span>
+                <span class="money">${{ "{:,.0f}".format(total_neto) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="clear: both;"></div>
+    
+    <div style="margin-top: 50px; text-align: center; color: #94a3b8; font-size: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
+        Este reporte incluye deducciones por descuentos y comisiones de empleados sobre valores netos.
+    </div>
+</body>
+</html>

@@ -22,39 +22,48 @@
     }
 }" class="space-y-6">
 
-    <div class="bg-slate-900/50 border border-white/5 rounded-[2.5rem] p-6 backdrop-blur-md flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xl">
-<div class="relative pl-6 py-4 border-l-4 border-sky-500 bg-gradient-to-r from-sky-500/10 to-transparent rounded-r-xl">
-    <h1 class="text-white font-black text-3xl tracking-tight flex items-center gap-3">
-        <span class="bg-sky-500 p-2 rounded-lg shadow-lg shadow-sky-500/20">
-            <i class="fa-solid fa-clock-rotate-left text-white text-xl"></i>
-        </span>
-        Historial de <span class="text-sky-400">Reservas</span>
-    </h1>
-    
-    <div class="flex items-center gap-2 mt-1">
-        <span class="w-8 h-[1px] bg-sky-500/50"></span>
-        <p class="text-sky-500/80 text-[10px] uppercase tracking-[0.4em] font-black italic">
-            Base de datos centralizada
-        </p>
-    </div>
+<div class="flex items-center gap-3" x-data="{ openExport: false }">
+    <template x-if="filtrosActivos">
+        <a href="{{ url_for('admin.gestion_historial') }}" 
+           class="px-5 py-3 bg-rose-500/10 text-rose-500 rounded-2xl border border-rose-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all flex items-center group">
+            <i class="fa-solid fa-filter-circle-xmark mr-2 group-hover:rotate-12 transition-transform"></i> 
+            Limpiar
+        </a>
+    </template>
 
-    <div class="absolute top-0 right-0 opacity-10">
-        <i class="fa-solid fa-database text-6xl text-sky-500"></i>
-    </div>
-</div>
-        
-        <div class="flex gap-3">
-            <template x-if="filtrosActivos">
-                <a href="{{ url_for('admin.gestion_historial') }}" class="px-6 py-3 bg-rose-500/10 text-rose-500 rounded-2xl border border-rose-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all flex items-center">
-                    <i class="fa-solid fa-trash-can mr-2"></i> Limpiar Filtros
-                </a>
-            </template>
-            <button @click="openModal = true" 
-                    class="px-8 py-3 bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-sky-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
-                <i class="fa-solid fa-sliders"></i> Filtrar Agenda
+    <button @click="openModal = true" 
+            class="px-6 py-3 bg-slate-800 text-white border border-white/5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg hover:bg-slate-700 transition-all flex items-center gap-2 group">
+        <i class="fa-solid fa-sliders text-sky-400 group-hover:rotate-90 transition-transform"></i> 
+        Filtrar
+    </button>
+
+    <div class="relative">
+        <button @click="openExport = !openExport" @click.away="openExport = false"
+                class="px-6 py-3 bg-sky-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-sky-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group">
+            <i class="fa-solid fa-download group-hover:-translate-y-1 transition-transform"></i> 
+            Acciones
+        </button>
+
+        <div x-show="openExport" 
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             class="absolute right-0 mt-3 w-48 bg-slate-900/90 border border-white/10 backdrop-blur-xl rounded-3xl shadow-2xl z-50 overflow-hidden p-2">
+            
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest p-3 pb-1">Exportar datos</p>
+
+                <button @click="descargarPDF()" class="w-full flex items-center gap-3 ...">
+                    <i class="fa-solid fa-file-pdf text-lg text-rose-500"></i>
+                    <span class="text-[10px] font-black uppercase tracking-widest">Documento PDF</span>
+                </button>
+
+            <button class="w-full flex items-center gap-3 px-4 py-3 text-slate-200 hover:bg-emerald-500/20 hover:text-emerald-400 rounded-2xl transition-all group">
+                <i class="fa-solid fa-file-excel text-lg text-emerald-500"></i>
+                <span class="text-[10px] font-black uppercase tracking-widest">Hoja de Excel</span>
             </button>
         </div>
     </div>
+</div>
 
 <div id="modal-historial" x-show="openModal" x-cloak
     class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
@@ -284,4 +293,14 @@
     {{ reservas_json | safe }}
 </script>
 
+
+<script>
+// Añade esta función en tu bloque <script>
+function descargarPDF() {
+    const params = window.location.search;
+    // Usamos url_for de Flask si estás dentro de un template para evitar errores de ruta
+    const urlBase = "{{ url_for('admin.exportar_pdf_historial') }}";
+    window.location.href = urlBase + params;
+}
+</script>
 {% endblock %}
