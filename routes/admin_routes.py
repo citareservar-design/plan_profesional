@@ -3098,110 +3098,120 @@ def descargar_recibo(emp_id):
 @login_required
 def gestion_historial():
     import json
-    from datetime import datetime
     from sqlalchemy import text
-    from models.models import db, Empleado, Servicio, MediosPago # Asegúrate de importar MediosPago
+    from models.models import db, Empleado, Servicio, MediosPago
 
     try:
-        # ... (Tus capturas de parámetros iniciales se mantienen igual) ...
+        # 1. Captura de filtros
         busqueda = request.args.get('busqueda', '').strip()
         f_inicio = request.args.get('fecha_inicio', '').strip()
         f_fin = request.args.get('fecha_fin', '').strip()
+        
         empleados_ids = request.args.getlist('empleados') 
-        servicios_ids = request.args.getlist('servicios') 
+        servicios_ids = request.args.getlist('servicios') # Estos son IDs (1, 2, etc.)
         estados = request.args.getlist('estados')
+        pasarelas = request.args.getlist('pasarelas')
 
-        parametros_interes = [busqueda, f_inicio, f_fin, empleados_ids, servicios_ids, estados]
-        tiene_filtros = any(parametros_interes)
+        # 2. SIEMPRE sacamos la lista de nombres de servicios seleccionados
+        # Esto es vital porque tus reservas tienen el ser_id vacío
+        nombres_servicios_seleccionados = []
+        if servicios_ids:
+            servs = Servicio.query.filter(Servicio.ser_id.in_(servicios_ids)).all()
+            nombres_servicios_seleccionados = [s.ser_nombre for s in servs]
 
+        tiene_filtros = any([busqueda, f_inicio, f_fin, empleados_ids, servicios_ids, estados, pasarelas])
+        
+        medios_db = MediosPago.query.filter_by(emp_id=current_user.emp_id).all()
+        reglas_pago = {m.nombre.lower().strip(): m for m in medios_db}
+
+        # 3. Query Base (Sacamos el bloque del IF para que siempre cargue datos)
+        query_sql = """
+            SELECT 
+                r.res_id as id, 
+                COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
+                COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
+                COALESCE(e.empl_nombre, 'No asignado') as empleado, 
+                r.res_fecha as fecha, r.res_hora as hora, r.res_estado as estado,
+                r.res_pasarela as pasarela,
+                COALESCE(r.res_descuento_valor, 0) as descuento_p,
+                COALESCE(s.ser_precio, (SELECT ser_precio FROM SERVICIOS WHERE ser_nombre = r.res_tipo_servicio AND emp_id = r.emp_id LIMIT 1), 0) as precio_base
+            FROM RESERVAS r
+            LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
+            LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
+            LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
+            WHERE r.emp_id = :emp_id
+        """
+        
+        params = {'emp_id': current_user.emp_id}
+
+        # --- FILTROS DINÁMICOS ---
+        if busqueda:
+            query_sql += " AND c.cli_nombre LIKE :busq"; params['busq'] = f"%{busqueda}%"
+        if f_inicio:
+            query_sql += " AND r.res_fecha >= :f_ini"; params['f_ini'] = f_inicio
+        if f_fin:
+            query_sql += " AND r.res_fecha <= :f_fin"; params['f_fin'] = f_fin
+        if estados:
+            query_sql += " AND r.res_estado IN :est"; params['est'] = tuple(estados)
+        if empleados_ids:
+            query_sql += " AND r.empl_id IN :emp_list"; params['emp_list'] = tuple(empleados_ids)
+        if pasarelas:
+            query_sql += " AND r.res_pasarela IN :pas_list"; params['pas_list'] = tuple(pasarelas)
+
+        # CORRECCIÓN PARA SERVICIOS: Filtrar por ID o por Nombre
+        if servicios_ids:
+            query_sql += """ 
+                AND (r.ser_id IN :ser_ids OR r.res_tipo_servicio IN :ser_nombres) 
+            """
+            params['ser_ids'] = tuple(servicios_ids)
+            params['ser_nombres'] = tuple(nombres_servicios_seleccionados) if nombres_servicios_seleccionados else ('',)
+
+        query_sql += " ORDER BY r.res_fecha DESC, r.res_hora DESC"
+        
+        if not tiene_filtros:
+            query_sql += " LIMIT 10"
+
+        resultado_db = db.session.execute(text(query_sql), params)
         resultados = []
         
-        # Cargar reglas de medios de pago para el cálculo
-        reglas_pago = {m.nombre.lower().strip(): m for m in MediosPago.query.filter_by(emp_id=current_user.emp_id).all()}
-
-        if tiene_filtros:
-            # SQL MEJORADO: Traemos el precio del servicio aunque ser_id sea NULL buscando por nombre
-            query_base = """
-                SELECT 
-                    r.res_id as id, 
-                    COALESCE(c.cli_nombre, 'Sin Nombre') as cliente,
-                    COALESCE(r.res_tipo_servicio, s.ser_nombre, 'Servicio General') as servicio,
-                    COALESCE(e.empl_nombre, 'No asignado') as empleado, 
-                    r.res_fecha as fecha, r.res_hora as hora, r.res_estado as estado,
-                    r.res_pasarela as pasarela,
-                    COALESCE(r.res_descuento_valor, 0) as descuento_p,
-                    -- Si ser_id es null, intentamos traer el precio por el nombre del servicio
-                    COALESCE(s.ser_precio, (SELECT ser_precio FROM SERVICIOS WHERE ser_nombre = r.res_tipo_servicio AND emp_id = r.emp_id LIMIT 1), 0) as precio_base
-                FROM RESERVAS r
-                LEFT JOIN CLIENTES c ON r.cli_id = c.cli_id
-                LEFT JOIN SERVICIOS s ON r.ser_id = s.ser_id
-                LEFT JOIN EMPLEADOS e ON r.empl_id = e.empl_id
-                WHERE r.emp_id = :emp_id
-            """
+        for fila in resultado_db:
+            # (Tu lógica de comisiones se mantiene igual...)
+            p_base = float(fila.precio_base)
+            desc_p = float(fila.descuento_p)
+            precio_con_desc = p_base * (1 - (desc_p / 100))
+            monto_neto = precio_con_desc
+            pas_key = (fila.pasarela or "Efectivo").lower().strip()
             
-            params = {'emp_id': current_user.emp_id}
-            # ... (Aquí van tus bloques de filtros IF busqueda, IF servicios_ids, etc. que ya tienes) ...
-            
-            # --- COPIAR AQUÍ TUS FILTROS EXISTENTES ---
-            if busqueda:
-                query_base += " AND c.cli_nombre LIKE :val"; params['val'] = f"%{busqueda}%"
-            # ... (etc)
+            if pas_key in reglas_pago:
+                reg = reglas_pago[pas_key]
+                v_com = precio_con_desc * (float(reg.valor_comision) / 100)
+                v_fijo = float(reg.valor_fijo or 0)
+                v_iva = (v_com + v_fijo) * (float(reg.porcentaje_iva) / 100)
+                monto_neto = precio_con_desc - v_com - v_fijo - v_iva
 
-            query_base += " ORDER BY r.res_fecha DESC"
-            resultado_db = db.session.execute(text(query_base), params)
-            
-            for fila in resultado_db:
-                # 1. Precio con el descuento de la reserva aplicado
-                p_base = float(fila.precio_base)
-                desc_p = float(fila.descuento_p)
-                precio_con_desc = p_base * (1 - (desc_p / 100))
-                
-                # 2. Calcular deducciones del medio de pago
-                monto_neto = precio_con_desc
-                pasarela_nombre = (fila.pasarela or "Efectivo").lower().strip()
-                
-                if pasarela_nombre in reglas_pago:
-                    regla = reglas_pago[pasarela_nombre]
-                    
-                    # Comisión Variable
-                    com_var = precio_con_desc * (float(regla.valor_comision) / 100)
-                    # Comisión Fija
-                    com_fija = float(regla.valor_fijo or 0)
-                    # IVA sobre las comisiones
-                    iva_comision = (com_var + com_fija) * (float(regla.porcentaje_iva) / 100)
-                    
-                    # El neto es: Precio - Comisiones - IVA de comisiones
-                    monto_neto = precio_con_desc - com_var - com_fija - iva_comision
-
-                # Formateo de tiempos
-                fecha_f = fila.fecha.strftime('%d/%m/%Y') if hasattr(fila.fecha, 'strftime') else str(fila.fecha)
-                hora_f = str(fila.hora)[:5] # Formato HH:MM
-
-# Dentro del bucle en admin_routes.py
-                resultados.append({
-                    'id': fila.id, 
-                    'cliente': fila.cliente, 
-                    'servicio': fila.servicio,
-                    'empleado': fila.empleado, 
-                    'fecha_display': fecha_f, 
-                    'hora': hora_f,
-                    'estado': fila.estado or "Pendiente",
-                    'pago': (fila.pasarela or "Efectivo").title(),
-                    'precio_base': int(p_base), # <--- Cambiado a int()
-                    'descuento_p': int(desc_p), # <--- Cambiado a int()
-                    'total': int(monto_neto)    # <--- Cambiado a int() para quitar el ,35
-                })
+            resultados.append({
+                'id': fila.id, 
+                'cliente': fila.cliente, 
+                'servicio': fila.servicio,
+                'empleado': fila.empleado, 
+                'fecha_display': fila.fecha.strftime('%d/%m/%Y') if fila.fecha else 'S/F', 
+                'hora': str(fila.hora)[:5],
+                'estado': fila.estado or "Pendiente",
+                'pago': (fila.pasarela or "Efectivo").title(),
+                'precio_base': int(p_base),
+                'total': int(monto_neto)
+            })
 
         return render_template('admin/historial.html', 
                                reservas_json=json.dumps(resultados),
                                empleados=Empleado.query.filter_by(emp_id=current_user.emp_id).all(),
                                servicios=Servicio.query.filter_by(emp_id=current_user.emp_id).all(),
+                               medios_pago=medios_db,
                                filtros_activos=tiene_filtros)
 
     except Exception as e:
         db.session.rollback()
-        return f"Error: {str(e)}", 500
-    
+        return f"Error en historial: {str(e)}", 500
  
  
 

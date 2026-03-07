@@ -56,66 +56,140 @@
         </div>
     </div>
 
-    <div id="modal-historial" x-show="openModal" x-cloak
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-        <div @click.away="openModal = false" 
-             class="bg-slate-900 border border-white/10 w-full max-w-2xl rounded-[3rem] p-8 shadow-2xl relative overflow-hidden">
+<div id="modal-historial" x-show="openModal" x-cloak
+    class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+    <div @click.away="openModal = false" 
+         class="bg-slate-900 border border-white/10 w-full max-w-3xl rounded-[3rem] p-8 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto custom-scrollbar">
+        
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-white font-black text-2xl uppercase tracking-tighter flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-sky-500"></i> Filtros Avanzados
+                </h2>
+                <p class="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Personaliza tu consulta de base de datos</p>
+            </div>
+            <button @click="openModal = false" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <form method="GET" action="{{ url_for('admin.gestion_historial') }}" class="space-y-6">
             
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-white font-black text-xl uppercase tracking-tighter">Filtros de búsqueda</h2>
-                    <p class="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Ajusta los parámetros de consulta</p>
+            <div class="space-y-2">
+                <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">Nombre del Cliente</label>
+                <div class="relative">
+                    <i class="fa-solid fa-user absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="text" name="busqueda" value="{{ request.args.get('busqueda', '') }}" placeholder="Buscar cliente..." class="w-full bg-slate-800/50 border border-white/5 rounded-2xl py-4 pl-12 pr-6 text-white font-bold focus:ring-2 focus:ring-sky-500 outline-none transition-all">
                 </div>
-                <button @click="openModal = false" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
             </div>
 
-            <form method="GET" action="{{ url_for('admin.gestion_historial') }}" class="space-y-6">
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Nombre del Cliente</label>
-                    <input type="text" name="busqueda" value="{{ request.args.get('busqueda', '') }}" placeholder="Ej: Juan Perez..." class="w-full bg-slate-800/50 border border-white/5 rounded-2xl py-4 px-6 text-white font-bold focus:ring-2 focus:ring-sky-500 outline-none transition-all">
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-4">
-                        <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Rango de tiempo</label>
-                        <div class="flex flex-col gap-2">
-                            <input type="date" name="fecha_inicio" value="{{ request.args.get('fecha_inicio', '') }}" class="bg-slate-800/50 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold [color-scheme:dark]">
-                            <input type="date" name="fecha_fin" value="{{ request.args.get('fecha_fin', '') }}" class="bg-slate-800/50 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold [color-scheme:dark]">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">Rango de tiempo</label>
+                    <div class="flex flex-col gap-2">
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 font-bold uppercase">Desde</span>
+                            <input type="date" name="fecha_inicio" value="{{ request.args.get('fecha_inicio', '') }}" class="w-full bg-slate-800/50 border border-white/5 rounded-2xl py-3 pl-16 pr-4 text-white font-bold [color-scheme:dark]">
                         </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Estados</label>
-                        <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 grid grid-cols-2 gap-2">
-                            {% for st in ['Pendiente', 'Confirmada', 'Realizada', 'Completada', 'Cancelada'] %}
-                            <label class="flex items-center gap-2 cursor-pointer group">
-                                <input type="checkbox" name="estados" value="{{ st }}" class="rounded border-white/10 bg-slate-700 text-sky-500 focus:ring-sky-500" {{ 'checked' if st in request.args.getlist('estados') }}>
-                                <span class="text-slate-400 text-[10px] font-black uppercase group-hover:text-white transition-colors">{{ st }}</span>
-                            </label>
-                            {% endfor %}
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 font-bold uppercase">Hasta</span>
+                            <input type="date" name="fecha_fin" value="{{ request.args.get('fecha_fin', '') }}" class="w-full bg-slate-800/50 border border-white/5 rounded-2xl py-3 pl-16 pr-4 text-white font-bold [color-scheme:dark]">
                         </div>
                     </div>
                 </div>
 
                 <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-500 uppercase ml-2 tracking-widest">Servicios</label>
-                    <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 max-h-40 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {% for ser in servicios %}
+                    <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">Estados</label>
+                    <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 grid grid-cols-2 gap-2 h-[92px] overflow-y-auto custom-scrollbar">
+                        {% for st in ['Pendiente', 'Confirmada', 'Realizada', 'Completada', 'Cancelada'] %}
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" name="estados" value="{{ st }}" class="rounded border-white/10 bg-slate-700 text-sky-500 focus:ring-sky-500" {{ 'checked' if st in request.args.getlist('estados') }}>
+                            <span class="text-slate-400 text-[10px] font-black uppercase group-hover:text-white transition-colors">{{ st }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">Atendido por (Profesional)</label>
+                    <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 h-40 overflow-y-auto custom-scrollbar space-y-2">
+                        {% for emp in empleados %}
                         <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-white/5 transition-all">
-                            <input type="checkbox" name="servicios" value="{{ ser.ser_id }}" class="rounded border-white/10 bg-slate-700 text-sky-500 focus:ring-sky-500" {{ 'checked' if ser.ser_id|string in request.args.getlist('servicios') }}>
-                            <span class="text-slate-200 text-[10px] font-black uppercase">{{ ser.ser_nombre }}</span>
+                            <input type="checkbox" name="empleados" value="{{ emp.empl_id }}" class="rounded border-white/10 bg-slate-700 text-sky-500 focus:ring-sky-500" {{ 'checked' if emp.empl_id|string in request.args.getlist('empleados') }}>
+                            <div class="flex flex-col">
+                                <span class="text-slate-200 text-[10px] font-black uppercase tracking-wider">{{ emp.empl_nombre }}</span>
+                                <span class="text-slate-500 text-[8px] uppercase">{{ emp.empl_cargo or 'Especialista' }}</span>
+                            </div>
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <button type="submit" class="w-full py-5 bg-sky-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-sky-500/20 flex items-center justify-center gap-3 hover:bg-sky-400">
+<div class="space-y-2">
+    <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">
+        Método de Pago
+    </label>
+    
+    <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 h-40 overflow-y-auto custom-scrollbar space-y-1">
+        
+        {% for medio in medios_pago %}
+        <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-white/5 transition-all">
+            <div class="relative flex items-center justify-center">
+                <input type="checkbox" 
+                       name="pasarelas" 
+                       value="{{ medio.nombre }}" 
+                       class="peer appearance-none w-5 h-5 border border-white/10 rounded-lg bg-slate-700 checked:bg-sky-500 checked:border-sky-500 transition-all cursor-pointer"
+                       {{ 'checked' if medio.nombre in request.args.getlist('pasarelas') }}>
+                <i class="fa-solid fa-check absolute text-[10px] text-white opacity-0 peer-checked:opacity-100 pointer-events-none"></i>
+            </div>
+
+            <span class="text-slate-200 text-[10px] font-black uppercase tracking-wider group-hover:text-sky-400 transition-colors">
+                {% if medio.nombre.lower().strip() == 'efectivo' %}
+                    💵
+                {% else %}
+                    💳
+                {% endif %} 
+                {{ medio.nombre }}
+            </span>
+        </label>
+        {% endfor %}
+
+        {% if not medios_pago %}
+        <div class="flex flex-col items-center justify-center h-full opacity-30">
+            <i class="fa-solid fa-receipt mb-2 text-xl"></i>
+            <p class="text-[8px] uppercase font-bold">No hay métodos registrados</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-[10px] font-black text-sky-500 uppercase ml-2 tracking-widest">Servicios</label>
+                <div class="bg-slate-800/50 border border-white/5 rounded-3xl p-4 max-h-32 overflow-y-auto custom-scrollbar grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {% for ser in servicios %}
+                    <label class="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-white/5 transition-all">
+                        <input type="checkbox" name="servicios" value="{{ ser.ser_id }}" class="rounded border-white/10 bg-slate-700 text-sky-500 focus:ring-sky-500" {{ 'checked' if ser.ser_id|string in request.args.getlist('servicios') }}>
+                        <span class="text-slate-200 text-[9px] font-black uppercase">{{ ser.ser_nombre }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-3">
+                <a href="{{ url_for('admin.gestion_historial') }}" class="w-full md:w-1/3 py-5 bg-slate-800 text-slate-400 rounded-3xl font-black uppercase tracking-[0.2em] text-center hover:bg-slate-700 transition-all text-xs">
+                    Limpiar Filtros
+                </a>
+                <button type="submit" class="w-full md:w-2/3 py-5 bg-sky-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-sky-500/20 flex items-center justify-center gap-3 hover:bg-sky-400">
                     <i class="fa-solid fa-magnifying-glass"></i> Procesar Consulta
                 </button>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
+</div>
 
     <div class="bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl backdrop-blur-sm">
         <div class="overflow-x-auto">
